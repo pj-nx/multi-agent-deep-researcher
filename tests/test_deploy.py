@@ -87,14 +87,7 @@ async def test_postgres_checkpointer_live(clean_env, monkeypatch, tmp_path):
             events = [e async for e in G.resume_with_plan(thread_id=tid, plan=True, graph=graph2)
                       if e[0] != "activity"]
             assert events[-1][0] == "report"
-            # the final checkpoint is committed shortly after the stream ends: poll briefly
-            import asyncio
-
-            for _ in range(40):
-                state = await graph2.aget_state({"configurable": {"thread_id": tid}})
-                if state.values.get("report"):
-                    break
-                await asyncio.sleep(0.1)
+            state = await graph2.aget_state({"configurable": {"thread_id": tid}})
             assert state.values["approved"] is True and state.values["report"]
         finally:
             await saver2.conn.close()

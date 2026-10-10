@@ -279,8 +279,11 @@ Each phase ends with something runnable. Estimated effort assumes evenings/weeke
   (lint + tests, then build the image and smoke `/api/health`).
 - Verified locally against a throwaway Postgres container and a local Chroma server: a plan interrupt written by
   one graph instance is resumed by a second one on the same database and the final state (report) lands in
-  Postgres shortly after the stream ends; evidence round-trips through Chroma over HTTP; the image builds and
-  serves `/api/health`. **Not done:** deploying to AWS/Vercel, which needs account credentials (none configured
+  Postgres; evidence round-trips through Chroma over HTTP; the image builds and serves `/api/health`.
+  Finding: checkpointers commit the final write slightly *after* `astream` yields its last chunk, so an
+  immediate resume on another instance could miss the interrupt and start over. `stream_until_interrupt` /
+  `resume_with_plan` now wait (≤5 s) until the checkpoint is readable before returning, which is what the
+  two-request API flow on serverless needs. **Not done:** deploying to AWS/Vercel, which needs account credentials (none configured
   here), and the Gradio UI is local-only by design (Settings page edits files).
 
 ### Phase 7 — Evals & polish (1 day)

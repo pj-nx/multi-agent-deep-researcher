@@ -333,6 +333,28 @@ async def _stream(graph: Any, inp: Any, cfg: dict[str, Any]) -> AsyncIterator[tu
             yield _event_for(node, update)
 
 
+async def _await_checkpoint(graph: Any, cfg: dict[str, Any], key: str, timeout: float = 5.0) -> None:
+    """Block until the thread's latest checkpoint contains ``key`` (or ``timeout`` passes).
+
+    Checkpointers commit the final write of a run slightly after ``astream`` yields its last chunk.
+    The API answers the plan request and the client may resume on another instance immediately, so
+    the checkpoint must be durable *before* we return; otherwise the resume starts a fresh run.
+    """
+    deadline = time.monotonic() + timeout
+    while True:
+        try:
+            state = await graph.aget_state(cfg)
+            if state and state.values.get(key) is not None:
+                return
+        except Exception as exc:  # noqa: BLE001 - transient read errors while the write lands
+            log.debug("checkpoint not readable yet: %s", exc)
+        if time.monotonic() > deadline:
+            log.warning("checkpoint with %r not visible after %.1fs (thread %s)", key, timeout,
+                        cfg["configurable"].get("thread_id"))
+            return
+        await asyncio.sleep(0.05)
+
+
 async def stream_until_interrupt(*, question: str, thread_id: str, max_hops: int = DEFAULT_MAX_HOPS,
                                  budget_seconds: int | None = None, config: dict[str, Any] | None = None,
                                  graph: Any = None) -> AsyncIterator[tuple[str, dict[str, Any]]]:
@@ -340,8 +362,10 @@ async def stream_until_interrupt(*, question: str, thread_id: str, max_hops: int
     deadline = time.time() + budget_seconds if budget_seconds else 0.0
     state: dict[str, Any] = {"question": question, "max_hops": max_hops, "deadline": deadline,
                              "evidence": [], "retrieval_log": [], "notes": []}
-    async for ev in _stream(graph, state, _config(thread_id, config)):
+    cfg = _config(thread_id, config)
+    async for ev in _stream(graph, state, cfg):
         yield ev
+    await _await_checkpoint(graph, cfg, "plan")
 
 
 async def resume_with_plan(*, thread_id: str, plan: dict[str, Any] | bool, budget_seconds: int | None = None,
@@ -354,3 +378,4 @@ async def resume_with_plan(*, thread_id: str, plan: dict[str, Any] | bool, budge
     resume = {"plan": plan} if isinstance(plan, dict) else True
     async for ev in _stream(graph, Command(resume=resume), cfg):
         yield ev
+    await _await_checkpoint(graph, cfg, "report")
