@@ -3,8 +3,8 @@ dark mode (near-black canvas, light type, the same green).
 
 One palette, used by the Gradio theme (component chrome, light + ``_dark`` variants), the extra CSS
 (layout details Gradio's theme variables do not reach, with ``.dark`` overrides) and the pipeline
-boxes (``pipeline_view.CSS``). Dark mode is toggled client-side by adding the ``dark`` class Gradio
-itself uses; the choice is remembered in ``localStorage`` (see ``THEME_INIT_JS`` / ``THEME_TOGGLE_JS``).
+boxes (``pipeline_view.CSS``). Dark mode is the default; the header toggle flips the ``dark`` class Gradio
+itself uses and the choice is remembered in ``localStorage`` (see ``THEME_INIT_JS`` / ``THEME_TOGGLE_JS``).
 """
 from __future__ import annotations
 
@@ -167,11 +167,11 @@ footer {{ display: none !important; }}
 .dark #dr-downloads button:hover {{ background: {DARK['green_dark']} !important; }}
 """
 
-# Runs once when the page loads: apply the remembered mode (or the OS preference) and set the label.
+# Runs once when the page loads: dark unless the user chose light; sets the toggle label.
 THEME_INIT_JS = """
 () => {
   const pref = localStorage.getItem('dr-theme');
-  const dark = pref ? pref === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const dark = pref !== 'light';
   document.body.classList.toggle('dark', dark);
   document.querySelector('.gradio-container')?.classList.toggle('dark', dark);
   return dark ? '☀ Light mode' : '☾ Dark mode';

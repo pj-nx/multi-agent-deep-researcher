@@ -87,7 +87,7 @@ async def test_plan_then_run_streams(tmp_path, monkeypatch):
     theme = build_theme()
     assert PALETTE["green"] in CSS and theme is not None
     assert theme.body_background_fill_dark == DARK["bg"] and ".dark #dr-report" in CSS
-    assert "localStorage" in THEME_TOGGLE_JS and "prefers-color-scheme" in THEME_INIT_JS
+    assert "localStorage" in THEME_TOGGLE_JS and "pref !== 'light'" in THEME_INIT_JS   # dark by default
     assert "dr-box active" in plan_updates[0][3]                       # planner box pulses while planning
     assert thread_id and "plan ready: 3 sub-questions" in log_text
     assert [r[0] for r in rows] == ["sq1", "sq2", "sq3"]

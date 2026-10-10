@@ -353,7 +353,7 @@ def build_app(graph: Any = None):
 
         with gr.Row():
             gr.Markdown("# Deep Researcher", elem_id="dr-header")
-            theme_btn = gr.Button("☾ Dark mode", variant="secondary", size="sm", elem_id="dr-theme-toggle")
+            theme_btn = gr.Button("☀ Light mode", variant="secondary", size="sm", elem_id="dr-theme-toggle")
         gr.Markdown("Multi-agent research: plan, retrieve, validate, analyse, synthesise, critique, report. "
                     "Every claim cites stored evidence.", elem_id="dr-sub")
         pipeline = gr.HTML(PipelineProgress().render())
