@@ -60,7 +60,7 @@ Or import the GitHub repo in the Vercel dashboard; pushes to `main` deploy autom
   honours `MAX_HOPS` / `RUN_BUDGET_SECONDS`.
 - The filesystem is ephemeral, so hosted runs use a Postgres checkpointer and a Chroma server /
   Chroma Cloud (or another hosted store) instead of SQLite + the local Chroma directory. A local
-  embedding model will not fit in a function, so set `EMBEDDINGS_PROVIDER=openai` there.
+  embedding model will not fit in a function, so set `EMBEDDINGS_PROVIDER=openrouter` there.
 - Human plan approval is split into two requests: `POST /api/research` returns the plan and a
   `thread_id`; `POST /api/research/{thread_id}/resume` continues from the checkpoint.
 
@@ -98,13 +98,16 @@ the default needs **no API key and no server**:
 
 | Provider | Default model | Install | Notes |
 |---|---|---|---|
-| `local` (default) | `BAAI/bge-small-en-v1.5` (384-d) | `uv sync --extra embeddings-local` | sentence-transformers on CPU (CPU-only torch is pinned via `tool.uv.sources`); set `EMBEDDINGS_DEVICE=cuda`/`mps` to use a GPU |
+| `local` (default) | `BAAI/bge-base-en-v1.5` (768-d) | `uv sync --extra embeddings-local` | sentence-transformers on CPU (CPU-only torch is pinned via `tool.uv.sources`); set `EMBEDDINGS_DEVICE=cuda`/`mps` to use a GPU |
+| `openrouter` | `baai/bge-base-en-v1.5` (768-d) | `uv sync --extra embeddings-openai` | **Same weights as `local`**: identical vectors (cosine 1.0 measured), so collections are portable between laptop and cloud. Uses `OPENROUTER_API_KEY`. $0.005 / M tokens. Use this on AWS / Vercel. |
 | `ollama` | `nomic-embed-text` | `uv sync --extra embeddings-ollama` | `ollama pull nomic-embed-text`; `EMBEDDINGS_BASE_URL` for a remote server |
-| `openai` | `text-embedding-3-small` | `uv sync --extra embeddings-openai` | any OpenAI-compatible endpoint via `EMBEDDINGS_BASE_URL` (OpenAI, OpenRouter, vLLM, LM Studio) |
+| `openai` | `text-embedding-3-small` | `uv sync --extra embeddings-openai` | OpenAI, or any OpenAI-compatible endpoint via `EMBEDDINGS_BASE_URL` (vLLM, LM Studio) |
 
-The store writes the embedding fingerprint (`provider:model[@dims]`) and vector dimension into
-the collection's metadata and refuses to open it with a different model, so you cannot mix
-embeddings in one collection by accident. Chunk ids are deterministic, so re-ingesting a source is
+The store writes the embedding fingerprint (canonical model name, e.g. `baai/bge-base-en-v1.5`,
+plus requested dimensions) and the vector dimension into the collection's metadata and refuses to
+open it with a different model, so you cannot mix embeddings in one collection by accident. The
+fingerprint is model-based rather than provider-based on purpose: `local` and `openrouter` serving
+the same model share a collection. Chunk ids are deterministic, so re-ingesting a source is
 an idempotent upsert. Chroma is embedded and single-writer; the same code talks to a Chroma server
 or Chroma Cloud by swapping the client.
 

@@ -21,7 +21,7 @@ summarisation over a large evidence corpus).
 | LLMs | **OpenRouter** via `langchain-openrouter` (`src/deep_researcher/llm.py`). Tiers: heavy `anthropic/claude-opus-5.5`, worker `anthropic/claude-sonnet-5`, cheap `anthropic/claude-haiku-4.5`; per-role env overrides, model fallbacks, provider routing | One key for every vendor; swap a role's model with an env var; fallbacks keep a run alive when a provider is down. |
 | Retrieval tools | arXiv API, Semantic Scholar API, Tavily (or Serper) web search, NewsAPI (or GDELT), Wikipedia, PDF fetcher (`pypdf`), optional domain APIs (e.g. FRED, Polygon) | Covers the four source types in the brief: papers, news, reports, APIs. |
 | Evidence store | **Chroma, embedded and persistent** (`CHROMA_PATH`) via `src/deep_researcher/store/` | Zero-ops, survives restarts, same client for Chroma server/cloud; every chunk carries `evidence_id`, `url`, `source_type`, `published_at`, `credibility`; collection is fingerprinted with the embedding model. |
-| Embeddings | **Local by default**: `BAAI/bge-small-en-v1.5` on CPU via `langchain-huggingface`; or Ollama (`nomic-embed-text`); or any OpenAI-compatible endpoint. `src/deep_researcher/embeddings.py` | Local dev needs no key for indexing; hosted runs switch provider with one env var. |
+| Embeddings | **Local by default**: `BAAI/bge-base-en-v1.5` on CPU via `langchain-huggingface`; **OpenRouter** serves the identical model for hosted runs (`EMBEDDINGS_PROVIDER=openrouter`, same `OPENROUTER_API_KEY` as the LLMs); Ollama or any OpenAI-compatible endpoint as alternatives. `src/deep_researcher/embeddings.py` | Local dev needs no key for indexing; hosted runs switch provider with one env var and keep the same vectors. |
 | Persistence | `SqliteSaver` checkpointer | Resume after human approval, re-run a failed node, inspect state per thread. |
 | Observability | LangSmith tracing via `src/deep_researcher/tracing.py` | Required to debug a 7-agent graph; also gives eval datasets. See §11. |
 | UI (local) | **Gradio** app (streaming node events + plan approval + report download) | Consistent with the course projects. CLI runner too. |
@@ -249,7 +249,7 @@ preview URL.
 | Long-running Gradio server | Vercel runs request-scoped functions, not servers | FastAPI in `api/index.py`, static UI in `public/` |
 | `SqliteSaver` on disk | Filesystem is ephemeral; only `/tmp` is writable and it does not survive invocations | `PostgresSaver` (`langgraph-checkpoint-postgres`) on Neon or Vercel Postgres |
 | Local Chroma directory | Same ephemeral-disk problem | Chroma server / Chroma Cloud via `chromadb.HttpClient`/`CloudClient` (same `EvidenceStore`), or Qdrant Cloud |
-| Local embedding model | Too large for a function bundle | `EMBEDDINGS_PROVIDER=openai` with an OpenAI-compatible endpoint |
+| Local embedding model | Too large for a function bundle | `EMBEDDINGS_PROVIDER=openrouter` (same bge-base model, same vectors, same key as the LLMs) |
 | Unbounded run time | Functions are capped: **300 s on Hobby**, 800 s on Pro (1800 s beta) | Stream SSE so the response starts immediately; cap `max_hops` per plan tier; for unlimited runs use Vercel Workflows or LangGraph Platform |
 | Human approval mid-run | A function cannot block waiting for a click | Two requests: `POST /api/research` runs to the `interrupt()` and returns the plan + `thread_id`; `POST /api/research/{thread_id}/resume` continues from the Postgres checkpoint |
 
@@ -347,12 +347,36 @@ codebase imports a vendor SDK.
 Implemented: `src/deep_researcher/embeddings.py`, `src/deep_researcher/store/` (Phase 1's
 `EvidenceStore` landed early because the API surface was needed to settle the schema).
 
-**Local embeddings by default.** `EMBEDDINGS_PROVIDER=local` runs `BAAI/bge-small-en-v1.5`
-(384-d, ~130 MB) through sentence-transformers on CPU. No key, no server; the model downloads once
+**Local embeddings by default.** `EMBEDDINGS_PROVIDER=local` runs `BAAI/bge-base-en-v1.5`
+(768-d, ~440 MB) through sentence-transformers on CPU. No key, no server; the model downloads once
 into the Hugging Face cache. `tool.uv.sources` pins CPU-only PyTorch on Linux so the install does
-not pull CUDA libraries. Alternatives: `ollama` (`nomic-embed-text`, 768-d) if an Ollama server is
-running, or `openai` for any OpenAI-compatible endpoint (OpenAI, OpenRouter, vLLM, LM Studio).
-Each is an optional extra so the API deployment stays slim.
+not pull CUDA libraries.
+
+**OpenRouter embeddings for hosted runs.** `EMBEDDINGS_PROVIDER=openrouter` calls OpenRouter's
+`/embeddings` endpoint with the same `OPENROUTER_API_KEY` the LLMs use. The default model is
+`baai/bge-base-en-v1.5`, i.e. the same weights as the local default. Measured on 2026-10-10: the
+hosted and local vectors agree to cosine 1.0000 on every test text, rankings are identical, and a
+query embedded remotely against a locally built index ranks correctly. Consequences:
+
+- One collection works from both environments; the fingerprint is the canonical model name, not the
+  provider, so no re-ingest is needed when moving between laptop and cloud.
+- The chunker's 1200-character chunks (~300 tokens) stay well under bge-base's 512-token window.
+- Cost is negligible: $0.005 per million tokens; a 500-chunk research run embeds for well under a cent.
+- The `langchain-openai` client is configured with `check_embedding_ctx_length=False` and
+  `tiktoken_enabled=False` so it sends raw strings (third-party endpoints reject tiktoken token
+  arrays and their model ids are unknown to tiktoken).
+- Trade-offs vs. local: ~4–5 s round trip for a small batch vs. 0.1 s locally after a ~27 s model
+  load; a network dependency; and the embedding provider is now the same vendor as the LLMs, which
+  concentrates outage risk. Note that falling back to a *different* model is not a drop-in
+  mitigation: a new model means a new collection, so pick the model deliberately and, if outage
+  tolerance matters, keep `local` available as the same-model fallback.
+
+Other OpenRouter embedding options checked against the live catalogue (33 models): `baai/bge-m3`
+(8k context, multilingual, $0.01/M), `qwen/qwen3-embedding-8b` (32k, $0.01/M),
+`openai/text-embedding-3-small` ($0.02/M), `voyageai/voyage-4-lite` ($0.02/M); `bge-small` is **not**
+offered, which is why the local default moved from small to base. Alternatives outside OpenRouter:
+`ollama` (`nomic-embed-text`) or `openai` for any OpenAI-compatible endpoint. Each is an optional
+extra so the API deployment stays slim.
 
 **Persistent store.** Embedded Chroma at `CHROMA_PATH` (default `.chroma/`, git-ignored).
 Rules enforced by `EvidenceStore`:
@@ -371,3 +395,52 @@ fingerprint check makes the old collection unusable with the new model on purpos
 **Hosted path.** Same `EvidenceStore` with `client=chromadb.HttpClient(...)` or `CloudClient(...)`,
 plus `EMBEDDINGS_PROVIDER=openai`. Qdrant remains the alternative if hybrid BM25 + dense search
 becomes a requirement (stretch §9).
+
+---
+
+## 14. Deployment on AWS
+
+Vercel's 300 s function cap is the main reason to prefer AWS. Two paths, one recommended.
+
+### Recommended: Lambda Event Function (container image) with a streaming Function URL
+
+| Concern | Decision | Why |
+|---|---|---|
+| Form factor | Lambda **Event Function**, On-Demand | Python rules out Lambda Web Functions (Node.js only); a course project is bursty with long idle gaps, so scale-to-zero beats Managed Instances |
+| Packaging | **Container image** (≤ 10 GB) | even without torch the LangChain stack exceeds the 250 MB zip limit; SnapStart supports Python container images to trim cold start |
+| HTTP front door | **Function URL in response-stream mode** via Lambda Web Adapter, CloudFront in front for a domain + WAF | real SSE; API Gateway's 30 s integration timeout would cut the stream |
+| Duration | sync ceiling **15 min** → `RUN_BUDGET_SECONDS≈840`, `MAX_HOPS=2` | 3× Vercel; the existing budget guard already ends hops early |
+| Checkpoints | Postgres (Aurora Serverless v2 / RDS) via `langgraph-checkpoint-postgres`, or DynamoDB | `/tmp` is ephemeral |
+| Vector store | **Amazon S3 Vectors** (cheapest, serverless) or a Chroma server on a small ECS task; same `EvidenceStore` API via a client swap | embedded Chroma cannot live on ephemeral disk |
+| Embeddings | **`EMBEDDINGS_PROVIDER=openrouter`** (§13) | identical vectors to local dev, no torch in the image (hundreds of MB and ~27 s cold start saved), one key for LLMs and embeddings |
+| LLMs | OpenRouter unchanged | — |
+| Secrets | `OPENROUTER_API_KEY`, `API_AUTH_TOKEN`, `DATABASE_URL`, `LANGSMITH_API_KEY` in Secrets Manager → Lambda env | never in the image |
+| IaC | CDK (Python) or SAM; GitHub Actions deploys from `main` | — |
+
+Request flow on AWS: browser → CloudFront → Function URL (streaming) → FastAPI → graph → Postgres +
+S3 Vectors; LangSmith traces flushed before return (already implemented).
+
+### Alternative: ECS Fargate behind an ALB
+
+Use when runs must exceed 15 min or the Gradio UI should be hosted. Long-lived uvicorn, no duration
+cap, one task can mount **EFS** and keep embedded Chroma exactly as local (single writer). The local
+embedding model is fine here, but `openrouter` is still the simpler choice: no model download at task
+start and portable collections. Cost: an always-on task (~$10–30/month at the smallest size) vs
+near-zero idle on Lambda. Zero code changes: Dockerfile + task definition.
+
+### Beyond 15 minutes on Lambda
+
+Split the design: the API enqueues a run, a worker executes the graph (Fargate, or Lambda Managed
+Instances for async executions up to 90 min), the client follows progress over an API Gateway
+WebSocket (or polls checkpoints). Deferred until a 15-minute budget proves too tight.
+
+### Env matrix
+
+| Variable | Local dev | AWS Lambda | AWS Fargate |
+|---|---|---|---|
+| `EMBEDDINGS_PROVIDER` | `local` | `openrouter` | `openrouter` (or `local`) |
+| `CHROMA_PATH` / store | `.chroma/` | S3 Vectors or Chroma server | EFS mount |
+| checkpointer | SQLite | Postgres / DynamoDB | Postgres (or SQLite on EFS) |
+| `RUN_BUDGET_SECONDS` | unlimited | 840 | unlimited |
+| `TRUST_PROXY_HEADERS` | false | true (CloudFront sets `x-forwarded-for`) | true (ALB) |
+| `API_AUTH_TOKEN` | optional | required | required |
