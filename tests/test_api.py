@@ -37,7 +37,8 @@ async def test_open_by_default_and_health_fields(monkeypatch):
     mod = _load_api(monkeypatch)
     async with _client(mod) as c:
         h = (await c.get("/api/health")).json()
-        assert h["auth_required"] is False and h["graph_wired"] is False
+        assert h["auth_required"] is False and h["graph_wired"] is True
+        assert h["sources"]["papers"]["active"] == ["arxiv", "semantic_scholar"]
         r = await c.post("/api/research", json={"question": "Does remote work help?"})
         assert r.status_code == 200
         body = r.text
@@ -174,7 +175,7 @@ async def test_resume_validates_plan_and_thread_id(monkeypatch):
         r = await c.post(f"/api/research/{tid}/resume", json={"plan": {
             "question": "Does remote work help?",
             "sub_questions": [{"id": "sq1", "question": "What do RCTs say?"}]}})
-        assert r.status_code == 501                       # valid, but graph not wired yet
+        assert r.status_code == 200 and "event: report" in r.text
 
 
 def _with_graph_module(monkeypatch, tmp_path, source: str):
@@ -191,28 +192,29 @@ def _with_graph_module(monkeypatch, tmp_path, source: str):
 
 def test_graph_available_distinguishes_missing_from_broken(monkeypatch, tmp_path, caplog, request):
     mod = _load_api(monkeypatch)
+    real = sys.modules.get("deep_researcher.graph")
 
-    def _cleanup():  # don't leak a "wired" graph into later tests
+    def _cleanup():  # restore the real graph module for later tests
         import deep_researcher
 
         mod._graph_available.cache_clear()
-        sys.modules.pop("deep_researcher.graph", None)
-        deep_researcher.__dict__.pop("graph", None)
+        if real is not None:
+            sys.modules["deep_researcher.graph"] = real
+            deep_researcher.graph = real
 
     request.addfinalizer(_cleanup)
-    assert mod._graph_available() is False          # genuinely missing: quiet
+    assert mod._graph_available() is True            # the real graph module
+
+    mod._graph_available.cache_clear()
+    monkeypatch.setitem(sys.modules, "deep_researcher.graph", None)   # => ModuleNotFoundError(name=...)
+    assert mod._graph_available() is False           # genuinely missing: quiet
     assert "graph" not in caplog.text
 
     mod._graph_available.cache_clear()
     _with_graph_module(monkeypatch, tmp_path, "raise RuntimeError('bug in graph')\n")
     with caplog.at_level("ERROR"):
-        assert mod._graph_available() is False      # broken: still degrades...
-    assert "failed to import" in caplog.text        # ...but loudly
-
-    mod._graph_available.cache_clear()
-    caplog.clear()
-    _with_graph_module(monkeypatch, tmp_path, "WIRED = True\n")
-    assert mod._graph_available() is True
+        assert mod._graph_available() is False       # broken: still degrades...
+    assert "failed to import" in caplog.text         # ...but loudly
 
 
 def test_requirements_cover_core_dependencies():

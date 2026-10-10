@@ -14,6 +14,7 @@ Invariants
 """
 from __future__ import annotations
 
+import functools
 import hashlib
 import logging
 import os
@@ -174,3 +175,15 @@ class EvidenceStore:
     def info(self) -> dict[str, Any]:
         return {"backend": "chroma", "path": self.path, "collection": self.collection_name,
                 "count": self.count(), "metadata": dict(self.collection.metadata or {})}
+
+
+@functools.cache
+def get_store() -> EvidenceStore:
+    """Process-wide store built from the configured embeddings (CHROMA_PATH / CHROMA_COLLECTION)."""
+    from deep_researcher import embeddings
+
+    return EvidenceStore(embeddings.get_embeddings(), embedding_id=embeddings.embedding_id())
+
+
+def reset_store_cache() -> None:
+    get_store.cache_clear()

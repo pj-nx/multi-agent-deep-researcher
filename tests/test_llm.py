@@ -53,24 +53,38 @@ def test_build_kwargs_routing(llm, monkeypatch):
     monkeypatch.setenv("OPENROUTER_ZDR", "true")
     kw = llm.build_kwargs("retriever")
     assert kw["model"] == "anthropic/claude-sonnet-5"
-    # primary first, duplicates removed
-    assert kw["model_kwargs"]["models"] == ["anthropic/claude-sonnet-5", "openai/gpt-5.1"]
-    assert kw["openrouter_provider"] == {"order": ["anthropic", "google-vertex"], "allow_fallbacks": False, "zdr": True}
+    # primary first, duplicates removed; routing travels in the OpenRouter-specific request body
+    assert kw["extra_body"]["models"] == ["anthropic/claude-sonnet-5", "openai/gpt-5.1"]
+    assert kw["extra_body"]["provider"] == {"order": ["anthropic", "google-vertex"], "allow_fallbacks": False,
+                                            "zdr": True}
     assert kw["temperature"] == 0.0 and "role:retriever" in kw["tags"]
+    assert kw["default_headers"]["X-OpenRouter-Title"]
 
 
-def test_make_llm_constructs_chat_openrouter(llm, monkeypatch):
+def test_make_llm_constructs_chat_openai_bound_to_openrouter(llm, monkeypatch):
     monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-test")
     monkeypatch.setenv("OPENROUTER_APP_TITLE", "Unit Test")
     model = llm.make_llm("insight", temperature=0.9)
-    from langchain_openrouter import ChatOpenRouter
-    assert isinstance(model, ChatOpenRouter)
+    from langchain_openai import ChatOpenAI
+    assert isinstance(model, ChatOpenAI)
     assert model.model_name == "anthropic/claude-opus-5.5"
-    assert model.openrouter_api_base == "https://openrouter.ai/api/v1"
-    assert model.openrouter_api_key.get_secret_value() == "sk-or-test"
-    assert model.app_title == "Unit Test"
+    assert model.openai_api_base == "https://openrouter.ai/api/v1"
+    assert model.openai_api_key.get_secret_value() == "sk-or-test"
+    assert model.default_headers["X-OpenRouter-Title"] == "Unit Test"
     assert model.temperature == 0.9
     assert model.metadata["role"] == "insight"
+
+
+def test_structured_uses_json_schema_method(llm):
+    captured = {}
+
+    class Fake:
+        def with_structured_output(self, schema, **kw):
+            captured.update(schema=schema, **kw)
+            return "bound"
+
+    assert llm.structured(Fake(), dict) == "bound"
+    assert captured == {"schema": dict, "method": "json_schema"}
 
 
 def test_get_llm_caches_without_overrides(llm, monkeypatch):

@@ -3,6 +3,15 @@
 OpenRouter exposes hundreds of models behind one OpenAI-compatible endpoint, so the
 project needs a single key (``OPENROUTER_API_KEY``) and can mix vendors per role.
 
+Transport: ``langchain-openai``'s ``ChatOpenAI`` with ``base_url`` set to OpenRouter. The dedicated
+``langchain-openrouter`` package was tried first and dropped: its bundled SDK hung indefinitely on
+``ainvoke`` (event loop idle, our timeout never propagated) while raw HTTP to the same endpoint
+answered in ~2 s. OpenRouter-specific routing (fallback ``models``, ``provider`` preferences) goes
+through ``extra_body``; attribution headers through ``default_headers``.
+
+Structured output: use ``with_structured_output(schema, method="json_schema")``. OpenRouter's
+Anthropic route rejected the ``function_calling`` method for Opus with a provider 400 (verified).
+
 Roles map to cost tiers; each can be overridden by environment variable:
 
     OPENROUTER_MODEL_HEAVY   planner, analysis, insight, critic   (default anthropic/claude-opus-5.5)
@@ -122,44 +131,59 @@ def fallback_models() -> list[str]:
     return _env_list("OPENROUTER_FALLBACK_MODELS")
 
 
+STRUCTURED_OUTPUT_METHOD = "json_schema"
+
+
+def attribution_headers() -> dict[str, str]:
+    return {
+        "HTTP-Referer": os.getenv("OPENROUTER_APP_URL", DEFAULT_APP_URL),
+        "X-OpenRouter-Title": os.getenv("OPENROUTER_APP_TITLE", DEFAULT_APP_TITLE),
+    }
+
+
 def build_kwargs(role: str, **overrides: Any) -> dict[str, Any]:
-    """Keyword arguments for ChatOpenRouter. Pure function; no network, no import of langchain."""
+    """Keyword arguments for ChatOpenAI (pointed at OpenRouter). Pure; no network, no langchain import."""
     if role not in ROLE_TIER:
         raise LLMConfigError(f"unknown role {role!r}; expected one of {ROLES}")
     model = overrides.pop("model", None) or model_for(role)
-    model_kwargs: dict[str, Any] = dict(overrides.pop("model_kwargs", {}) or {})
-    if (fb := fallback_models()) and "models" not in model_kwargs:
-        model_kwargs["models"] = [model, *[m for m in fb if m != model]]
+    extra_body: dict[str, Any] = dict(overrides.pop("extra_body", {}) or {})
+    if (fb := fallback_models()) and "models" not in extra_body:
+        extra_body["models"] = [model, *[m for m in fb if m != model]]
+    if (prefs := provider_preferences()) and "provider" not in extra_body:
+        extra_body["provider"] = prefs
     kwargs: dict[str, Any] = {
         "model": model,
         "temperature": ROLE_TEMPERATURE[role],
         "max_tokens": ROLE_MAX_TOKENS[role],
-        "max_retries": 3,
+        "max_retries": 2,
         "timeout": 120,
-        "app_url": os.getenv("OPENROUTER_APP_URL", DEFAULT_APP_URL),
-        "app_title": os.getenv("OPENROUTER_APP_TITLE", DEFAULT_APP_TITLE),
+        "default_headers": attribution_headers(),
         "tags": [f"role:{role}", "openrouter"],
         "metadata": {"role": role, "model": model, "provider": PROVIDER},
     }
-    if prefs := provider_preferences():
-        kwargs["openrouter_provider"] = prefs
-    if model_kwargs:
-        kwargs["model_kwargs"] = model_kwargs
+    if extra_body:
+        kwargs["extra_body"] = extra_body
     kwargs.update(overrides)
     return kwargs
 
 
 def make_llm(role: str, **overrides: Any):
-    """Construct a fresh ChatOpenRouter for ``role``. Raises LLMConfigError without a key."""
+    """Construct a fresh ChatOpenAI bound to OpenRouter for ``role``. Raises LLMConfigError without a key."""
     if not enabled():
         raise LLMConfigError(
             "OPENROUTER_API_KEY is not set. Get a key at https://openrouter.ai/keys and add it to .env "
-            "(or the Vercel project settings)."
+            "(or the deployment's secrets)."
         )
-    from langchain_openrouter import ChatOpenRouter
+    from langchain_openai import ChatOpenAI
 
     kwargs = build_kwargs(role, **overrides)
-    return ChatOpenRouter(api_key=api_key(), base_url=base_url(), **kwargs)
+    return ChatOpenAI(api_key=api_key(), base_url=base_url(), **kwargs)
+
+
+def structured(llm: Any, schema: Any, **kwargs: Any):
+    """``with_structured_output`` with the method OpenRouter's Anthropic route accepts."""
+    kwargs.setdefault("method", STRUCTURED_OUTPUT_METHOD)
+    return llm.with_structured_output(schema, **kwargs)
 
 
 @functools.cache

@@ -164,20 +164,20 @@ Dependencies: `langgraph`, `langgraph-checkpoint-sqlite`, `langchain`, `langchai
 
 Each phase ends with something runnable. Estimated effort assumes evenings/weekends.
 
-### Phase 0 — Skeleton (½ day)
-- `uv init`, deps, `.env.example`, config, schemas, state + reducers.
-- Fake-LLM smoke test that the graph compiles and `Send` fan-out/fan-in works.
+### Phase 0 — Skeleton (½ day) — DONE 2026-10-10
+- deps, `.env.example`, schemas (plan, evidence, summary, contradiction, gap, insight, critique), `state.py` with reducers.
+- `graph.py` compiles the full topology (plan → approve/interrupt → `Send` fan-out → analyze → gap loop → insight → critic → report) with placeholder analysis nodes; fake-LLM/fake-tool test proves fan-out, interrupt/resume with an edited plan, budget stop and store writes (`tests/test_graph.py`).
 
-### Phase 1 — Retrieval layer (1–2 days)
-- Implement tools (arXiv, Semantic Scholar, Tavily, NewsAPI, Wikipedia, PDF).
-- `EvidenceStore`: chunk → embed → upsert with metadata; URL + near-duplicate dedup.
-- Retriever agent as a ReAct subgraph; run it standalone on one sub-question and inspect Chroma.
-- Unit tests for store and dedup.
+### Phase 1 — Retrieval layer (1–2 days) — DONE 2026-10-10 (deterministic retriever)
+- Tools: arXiv, Semantic Scholar, Tavily (+ reports mode), NewsAPI → GDELT fallback, Wikipedia, PDF/HTML fetcher; registry with per-source policies and env-driven enablement (`tools/`). Live-checked: arXiv, Wikipedia, PDF fetch OK; Semantic Scholar keyless and GDELT frequently 429 → empty result, never fatal.
+- `EvidenceStore`: 512-token chunks, 256-d vectors, URL-normalised dedup, idempotent upsert.
+- Retriever node is **deterministic** (all enabled tools for the sub-question's source types, in parallel, de-duplicated, stored). The ReAct variant (model reformulates queries) is deferred: it adds cost and nondeterminism without changing the state contract.
+- Planner (structured `ResearchPlan`, ids normalised) and `interrupt()` approval were pulled forward from Phase 2 so the pipeline runs end to end; CLI `python -m deep_researcher` with `--auto-approve`.
+- **Live run findings (2026-10-10, keyless sources + local embeddings):** 6 sub-questions, 6 parallel retrievers, 25 sources / 24 chunks stored, report written in ~3.5 min. Problems found and fixed the same day: (1) search APIs returned junk for the planner's long sentences → planner now emits short keyword `search_queries` and the retriever runs them; (2) GDELT rejects `or`/parentheses → query sanitiser; (3) a rate-limited tool stalled a branch → per-tool timeout (45 s); (4) the aiosqlite checkpointer thread kept the process alive after the run → `graph.aclose()` on CLI exit and API shutdown; (5) Wikipedia/arXiv keyword matches were often off-topic → lexical relevance gate (`min_relevance`, share of sub-question keywords present) as a stopgap for the Phase 3 Source Validator. After fixes: 68 s wall, 6 parallel branches, ~45 sources kept, roughly half on-topic with keyless sources. Remaining limitation: without keys, `papers` = arXiv only (weak outside STEM) and Semantic Scholar 429s; add `SEMANTIC_SCHOLAR_API_KEY` / `TAVILY_API_KEY` for real coverage.
 
-### Phase 2 — Planner + Retriever fan-out + approval (1 day)
-- Planner with structured `ResearchPlan`; `interrupt()` approval; `SqliteSaver`.
-- Fan-out via `Send`; verify N retrievers run in parallel in LangSmith.
-- CLI runner with `--auto-approve` flag.
+### Phase 2 — Planner + Retriever fan-out + approval (1 day) — mostly DONE
+- Done: planner, `interrupt()` approval (edit or accept), `AsyncSqliteSaver`, `Send` fan-out, CLI with `--auto-approve`.
+- Remaining: verify parallelism in a LangSmith trace; optional ReAct retriever for query reformulation; dependency-aware ordering (`depends_on`) so dependent sub-questions see earlier evidence.
 
 ### Phase 3 — Critical Analysis + multi-hop loop (1–2 days)
 - Source Validator grading.
@@ -323,6 +323,13 @@ Conventions:
 
 Implemented in `src/deep_researcher/llm.py`. Every agent calls `get_llm(role)`; nothing else in the
 codebase imports a vendor SDK.
+
+**Transport (changed 2026-10-10):** `langchain-openai`'s `ChatOpenAI` with `base_url` =
+OpenRouter. The dedicated `langchain-openrouter` package was dropped after its bundled SDK hung
+indefinitely on async calls (event loop idle, timeout not propagated) while raw HTTP to the same
+endpoint answered in ~2 s. Routing extras (`models` fallbacks, `provider` prefs) go in `extra_body`.
+Structured output must use `method="json_schema"`; `function_calling` returned a provider 400 on
+Opus via OpenRouter's Anthropic route. Use `llm.structured(model, Schema)`.
 
 - **Why**: one API key covers Anthropic, OpenAI, Google, DeepSeek and others; per-role model choice
   is an env var; OpenRouter's `models` fallback list and `provider` routing keep a multi-minute

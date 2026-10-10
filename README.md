@@ -10,8 +10,10 @@ cited report.
 Showcases **agent collaboration**, **retrieval-augmented reasoning** (every claim cites a stored
 evidence ID that is verified before the report ships) and **long-context synthesis**.
 
-**Status:** planning + deployable skeleton. See [PLAN.md](PLAN.md) for the full design, agent
-roster, graph, phases and Vercel architecture.
+**Status:** the pipeline runs end to end. Planner (LLM, structured output) → human approval →
+parallel retrievers over real sources → persistent vector store → evidence digest report. The
+analysis, insight, critic and report agents are placeholders that keep the state contract; Phases
+3-4 replace them one node at a time. See [PLAN.md](PLAN.md) for the design and phase status.
 
 ## Architecture
 
@@ -31,14 +33,40 @@ flowchart LR
 ## Quick start (local)
 
 ```bash
-uv sync --extra dev
-cp .env.example .env            # fill in keys
-uv run uvicorn api.index:app --reload
-# open http://localhost:8000/api/health
+uv sync --extra dev --extra vectordb --extra embeddings-local
+cp .env.example .env            # OPENROUTER_API_KEY is the only required key
+uv run python -m deep_researcher "Does the four-day week raise productivity?" --auto-approve
 ```
 
-The Gradio UI (`app/gradio_app.py`) and the LangGraph graph (`src/deep_researcher/`) land in
-Phases 1–5 of the plan.
+The CLI prints each agent event, writes the report to `reports/`, and without `--auto-approve`
+shows the planner's sub-questions and asks before retrieving. The same graph serves the API:
+
+```bash
+uv run uvicorn api.index:app --reload     # http://localhost:8000/api/health, UI at public/index.html
+```
+
+## Sources
+
+Which tools run is decided per sub-question from the planner's `source_types`, and per tool by
+whether its key is present (`/api/health` → `sources`). Keyless tools are always on.
+
+| `source_type` | Tool | Key | Notes |
+|---|---|---|---|
+| `papers` | arXiv | none | abstracts + PDF links; 1 request / 3 s |
+| `papers` | Semantic Scholar | optional `SEMANTIC_SCHOLAR_API_KEY` | the keyless pool returned 429 on every call in testing; request a free key, it is the right source for social-science papers (arXiv is not) |
+| `web` | Tavily | `TAVILY_API_KEY` | general web search |
+| `reports` | Tavily (reports mode) | `TAVILY_API_KEY` | steered to reports/whitepapers/PDFs |
+| `news` | NewsAPI → GDELT | `NEWSAPI_KEY` optional | NewsAPI when the key is set, otherwise GDELT (keyless, titles only, 1 request / 5 s, strict query syntax: the tool sanitises queries to plain keywords) |
+| `wikipedia` | Wikipedia | none | search + intro extracts |
+| `api` | none built in | per service | `tools.register("api", YourTool)` for FRED, Polygon, etc. |
+
+The planner emits 2-3 short keyword `search_queries` per sub-question; the retriever runs each of
+them against every enabled tool (bounded by a per-tool timeout), de-duplicates by URL, embeds and
+stores. `RETRIEVAL_FETCH_FULL_TEXT=true` additionally fetches PDFs and pages for short results
+(GDELT titles, arXiv PDFs) via `tools/fetch.py` (size- and page-capped, best effort).
+
+**For useful results on non-CS topics, add `TAVILY_API_KEY` and `SEMANTIC_SCHOLAR_API_KEY`.** With
+only the keyless sources, `papers` means arXiv, which is thin outside maths/physics/CS.
 
 ## Deploy to Vercel
 
@@ -67,8 +95,9 @@ Or import the GitHub repo in the Vercel dashboard; pushes to `main` deploy autom
 ## LLM provider: OpenRouter
 
 All agents get their chat model from [`src/deep_researcher/llm.py`](src/deep_researcher/llm.py),
-which routes through [OpenRouter](https://openrouter.ai). One key, any vendor, per-role model
-choice, automatic fallbacks.
+which routes through [OpenRouter](https://openrouter.ai) using LangChain's OpenAI-compatible
+`ChatOpenAI` client with OpenRouter's base URL. One key, any vendor, per-role model choice,
+automatic fallbacks. Structured output uses the `json_schema` method (`llm.structured(...)`).
 
 ```bash
 OPENROUTER_API_KEY=sk-or-...
@@ -174,11 +203,12 @@ public and never exposes secrets.
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/api/health` | liveness + whether the graph is wired |
+| GET | `/api/health` | liveness, graph/tracing/llm/embeddings/chunking config, enabled sources |
 | POST | `/api/research` | `{question, max_hops?}` → SSE stream until plan approval |
 | POST | `/api/research/{thread_id}/resume` | `{plan: ResearchPlan}` → SSE stream to final report |
 
-SSE events: `started` (with `trace_url`), `plan`, agent events, `error`, `done`.
+SSE events: `started` (with `trace_url`), `plan` (awaiting approval), one `retrieve` per sub-question (parallel),
+`analyze`, `insight`, `critic`, `report` (Markdown in `report`), `error`, `done`.
 
 ## License
 

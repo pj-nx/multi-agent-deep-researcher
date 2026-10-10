@@ -31,6 +31,7 @@ import time
 import uuid
 from collections import defaultdict, deque
 from collections.abc import AsyncIterator, Callable, Iterable
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
@@ -46,11 +47,21 @@ from starlette.types import Receive, Scope, Send
 from deep_researcher import embeddings, llm, tracing
 from deep_researcher.schemas import ResearchPlan
 from deep_researcher.store import chunking
+from deep_researcher.tools import registry as tool_registry
 
 log = logging.getLogger("deep_researcher.api")
 tracing.configure()
 
-app = FastAPI(title="Deep Researcher API", version="0.1.0")
+@asynccontextmanager
+async def _lifespan(_: FastAPI):
+    yield
+    if _graph_available():
+        from deep_researcher.graph import aclose
+
+        await aclose()
+
+
+app = FastAPI(title="Deep Researcher API", version="0.1.0", lifespan=_lifespan)
 
 
 def _env_int(name: str, default: int) -> int:
@@ -247,6 +258,7 @@ async def health() -> dict:
                       "collection": os.getenv("CHROMA_COLLECTION") or "evidence"},
         "chunking": {"size": chunking.default_chunk_size(), "overlap": chunking.default_chunk_overlap(),
                      "unit": chunking.default_chunk_unit()},
+        "sources": tool_registry.info(),
     }
 
 

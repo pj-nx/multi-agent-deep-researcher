@@ -1,8 +1,9 @@
 """Pydantic models shared by the API and the graph.
 
-Plan and evidence models exist so far; Summary, Contradiction, Insight and Critique
-arrive with their phases (see PLAN.md §3). Bounds are deliberate: these objects cross the HTTP
-boundary, so they cap payload size and shape before anything reaches a graph node.
+Plan, evidence and the analysis/insight/critique records. Later phases fill them in; the shapes
+are fixed here so the graph state and API contract do not churn (see PLAN.md §3). Bounds are
+deliberate: these objects cross the HTTP boundary, so they cap payload size and shape before
+anything reaches a graph node.
 """
 from __future__ import annotations
 
@@ -17,6 +18,8 @@ class SubQuestion(BaseModel):
     id: str = Field(min_length=1, max_length=32, pattern=r"^[A-Za-z0-9_.-]+$")
     question: str = Field(min_length=5, max_length=1000)
     source_types: list[SourceType] = Field(default_factory=lambda: ["web"], max_length=6)
+    search_queries: list[str] = Field(default_factory=list, max_length=5,
+                                      description="2-3 short keyword queries (<= 8 words) for search APIs")
     depends_on: list[str] = Field(default_factory=list, max_length=10)
     rationale: str | None = Field(default=None, max_length=1000)
 
@@ -57,3 +60,54 @@ class ResearchPlan(BaseModel):
     @property
     def open_questions(self) -> list[SubQuestion]:
         return list(self.sub_questions)
+
+
+class Claim(BaseModel):
+    text: str = Field(min_length=1, max_length=1000)
+    evidence_ids: list[str] = Field(min_length=1, max_length=20)
+    confidence: float = Field(default=0.5, ge=0.0, le=1.0)
+
+
+class Summary(BaseModel):
+    """Critical-analysis output for one sub-question."""
+
+    sub_question_id: str = Field(min_length=1, max_length=32)
+    summary: str = Field(min_length=1, max_length=6000)
+    claims: list[Claim] = Field(default_factory=list, max_length=40)
+    evidence_ids: list[str] = Field(default_factory=list, max_length=200)
+
+
+class Contradiction(BaseModel):
+    sub_question_id: str = Field(min_length=1, max_length=32)
+    claim_a: str = Field(min_length=1, max_length=1000)
+    claim_b: str = Field(min_length=1, max_length=1000)
+    evidence_ids_a: list[str] = Field(min_length=1, max_length=20)
+    evidence_ids_b: list[str] = Field(min_length=1, max_length=20)
+    explanation: str = Field(default="", max_length=2000)
+
+
+class Gap(BaseModel):
+    """A follow-up question the analysis could not answer from current evidence (drives multi-hop)."""
+
+    parent_sub_question_id: str = Field(min_length=1, max_length=32)
+    question: str = Field(min_length=5, max_length=1000)
+    source_types: list[SourceType] = Field(default_factory=lambda: ["web"], max_length=6)
+    reason: str = Field(default="", max_length=1000)
+
+
+class ReasoningStep(BaseModel):
+    step: str = Field(min_length=1, max_length=1000)
+    evidence_ids: list[str] = Field(default_factory=list, max_length=20)
+
+
+class Insight(BaseModel):
+    hypothesis: str = Field(min_length=1, max_length=1500)
+    reasoning: list[ReasoningStep] = Field(min_length=1, max_length=12)
+    confidence: float = Field(ge=0.0, le=1.0)
+    falsifier: str = Field(default="", max_length=1000)   # what evidence would refute it
+
+
+class Critique(BaseModel):
+    verdict: Literal["accept", "revise", "need_more_evidence"]
+    issues: list[str] = Field(default_factory=list, max_length=20)
+    follow_up: list[Gap] = Field(default_factory=list, max_length=6)
