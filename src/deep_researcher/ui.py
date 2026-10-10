@@ -194,7 +194,7 @@ def build_app(graph: Any = None):
                               autoscroll=True)
         gr.Markdown("### 2. Review the plan (edit cells, clear a question to drop it), then approve")
         plan_table = gr.Dataframe(headers=PLAN_HEADERS, datatype=["str"] * 5, type="array", interactive=True,
-                                  row_count=(0, "dynamic"), col_count=(5, "fixed"), wrap=True,
+                                  row_count=(0, "dynamic"), column_count=(5, "fixed"), wrap=True,
                                   column_widths=["7%", "43%", "15%", "25%", "10%"], label="Plan")
         with gr.Row():
             run_btn = gr.Button("3. Approve & run", variant="primary")

@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "ui",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "python", "-m", "deep_researcher.ui"],
+      "port": 7860
+    },
+    {
+      "name": "api",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "uvicorn", "api.index:app", "--port", "8000"],
+      "port": 8000
+    }
+  ]
+}
