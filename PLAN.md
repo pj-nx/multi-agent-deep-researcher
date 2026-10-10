@@ -291,11 +291,21 @@ Each phase ends with something runnable. Estimated effort assumes evenings/weeke
   two-request API flow on serverless needs. **Not done:** deploying to AWS/Vercel, which needs account credentials (none configured
   here), and the Gradio UI is local-only by design (Settings page edits files).
 
-### Phase 7 — Evals & polish (1 day)
-- 10 seeded questions in `evals/questions.jsonl`.
-- Judges: groundedness (every claim cites a real evidence ID whose text supports it),
-  coverage (expected facets present), contradiction recall on seeded cases.
-- README with architecture diagram, demo GIF, cost/time per run.
+### Phase 7 — Evals & polish (1 day) — DONE 2026-10-11
+- 10 seeded questions in `evals/questions.jsonl` (`EvalCase`: question, expected facets, seeded
+  contradiction hint, tags, optional per-case hop override).
+- Judges in `src/deep_researcher/evals/judges.py`: citation integrity (deterministic), groundedness
+  (ids checked, then the `grader` model reads each claim against its cited source text; partial = 0.5),
+  coverage (expected facets present; keyword fallback), contradiction recall (1.0 when the found
+  contradiction matches the hint, 0.5 otherwise, n/a when none seeded). Model halves degrade to
+  deterministic checks without a key.
+- Runner (`runner.py`, CLI `python -m deep_researcher.evals run|judge|list|langsmith`): plan →
+  auto-approve → report through the real graph, tokens per model from `llm_end` activity events, cost
+  from OpenRouter's live prices, results folder with per-case `.eval.json` + `summary.md`. `judge`
+  scores existing report JSON. LangSmith glue (`langsmith_evals.py`): dataset upload and
+  `aevaluate` with the judges as evaluators.
+- README: architecture diagram, UI screenshot (`docs/ui.png`), evaluation section with cost/time per
+  run from the baseline suite run. A demo GIF was not recorded.
 
 ---
 

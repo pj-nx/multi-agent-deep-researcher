@@ -1,0 +1,117 @@
+{
+  "case_id": "congestion-charges",
+  "question": "Do urban congestion charges reduce air pollution without harming local businesses?",
+  "ok": true,
+  "error": null,
+  "thread_id": "60c0fcbd-a666-4e83-8b02-bebb1a5ca6af",
+  "plan_seconds": 65.4,
+  "run_seconds": 703.3,
+  "judge_seconds": 37.9,
+  "usage": {
+    "models": {
+      "deepseek/deepseek-v4-pro": {
+        "calls": 13,
+        "input_tokens": 38318,
+        "output_tokens": 37084
+      },
+      "anthropic/claude-haiku-4.5": {
+        "calls": 10,
+        "input_tokens": 22213,
+        "output_tokens": 13798
+      },
+      "anthropic/claude-sonnet-5": {
+        "calls": 1,
+        "input_tokens": 8101,
+        "output_tokens": 1154
+      }
+    }
+  },
+  "est_cost_usd": 0.142432,
+  "stats": {
+    "retrieved": 62,
+    "kept": 17,
+    "dropped": 45,
+    "claims": 25,
+    "contradictions": 1,
+    "gaps": 21,
+    "gaps_pursued": 4,
+    "citations_verified": 6,
+    "citations_removed": 0,
+    "embedding_id": "snowflake/snowflake-arctic-embed-m-v1.5@256",
+    "hops": 1,
+    "languages": [
+      "en"
+    ],
+    "filtered_language": 0
+  },
+  "sub_questions": 7,
+  "judges": {
+    "citation_integrity": {
+      "name": "citation_integrity",
+      "score": 1.0,
+      "mode": "deterministic",
+      "details": {
+        "citations": 53,
+        "invalid": [],
+        "sources": 17
+      }
+    },
+    "groundedness": {
+      "name": "groundedness",
+      "score": 1.0,
+      "mode": "structural",
+      "details": {
+        "claims": 25,
+        "structurally_valid": 25,
+        "error": "LengthFinishReasonError: Could not parse response content as the length limit was reached - CompletionUsage(completion_tokens=2000, prompt_tokens=13755, total_tokens=15755, completion_t"
+      }
+    },
+    "coverage": {
+      "name": "coverage",
+      "score": 0.5,
+      "mode": "model",
+      "details": {
+        "facets": [
+          {
+            "facet": "pollutant or traffic reductions in London, Stockholm, Singapore or Milan",
+            "covered": false,
+            "where": "The report mentions London, Stockholm, Singapore, and Milan only in historical background (sq1) describing these schemes, but provides no data on pollutant or traffic reductions in any of these four c",
+            "keyword_share": 1.0
+          },
+          {
+            "facet": "effects on retail sales, footfall or business closures",
+            "covered": true,
+            "where": "Section sq3 discusses London's 2003 congestion charge effect on John Lewis Oxford Street retail sales: 'Both models found a statistically significant drop in sales after the charge was introduced on 1",
+            "keyword_share": 1.0
+          },
+          {
+            "facet": "traffic displacement to areas outside the charging zone",
+            "covered": false,
+            "where": "The report mentions air quality 'spillover benefits across the five boroughs and the wider metro area' in NYC but does not substantively discuss traffic displacement to areas outside charging zones. S",
+            "keyword_share": 0.67
+          },
+          {
+            "facet": "health outcomes attributed to the schemes",
+            "covered": true,
+            "where": "Section sq2 addresses health outcomes: 'morning rush-hour improvements in PM1.0 and PM2.5 were partly offset by compensatory increases during off-peak hours, leading to no detectable overall daily res",
+            "keyword_share": 0.75
+          }
+        ]
+      }
+    },
+    "contradiction_recall": {
+      "name": "contradiction_recall",
+      "score": 1.0,
+      "mode": "model",
+      "details": {
+        "found": 1,
+        "matches_hint": true,
+        "reason": "The contradiction found addresses the 'mixed or null findings on pollutant concentrations' part of the expected disagreement. Position A shows substantial PM2.5 reductions (22% in NYC), while Position B shows negligible reductions (0.01% in Italian corridor), directly representing the mixed/contradi"
+      }
+    }
+  },
+  "total_seconds": 768.7,
+  "total_tokens": 120668,
+  "llm_calls": 24,
+  "mean_score": 0.875
+}

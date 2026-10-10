@@ -1,0 +1,116 @@
+{
+  "case_id": "intermittent-fasting",
+  "question": "Does intermittent fasting outperform continuous calorie restriction for long-term weight maintenance?",
+  "ok": true,
+  "error": null,
+  "thread_id": "9ded8e4c-4a95-4385-8198-9f3e94ae4047",
+  "plan_seconds": 29.0,
+  "run_seconds": 605.5,
+  "judge_seconds": 30.6,
+  "usage": {
+    "models": {
+      "deepseek/deepseek-v4-pro": {
+        "calls": 12,
+        "input_tokens": 24458,
+        "output_tokens": 32776
+      },
+      "anthropic/claude-haiku-4.5": {
+        "calls": 9,
+        "input_tokens": 21331,
+        "output_tokens": 13691
+      },
+      "anthropic/claude-sonnet-5": {
+        "calls": 1,
+        "input_tokens": 7044,
+        "output_tokens": 3275
+      }
+    }
+  },
+  "est_cost_usd": 0.155418,
+  "stats": {
+    "retrieved": 57,
+    "kept": 16,
+    "dropped": 41,
+    "claims": 10,
+    "contradictions": 1,
+    "gaps": 28,
+    "gaps_pursued": 4,
+    "citations_verified": 11,
+    "citations_removed": 0,
+    "embedding_id": "snowflake/snowflake-arctic-embed-m-v1.5@256",
+    "hops": 1,
+    "languages": [
+      "en"
+    ],
+    "filtered_language": 0
+  },
+  "sub_questions": 6,
+  "judges": {
+    "citation_integrity": {
+      "name": "citation_integrity",
+      "score": 1.0,
+      "mode": "deterministic",
+      "details": {
+        "citations": 54,
+        "invalid": [],
+        "sources": 11
+      }
+    },
+    "groundedness": {
+      "name": "groundedness",
+      "score": 1.0,
+      "mode": "structural",
+      "details": {
+        "claims": 10,
+        "structurally_valid": 10,
+        "error": "LengthFinishReasonError: Could not parse response content as the length limit was reached - CompletionUsage(completion_tokens=2000, prompt_tokens=6273, total_tokens=8273, completion_tok"
+      }
+    },
+    "coverage": {
+      "name": "coverage",
+      "score": 0.75,
+      "mode": "model",
+      "details": {
+        "facets": [
+          {
+            "facet": "head-to-head randomised trials of fasting versus daily restriction",
+            "covered": true,
+            "where": "An 8-week randomized trial in adults with metabolic syndrome found that modified alternate-day fasting produced greater reductions in body weight and fasting plasma glucose than CCR, though only short",
+            "keyword_share": 0.67
+          },
+          {
+            "facet": "adherence and dropout rates",
+            "covered": true,
+            "where": "One review reports a numeric adherence advantage for IF over continuous energy restriction (78% vs 65%); however, no dropout rates for IF versus CCR in long-term interventions were found in the eviden",
+            "keyword_share": 1.0
+          },
+          {
+            "facet": "metabolic markers beyond body weight",
+            "covered": true,
+            "where": "An 8-week RCT found that modified alternate-day fasting produced greater reductions in fasting plasma glucose than CCR, with no differences in insulin, HOMA-IR, or lipids. A meta-analysis reported a d",
+            "keyword_share": 0.8
+          },
+          {
+            "facet": "follow-up of twelve months or longer",
+            "covered": false,
+            "where": "No randomized controlled trials comparing IF to CCR with weight outcomes measured at one year or longer were identified in the evidence base; the evidentiary gap is the central finding of this review.",
+            "keyword_share": 0.5
+          }
+        ]
+      }
+    },
+    "contradiction_recall": {
+      "name": "contradiction_recall",
+      "score": null,
+      "mode": "deterministic",
+      "details": {
+        "found": 1,
+        "note": "no contradiction seeded for this case"
+      }
+    }
+  },
+  "total_seconds": 634.5,
+  "total_tokens": 102575,
+  "llm_calls": 22,
+  "mean_score": 0.917
+}

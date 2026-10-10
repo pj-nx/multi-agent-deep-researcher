@@ -1,0 +1,112 @@
+{
+  "case_id": "grid-batteries",
+  "question": "Can grid-scale batteries alone handle the intermittency of a mostly renewable grid?",
+  "ok": true,
+  "error": null,
+  "thread_id": "2613746d-d54a-4915-9101-4f964a3e1ee9",
+  "plan_seconds": 49.7,
+  "run_seconds": 450.0,
+  "judge_seconds": 34.2,
+  "usage": {
+    "models": {
+      "deepseek/deepseek-v4-pro": {
+        "calls": 11,
+        "input_tokens": 25633,
+        "output_tokens": 29043
+      },
+      "anthropic/claude-haiku-4.5": {
+        "calls": 11,
+        "input_tokens": 24873,
+        "output_tokens": 16238
+      },
+      "anthropic/claude-sonnet-5": {
+        "calls": 1,
+        "input_tokens": 9035,
+        "output_tokens": 3387
+      }
+    }
+  },
+  "est_cost_usd": 0.175484,
+  "stats": {
+    "retrieved": 66,
+    "kept": 25,
+    "dropped": 41,
+    "claims": 28,
+    "contradictions": 0,
+    "gaps": 28,
+    "gaps_pursued": 4,
+    "citations_verified": 14,
+    "citations_removed": 0,
+    "embedding_id": "snowflake/snowflake-arctic-embed-m-v1.5@256",
+    "hops": 1,
+    "languages": [
+      "en"
+    ],
+    "filtered_language": 0
+  },
+  "sub_questions": 6,
+  "judges": {
+    "citation_integrity": {
+      "name": "citation_integrity",
+      "score": 1.0,
+      "mode": "deterministic",
+      "details": {
+        "citations": 80,
+        "invalid": [],
+        "sources": 20
+      }
+    },
+    "groundedness": {
+      "name": "groundedness",
+      "score": 1.0,
+      "mode": "structural",
+      "details": {
+        "claims": 28,
+        "structurally_valid": 28,
+        "error": "LengthFinishReasonError: Could not parse response content as the length limit was reached - CompletionUsage(completion_tokens=2000, prompt_tokens=12255, total_tokens=14255, completion_t"
+      }
+    },
+    "coverage": {
+      "name": "coverage",
+      "score": 1.0,
+      "mode": "keyword",
+      "details": {
+        "facets": [
+          {
+            "facet": "duration limits of lithium-ion storage (hours rather than days)",
+            "covered": true,
+            "keyword_share": 1.0
+          },
+          {
+            "facet": "seasonal or multi-day shortfalls such as Dunkelflaute",
+            "covered": true,
+            "keyword_share": 0.5
+          },
+          {
+            "facet": "battery cost trajectories",
+            "covered": true,
+            "keyword_share": 1.0
+          },
+          {
+            "facet": "alternatives including long-duration storage, transmission, demand response and firm generation",
+            "covered": true,
+            "keyword_share": 0.88
+          }
+        ],
+        "error": "ValidationError: 2 validation errors for CoverageVerdicts\nitems.2.where\n  String should have at most 400 characters [type=string_too_long, input_value='Cost-optimal highly rene."
+      }
+    },
+    "contradiction_recall": {
+      "name": "contradiction_recall",
+      "score": 0.0,
+      "mode": "deterministic",
+      "details": {
+        "found": 0
+      }
+    }
+  },
+  "total_seconds": 499.7,
+  "total_tokens": 108209,
+  "llm_calls": 23,
+  "mean_score": 0.75
+}

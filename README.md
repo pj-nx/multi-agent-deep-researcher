@@ -10,29 +10,37 @@ cited report.
 Showcases **agent collaboration**, **retrieval-augmented reasoning** (every claim cites a stored
 evidence ID that is verified before the report ships) and **long-context synthesis**.
 
-**Status:** all seven agents are live (Phases 0-4). Planner (structured output) → human approval →
+**Status:** all seven phases of [PLAN.md](PLAN.md) are done. Planner (structured output) → human approval →
 parallel retrievers over real sources → persistent vector store → **Source Validator** (model-graded
 relevance/credibility) → **Critical Analysis** (retrieval-augmented: claims, contradictions, gaps,
 every citation checked against the chunks shown) → multi-hop loop on the most valuable gaps →
 **Insight Generation** (reasoning chains with citations, confidence, falsifier) → **Red-Team Critic**
 (accept / revise / request more evidence, capped) → **Report Builder** (executive summary, findings,
-disagreements, insights, limitations, methodology, bibliography; every citation verified). Remaining:
-Gradio UI, deployment wiring, evals. See [PLAN.md](PLAN.md).
+disagreements, insights, limitations, methodology, bibliography; every citation verified). Gradio UI,
+HTTP API, Docker / AWS Lambda / Vercel deployment (live below) and an [evaluation harness](#evaluation)
+with seeded questions and groundedness / coverage / contradiction judges.
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-    planner[Planner] --> approve{{approve plan}}
-    approve -->|fan-out| retriever[Retrievers ×N]
-    retriever --> validator[Source Validator]
-    validator --> analysis[Critical Analysis]
-    analysis -->|gaps| retriever
+    q([question]) --> planner[Planner]
+    planner --> approve{{human approves / edits plan}}
+    approve -->|Send fan-out| retriever[Retrievers ×N<br/>arXiv · Semantic Scholar · Tavily<br/>newsdata.io / GDELT · Wikipedia · PDF]
+    retriever --> store[(Chroma evidence store<br/>512-token chunks, 256-d)]
+    store --> validator[Source Validator]
+    validator --> analysis[Critical Analysis<br/>claims · contradictions · gaps]
+    analysis -->|top gaps, ≤ max_hops| retriever
     analysis --> insight[Insight Generation]
     insight --> critic[Red-Team Critic]
-    critic -->|more evidence| planner
-    critic --> report[Report Builder]
+    critic -->|revise| insight
+    critic -->|need more evidence| retriever
+    critic -->|accept| report[Report Builder<br/>citation check]
+    report --> out([Markdown · PDF · JSON])
+    out -.-> evals[Evals: groundedness · coverage<br/>contradiction recall · citation integrity]
 ```
+
+![Gradio UI](docs/ui.png)
 
 ## Quick start (local)
 
@@ -134,8 +142,9 @@ hosting. The API needs the `API_AUTH_TOKEN` bearer; the hosted page at `/` asks 
 Verified locally: the image builds and answers `/api/health`; the Postgres checkpointer persists a
 plan interrupt that a second process resumes; the Chroma http mode stores and queries evidence against
 a Chroma server (both via `tests/test_deploy.py` when `DR_TEST_DATABASE_URL` / `DR_TEST_CHROMA_HOST` are
-set; `ci.yml` builds and smoke-tests the image on every push). Not verified: an actual deployment to
-AWS or Vercel, which needs your account credentials.
+set; `ci.yml` builds and smoke-tests the image on every push). Verified on Vercel: the production
+deployment above answers health, enforces the bearer token and completed a full plan + research run
+(6 sub-questions, 0 hops) end to end. Not verified: an actual AWS deployment, which needs your account.
 
 ## LLM provider: OpenRouter
 
@@ -259,6 +268,73 @@ SSE events: `started` (with `trace_url`), `plan` (awaiting approval), one `retri
 `validate` (assessed/kept), `analyze` (claims, contradictions, gaps), `route_gaps` (next hop or stop), repeated per
 hop, then `insight` (hypotheses), `critic` (verdict, issues, follow-up; may loop back), `report` (Markdown in
 `report`, structured record in `report_json`, `stats`), `error`, `done`.
+
+## Evaluation
+
+`evals/questions.jsonl` seeds ten contested research questions, each with the facets a complete
+answer must cover and, for most, the disagreement an expert expects the pipeline to surface. The
+harness in [`src/deep_researcher/evals/`](src/deep_researcher/evals/) runs them through the real
+graph (plan auto-approved), judges every report and writes a results folder:
+
+```bash
+uv run python -m deep_researcher.evals list                      # the seeded cases
+uv run python -m deep_researcher.evals run --max-hops 1 --budget 240 --concurrency 2
+uv run python -m deep_researcher.evals run --ids four-day-week   # one case
+uv run python -m deep_researcher.evals judge reports/*.json      # score reports you already have
+uv run python -m deep_researcher.evals langsmith upload          # cases -> LangSmith dataset
+uv run python -m deep_researcher.evals langsmith experiment      # aevaluate with the judges as evaluators
+```
+
+Judges (all read the report only; the model-judged halves use the cheap `grader` role and fall back
+to deterministic checks when no key is set):
+
+| Judge | What it measures | How |
+|---|---|---|
+| `citation_integrity` | every `[E-id]` in the narrative, claims, insights and contradictions refers to a kept source | deterministic |
+| `groundedness` | each analysis claim is supported by the text of the sources it cites | ids checked deterministically, then the grader reads claim + cited text: supported 1.0, partial 0.5, unsupported 0 |
+| `coverage` | the case's expected facets are substantively addressed | grader over the report text; keyword-overlap fallback |
+| `contradiction_recall` | a seeded disagreement was surfaced | 1.0 when a found contradiction matches the hint, 0.5 for other contradictions only, 0 for none; n/a when the case seeds none |
+
+Each run writes `evals/results/<timestamp>/` with the report (`.md`, `.json`), an `.eval.json` per
+case (timings, tokens per model, estimated cost from OpenRouter's live prices, per-claim and per-facet
+verdicts) and `summary.md` / `summary.json`. Tokens are summed from the agents' `llm_end` activity
+events, so cost and time need no tracing backend; with LangSmith configured the same judges run as
+evaluators in an experiment over the uploaded dataset.
+
+### Baseline run (2026-10-11)
+
+All ten cases, `--max-hops 1 --budget 240 --concurrency 2`, heavy role `deepseek/deepseek-v4-pro`
+(reasoning effort high), worker `anthropic/claude-sonnet-5`, cheap and grader `anthropic/claude-haiku-4.5`,
+local embeddings. Full table and per-claim verdicts in
+[`evals/results/20261011-011036/summary.md`](evals/results/20261011-011036/summary.md).
+
+| | Per run (mean of 10) |
+|---|---|
+| Wall time | 8.5 min (range 4.9 to 12.8) |
+| Model tokens | 86k (range 49k to 122k) |
+| Estimated model cost | $0.13 (range $0.10 to $0.18; $1.33 for the suite) |
+| Sources kept | 13 of about 40 retrieved |
+| Citation integrity | 100% |
+| Groundedness | 92% |
+| Coverage | 73% |
+| Contradiction recall | 50% (9 seeded; 4 matched, 1 other, 4 none) |
+
+What the numbers say:
+
+- **Citations are always real.** The Report Builder's citation check holds across every section.
+- **Groundedness failures are informative.** The one weak case (GLP-1, 33%) kept only 4 of 34 sources
+  and two of its three claims quoted hazard ratios that are not in the cited abstracts; the grader
+  caught model knowledge leaking into "grounded" claims. Fetching full text (`Deps.fetch_full_text`)
+  and a stricter validator threshold are the obvious levers.
+- **Coverage misses are mostly retrieval misses.** The facets not covered (NuScale cancellation,
+  Hall feeding trial, traffic displacement, hybrid vs fully remote) are the ones that need the web
+  search tool; during this run the Tavily key was invalid (every query returned 401), so retrieval
+  ran on arXiv, Semantic Scholar (rate-limited), newsdata.io and Wikipedia only. Re-run with a valid
+  key to measure the difference.
+- **Contradiction recall is the weakest judge**: four seeded disagreements produced no contradiction
+  at all. The analysis agent only flags contradictions *within* one sub-question's evidence; a
+  cross-sub-question pass before the insight step is the next improvement.
+
 
 ## License
 

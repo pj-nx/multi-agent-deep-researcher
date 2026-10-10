@@ -1,0 +1,178 @@
+{
+  "case_id": "remote-work-innovation",
+  "question": "Has remote work reduced innovation in firms that adopted it broadly?",
+  "ok": true,
+  "error": null,
+  "thread_id": "5f0f6c28-62f3-43ea-bc25-2fd78b9c28aa",
+  "plan_seconds": 23.3,
+  "run_seconds": 303.9,
+  "judge_seconds": 24.2,
+  "usage": {
+    "models": {
+      "deepseek/deepseek-v4-pro": {
+        "calls": 5,
+        "input_tokens": 9145,
+        "output_tokens": 13473
+      },
+      "anthropic/claude-haiku-4.5": {
+        "calls": 9,
+        "input_tokens": 16781,
+        "output_tokens": 10189
+      },
+      "anthropic/claude-sonnet-5": {
+        "calls": 1,
+        "input_tokens": 4202,
+        "output_tokens": 3013
+      }
+    }
+  },
+  "est_cost_usd": 0.113796,
+  "stats": {
+    "retrieved": 40,
+    "kept": 9,
+    "dropped": 31,
+    "claims": 9,
+    "contradictions": 0,
+    "gaps": 13,
+    "gaps_pursued": 4,
+    "citations_verified": 6,
+    "citations_removed": 0,
+    "embedding_id": "snowflake/snowflake-arctic-embed-m-v1.5@256",
+    "hops": 1,
+    "languages": [
+      "en"
+    ],
+    "filtered_language": 0
+  },
+  "sub_questions": 5,
+  "judges": {
+    "citation_integrity": {
+      "name": "citation_integrity",
+      "score": 1.0,
+      "mode": "deterministic",
+      "details": {
+        "citations": 27,
+        "invalid": [],
+        "sources": 9
+      }
+    },
+    "groundedness": {
+      "name": "groundedness",
+      "score": 0.944,
+      "mode": "model",
+      "details": {
+        "claims": 9,
+        "structurally_valid": 9,
+        "judged": 9,
+        "unsupported": 0,
+        "verdicts": [
+          {
+            "claim": "Remote work challenges serendipity, but collaboration tools can be designed to stimulate serendipitous discoveries by incorporating 23 elements identified from physical offices and 38 remote-work stra",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The source explicitly states: 'we identified twenty-three elements' from physical offices and 'we compiled 38 strategies for remote work', exactly matching the numbers and framework described in the c",
+            "score": 1.0
+          },
+          {
+            "claim": "Remote work technologies reshape communication patterns, creating both opportunities (enhanced digital collaboration) and challenges (isolation, knowledge-sharing barriers) that affect innovation.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The source directly addresses all elements: 'reshaping traditional workplace interactions', identifies 'challenges such as...isolation, and knowledge-sharing barriers', and mentions 'opportunities for",
+            "score": 1.0
+          },
+          {
+            "claim": "Remote work increases network modularity and tie churn, which hinder cohesion and innovation; async-first communication, cross-team structures, and digital fluency are critical levers for resilience.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The source analyzes 'modularity...and tie churn', states these findings 'underscore the challenges organizations face in maintaining cohesion and innovation', and explicitly identifies 'async first co",
+            "score": 1.0
+          },
+          {
+            "claim": "E-Design and virtual collaboration tools enable innovation across geographic, time-zone, and cultural boundaries, but face challenges of trust, effective communication, and intellectual property prote",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The source describes 'techniques and tools that facilitate teams in overcoming geographical boundaries, time zones, and cultural differences' and discusses 'obstacles of establishing trust, ensuring e",
+            "score": 1.0
+          },
+          {
+            "claim": "In remote design collaboration, the cognitive dimensions of representation, communication, and allocation (R-C-A framework) are interconnected, and understanding these patterns can optimize design inn",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The source explicitly states the findings highlight 'the interconnected nature of the three cognitive dimensions \u2013 representation (R), communication (C), and allocation (A) \u2013 in the R-C-A framework' a",
+            "score": 1.0
+          },
+          {
+            "claim": "Serendipity in innovation can be modeled as predictable crossovers in component usefulness over time, suggesting a strategic approach to foster serendipitous discovery that could apply to remote conte",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The source describes observing that 'the relative usefulness of different components is not fixed, but cross each other over time' and explains that 'when we can predict crossovers ahead of time, they",
+            "score": 1.0
+          },
+          {
+            "claim": "Mixed Reality tools like BeeCube provide immersive, interactive environments that enhance collaboration for business model innovation, extending virtual teamwork capabilities.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The source states: 'using Mixed Reality can add one more layer of interactivity thus extending and enhancing the capabilities of the...BeeCube' for business model innovation processes, with collaborat",
+            "score": 1.0
+          },
+          {
+            "claim": "AI-mediated communication tools improved remote-work efficiency but caused employees to struggle with face-to-face interaction and perceive traditional collaboration as slower, potentially affecting i",
+            "verdict": "partially_supported",
+            "structural": true,
+            "reason": "The source confirms that employees 'struggled with face-to-face interaction' and that 'traditional workplace...interactions are now slower and less efficient', but does not explicitly address how this",
+            "score": 0.5
+          },
+          {
+            "claim": "The COVID-19 pandemic prompted an increase in the output of green invention patents by firms, universities and firm-university collaborations in China, as shown by a difference-in-differences analysis",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The source states: 'Results from the difference-in-differences (DID) model showed that the COVID-19 pandemic has prompted the output of three types of green invention patents' from firms, universities",
+            "score": 1.0
+          }
+        ]
+      }
+    },
+    "coverage": {
+      "name": "coverage",
+      "score": 0.5,
+      "mode": "keyword",
+      "details": {
+        "facets": [
+          {
+            "facet": "communication or collaboration network studies (for example the Microsoft remote-work study)",
+            "covered": true,
+            "keyword_share": 0.8
+          },
+          {
+            "facet": "patent, publication or product output measures",
+            "covered": true,
+            "keyword_share": 0.75
+          },
+          {
+            "facet": "hybrid versus fully remote arrangements",
+            "covered": false,
+            "keyword_share": 0.25
+          },
+          {
+            "facet": "causal identification versus correlational evidence",
+            "covered": false,
+            "keyword_share": 0.33
+          }
+        ],
+        "error": "ValidationError: 1 validation error for CoverageVerdicts\nitems.3.where\n  String should have at most 400 characters [type=string_too_long, input_value=\"The report discusses cau.."
+      }
+    },
+    "contradiction_recall": {
+      "name": "contradiction_recall",
+      "score": 0.0,
+      "mode": "deterministic",
+      "details": {
+        "found": 0
+      }
+    }
+  },
+  "total_seconds": 327.2,
+  "total_tokens": 56803,
+  "llm_calls": 15,
+  "mean_score": 0.611
+}

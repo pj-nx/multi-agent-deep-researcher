@@ -1,0 +1,139 @@
+{
+  "case_id": "glp1-cardiovascular",
+  "question": "Do GLP-1 receptor agonists reduce cardiovascular risk independently of weight loss?",
+  "ok": true,
+  "error": null,
+  "thread_id": "61396f24-fcb3-43f7-a90e-bbd759788dc0",
+  "plan_seconds": 35.2,
+  "run_seconds": 258.4,
+  "judge_seconds": 30.3,
+  "usage": {
+    "models": {
+      "deepseek/deepseek-v4-pro": {
+        "calls": 4,
+        "input_tokens": 7409,
+        "output_tokens": 9824
+      },
+      "anthropic/claude-haiku-4.5": {
+        "calls": 8,
+        "input_tokens": 15787,
+        "output_tokens": 10051
+      },
+      "anthropic/claude-sonnet-5": {
+        "calls": 1,
+        "input_tokens": 2674,
+        "output_tokens": 2937
+      }
+    }
+  },
+  "est_cost_usd": 0.10641,
+  "stats": {
+    "retrieved": 34,
+    "kept": 4,
+    "dropped": 30,
+    "claims": 3,
+    "contradictions": 0,
+    "gaps": 5,
+    "gaps_pursued": 4,
+    "citations_verified": 2,
+    "citations_removed": 0,
+    "embedding_id": "snowflake/snowflake-arctic-embed-m-v1.5@256",
+    "hops": 1,
+    "languages": [
+      "en"
+    ],
+    "filtered_language": 0
+  },
+  "sub_questions": 6,
+  "judges": {
+    "citation_integrity": {
+      "name": "citation_integrity",
+      "score": 1.0,
+      "mode": "deterministic",
+      "details": {
+        "citations": 14,
+        "invalid": [],
+        "sources": 3
+      }
+    },
+    "groundedness": {
+      "name": "groundedness",
+      "score": 0.333,
+      "mode": "model",
+      "details": {
+        "claims": 3,
+        "structurally_valid": 3,
+        "judged": 3,
+        "unsupported": 2,
+        "verdicts": [
+          {
+            "claim": "In participants with type 2 diabetes, GLP-1 receptor agonists reduced MACE by 13% compared with placebo (HR 0.87, 95% CI 0.81-0.93) based on meta-analysis of 11 RCTs.",
+            "verdict": "unsupported",
+            "structural": true,
+            "reason": "The provided source text does not include the specific results section with the HR 0.87 (95% CI 0.81-0.93) figure or the number of RCTs included. The source text cuts off in the Methods section before",
+            "score": 0.0
+          },
+          {
+            "claim": "The reduction in MACE remained significant when the SELECT trial (participants with cardiovascular disease but without diabetes) was included, with HR 0.86 (95% CI 0.80-0.92).",
+            "verdict": "unsupported",
+            "structural": true,
+            "reason": "While the source confirms that the SELECT trial was included post hoc and describes it as enrolling participants with cardiovascular disease without diabetes, the specific HR 0.86 (95% CI 0.80-0.92) r",
+            "score": 0.0
+          },
+          {
+            "claim": "A hybrid RCT-real-world data analysis of oral semaglutide estimated a MACE risk difference of -1.53 percentage points (95% CI -2.75% to -0.30%), supporting the benefit.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The source explicitly states: 'In real data analysis using Design 3, external controls were integrated in 84% of cross-validation folds, resulting in an estimated risk difference of -1.53%-points (95%",
+            "score": 1.0
+          }
+        ]
+      }
+    },
+    "coverage": {
+      "name": "coverage",
+      "score": 0.5,
+      "mode": "model",
+      "details": {
+        "facets": [
+          {
+            "facet": "cardiovascular outcome trials such as SELECT, LEADER or SUSTAIN-6",
+            "covered": true,
+            "where": "when the SELECT trial\u2014conducted in non-diabetic individuals with established cardiovascular disease but treated primarily for obesity\u2014was incorporated, the pooled effect remained essentially unchanged",
+            "keyword_share": 0.67
+          },
+          {
+            "facet": "mediation analyses separating weight loss from direct drug effects",
+            "covered": false,
+            "where": "No studies were retrieved that performed formal mediation analysis quantifying the proportion of cardiovascular risk reduction attributable to weight loss versus weight-independent mechanisms",
+            "keyword_share": 0.67
+          },
+          {
+            "facet": "proposed mechanisms such as inflammation, blood pressure or lipids",
+            "covered": false,
+            "where": "No evidence was found describing specific weight-independent biological mechanisms such as anti-inflammatory, endothelial, or anti-atherosclerotic effects",
+            "keyword_share": 0.17
+          },
+          {
+            "facet": "results in people with and without diabetes",
+            "covered": true,
+            "where": "In type 2 diabetes, GLP-1 receptor agonists reduced MACE by 13% relative to placebo (HR 0.87, 95% CI 0.81-0.93); when the SELECT trial (non-diabetic individuals with cardiovascular disease) was includ",
+            "keyword_share": 1.0
+          }
+        ]
+      }
+    },
+    "contradiction_recall": {
+      "name": "contradiction_recall",
+      "score": 0.0,
+      "mode": "deterministic",
+      "details": {
+        "found": 0
+      }
+    }
+  },
+  "total_seconds": 293.6,
+  "total_tokens": 48682,
+  "llm_calls": 13,
+  "mean_score": 0.458
+}

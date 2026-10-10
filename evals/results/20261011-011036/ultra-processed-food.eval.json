@@ -1,0 +1,114 @@
+{
+  "case_id": "ultra-processed-food",
+  "question": "How strong is the evidence linking ultra-processed food consumption to all-cause mortality?",
+  "ok": true,
+  "error": null,
+  "thread_id": "356791b0-a092-4c4f-95a1-7000e71c919c",
+  "plan_seconds": 41.1,
+  "run_seconds": 676.4,
+  "judge_seconds": 46.2,
+  "usage": {
+    "models": {
+      "deepseek/deepseek-v4-pro": {
+        "calls": 10,
+        "input_tokens": 31375,
+        "output_tokens": 38905
+      },
+      "anthropic/claude-haiku-4.5": {
+        "calls": 7,
+        "input_tokens": 14326,
+        "output_tokens": 7946
+      },
+      "anthropic/claude-sonnet-5": {
+        "calls": 1,
+        "input_tokens": 7744,
+        "output_tokens": 3872
+      }
+    }
+  },
+  "est_cost_usd": 0.131062,
+  "stats": {
+    "retrieved": 34,
+    "kept": 11,
+    "dropped": 23,
+    "claims": 16,
+    "contradictions": 1,
+    "gaps": 12,
+    "gaps_pursued": 4,
+    "citations_verified": 11,
+    "citations_removed": 0,
+    "embedding_id": "snowflake/snowflake-arctic-embed-m-v1.5@256",
+    "hops": 1,
+    "languages": [
+      "en"
+    ],
+    "filtered_language": 0
+  },
+  "sub_questions": 6,
+  "judges": {
+    "citation_integrity": {
+      "name": "citation_integrity",
+      "score": 1.0,
+      "mode": "deterministic",
+      "details": {
+        "citations": 68,
+        "invalid": [],
+        "sources": 11
+      }
+    },
+    "groundedness": {
+      "name": "groundedness",
+      "score": 1.0,
+      "mode": "structural",
+      "details": {
+        "claims": 16,
+        "structurally_valid": 16,
+        "error": "LengthFinishReasonError: Could not parse response content as the length limit was reached - CompletionUsage(completion_tokens=2000, prompt_tokens=11251, total_tokens=13251, completion_t"
+      }
+    },
+    "coverage": {
+      "name": "coverage",
+      "score": 0.75,
+      "mode": "keyword",
+      "details": {
+        "facets": [
+          {
+            "facet": "prospective cohort studies and meta-analyses of mortality",
+            "covered": true,
+            "keyword_share": 1.0
+          },
+          {
+            "facet": "the NOVA classification and criticisms of it",
+            "covered": true,
+            "keyword_share": 0.67
+          },
+          {
+            "facet": "confounding by overall diet quality, income or lifestyle",
+            "covered": true,
+            "keyword_share": 0.83
+          },
+          {
+            "facet": "randomised feeding trials such as the Hall et al. inpatient study",
+            "covered": false,
+            "keyword_share": 0.2
+          }
+        ],
+        "error": "ValidationError: 2 validation errors for CoverageVerdicts\nitems.1.where\n  String should have at most 400 characters [type=string_too_long, input_value=\"Section sq1 describes th."
+      }
+    },
+    "contradiction_recall": {
+      "name": "contradiction_recall",
+      "score": 0.5,
+      "mode": "model",
+      "details": {
+        "found": 1,
+        "matches_hint": false,
+        "reason": "The found contradiction concerns the shape of the dose-response relationship (linear vs. nonlinear), with both positions accepting that an association exists. The expected disagreement is between accepting observational associations versus questioning whether the category is too heterogeneous and co"
+      }
+    }
+  },
+  "total_seconds": 717.5,
+  "total_tokens": 104168,
+  "llm_calls": 18,
+  "mean_score": 0.812
+}

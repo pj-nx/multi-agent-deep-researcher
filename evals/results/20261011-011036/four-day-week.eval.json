@@ -1,0 +1,188 @@
+{
+  "case_id": "four-day-week",
+  "question": "Does the four-day work week raise productivity?",
+  "ok": true,
+  "error": null,
+  "thread_id": "c038df42-856d-46fc-85f6-48fe907eedc3",
+  "plan_seconds": 28.3,
+  "run_seconds": 306.5,
+  "judge_seconds": 104.3,
+  "usage": {
+    "models": {
+      "deepseek/deepseek-v4-pro": {
+        "calls": 5,
+        "input_tokens": 8324,
+        "output_tokens": 12006
+      },
+      "anthropic/claude-haiku-4.5": {
+        "calls": 7,
+        "input_tokens": 13184,
+        "output_tokens": 9410
+      },
+      "anthropic/claude-sonnet-5": {
+        "calls": 1,
+        "input_tokens": 4250,
+        "output_tokens": 2866
+      }
+    }
+  },
+  "est_cost_usd": 0.104146,
+  "stats": {
+    "retrieved": 29,
+    "kept": 11,
+    "dropped": 18,
+    "claims": 9,
+    "contradictions": 1,
+    "gaps": 13,
+    "gaps_pursued": 4,
+    "citations_verified": 3,
+    "citations_removed": 0,
+    "embedding_id": "snowflake/snowflake-arctic-embed-m-v1.5@256",
+    "hops": 1,
+    "languages": [
+      "en"
+    ],
+    "filtered_language": 0
+  },
+  "sub_questions": 6,
+  "judges": {
+    "citation_integrity": {
+      "name": "citation_integrity",
+      "score": 1.0,
+      "mode": "deterministic",
+      "details": {
+        "citations": 31,
+        "invalid": [],
+        "sources": 5
+      }
+    },
+    "groundedness": {
+      "name": "groundedness",
+      "score": 0.889,
+      "mode": "model",
+      "details": {
+        "claims": 9,
+        "structurally_valid": 9,
+        "judged": 9,
+        "unsupported": 1,
+        "verdicts": [
+          {
+            "claim": "A four-day workweek is an arrangement where employees work four days per week instead of five.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The source directly defines a four-day workweek as an arrangement where employees work four days per week rather than the customary five-day workweek.",
+            "score": 1.0
+          },
+          {
+            "claim": "It can be part of flexible working hours and is sometimes used to cut costs.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The source explicitly states: 'This arrangement can be a part of flexible working hours, and is sometimes used to cut costs.'",
+            "score": 1.0
+          },
+          {
+            "claim": "A common configuration is a four-day working week of around 32 hours with no reduction in pay.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The source describes 'a four-day working week of around 32 hours, with no less pay for workers,' which matches the claim of around 32 hours with no reduction in pay.",
+            "score": 1.0
+          },
+          {
+            "claim": "Most trials of this configuration involve white\u2011collar work.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The source states: 'Most of these businesses and organizations have involved white collar work.'",
+            "score": 1.0
+          },
+          {
+            "claim": "Trials indicate that this configuration leads to better work\u2011life balance, lower stress, and increased productivity by eliminating wasted work time.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The source directly states that trials have shown the four-day week 'leads to a better work-life balance, lower stress-levels, and increased productivity, mainly by eliminating wasted work time.'",
+            "score": 1.0
+          },
+          {
+            "claim": "Experts question whether the same benefits can be achieved in blue\u2011collar work without increasing stress or decreasing safety.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The source states that experts question whether this arrangement is possible in blue-collar work, noting workers 'would be required to work faster to maintain the same productivity, potentially increa",
+            "score": 1.0
+          },
+          {
+            "claim": "The productivity and well-being benefits of a four-day workweek are not uniformly observed across all economic sectors, as indicated by a mixed-methods study of private companies in the Baltic States.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The source confirms it is a mixed-methods study of Baltic States companies and states: 'Results indicate that, while the 4DWW can sustain or enhance operational efficiency and substantially improve wo",
+            "score": 1.0
+          },
+          {
+            "claim": "Employees in sectors requiring continuous operations (e.g., healthcare, manufacturing) express concerns about increased workload pressure and coordination difficulties under a four-day workweek, sugge",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The source states: 'Concerns were raised about increased workload pressure, coordination difficulties, and financial viability, particularly in roles requiring continuous operations,' and the study in",
+            "score": 1.0
+          },
+          {
+            "claim": "The available evidence provides no quantitative productivity comparisons across different sectors for the four-day workweek.",
+            "verdict": "unsupported",
+            "structural": true,
+            "reason": "The first source mentions 'quantitative assessment of key performance indicators over an 8-year period,' suggesting quantitative data exists. The claim that no quantitative comparisons are available c",
+            "score": 0.0
+          }
+        ]
+      }
+    },
+    "coverage": {
+      "name": "coverage",
+      "score": 0.8,
+      "mode": "model",
+      "details": {
+        "facets": [
+          {
+            "facet": "results of the Iceland, UK or other large pilot trials",
+            "covered": false,
+            "where": "No evidence was retrieved on specific large-scale national trials (e.g., Iceland, UK, Spain, New Zealand) or their reported productivity outcomes.",
+            "keyword_share": 1.0
+          },
+          {
+            "facet": "self-reported versus objectively measured productivity",
+            "covered": true,
+            "where": "A firm-level efficiency observation and an employee perception study \u2014 neither provides a measured productivity metric; UK employees report concerns reflecting perception rather than measured producti",
+            "keyword_share": 0.75
+          },
+          {
+            "facet": "differences between knowledge work and manufacturing or service sectors",
+            "covered": true,
+            "where": "The pattern is drawn almost entirely from white-collar trials. Sector matters, but the evidence cannot yet quantify how much. Employees in continuous-operation roles (healthcare, manufacturing) worry ",
+            "keyword_share": 0.67
+          },
+          {
+            "facet": "employee wellbeing, burnout or retention outcomes",
+            "covered": true,
+            "where": "A reduced-hours model is reported to improve work-life balance, lower stress, and increase productivity. However, no evidence was retrieved directly linking well-being, burnout, or job satisfaction ch",
+            "keyword_share": 0.6
+          },
+          {
+            "facet": "self-selection of volunteer firms as a limitation",
+            "covered": true,
+            "where": "Reported productivity gains from four-day week trials may be partly inflated by self-selection, as early-adopting white-collar firms already possess management practices that facilitate efficiency imp",
+            "keyword_share": 0.75
+          }
+        ]
+      }
+    },
+    "contradiction_recall": {
+      "name": "contradiction_recall",
+      "score": 1.0,
+      "mode": "deterministic",
+      "details": {
+        "found": 1,
+        "error": "ValidationError"
+      }
+    }
+  },
+  "total_seconds": 334.8,
+  "total_tokens": 50040,
+  "llm_calls": 13,
+  "mean_score": 0.922
+}

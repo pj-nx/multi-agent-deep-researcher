@@ -30,3 +30,7 @@ reports/
 .DS_Store
 .vercel
 .env*
+
+# Evaluation runs: keep scores, drop the bulky reports
+evals/results/**/*.report.md
+evals/results/**/*.report.json

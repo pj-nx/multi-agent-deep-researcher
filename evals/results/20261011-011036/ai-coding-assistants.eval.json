@@ -1,0 +1,114 @@
+{
+  "case_id": "ai-coding-assistants",
+  "question": "Do AI coding assistants improve developer productivity without lowering code quality?",
+  "ok": true,
+  "error": null,
+  "thread_id": "b3e4b446-06d3-4764-b2dc-51a741af29f2",
+  "plan_seconds": 26.6,
+  "run_seconds": 614.3,
+  "judge_seconds": 47.9,
+  "usage": {
+    "models": {
+      "deepseek/deepseek-v4-pro": {
+        "calls": 13,
+        "input_tokens": 39941,
+        "output_tokens": 41678
+      },
+      "anthropic/claude-haiku-4.5": {
+        "calls": 8,
+        "input_tokens": 15887,
+        "output_tokens": 10722
+      },
+      "anthropic/claude-sonnet-5": {
+        "calls": 1,
+        "input_tokens": 10295,
+        "output_tokens": 3679
+      }
+    }
+  },
+  "est_cost_usd": 0.152621,
+  "stats": {
+    "retrieved": 42,
+    "kept": 19,
+    "dropped": 23,
+    "claims": 28,
+    "contradictions": 6,
+    "gaps": 24,
+    "gaps_pursued": 4,
+    "citations_verified": 11,
+    "citations_removed": 0,
+    "embedding_id": "snowflake/snowflake-arctic-embed-m-v1.5@256",
+    "hops": 1,
+    "languages": [
+      "en"
+    ],
+    "filtered_language": 0
+  },
+  "sub_questions": 5,
+  "judges": {
+    "citation_integrity": {
+      "name": "citation_integrity",
+      "score": 1.0,
+      "mode": "deterministic",
+      "details": {
+        "citations": 88,
+        "invalid": [],
+        "sources": 14
+      }
+    },
+    "groundedness": {
+      "name": "groundedness",
+      "score": 1.0,
+      "mode": "structural",
+      "details": {
+        "claims": 28,
+        "structurally_valid": 28,
+        "error": "LengthFinishReasonError: Could not parse response content as the length limit was reached - CompletionUsage(completion_tokens=2000, prompt_tokens=11087, total_tokens=13087, completion_t"
+      }
+    },
+    "coverage": {
+      "name": "coverage",
+      "score": 1.0,
+      "mode": "keyword",
+      "details": {
+        "facets": [
+          {
+            "facet": "controlled experiments measuring task completion speed (for example the GitHub Copilot study)",
+            "covered": true,
+            "keyword_share": 1.0
+          },
+          {
+            "facet": "effects on code quality, defects or security vulnerabilities",
+            "covered": true,
+            "keyword_share": 1.0
+          },
+          {
+            "facet": "differences between junior and senior developers",
+            "covered": true,
+            "keyword_share": 0.5
+          },
+          {
+            "facet": "field or telemetry studies compared with lab experiments",
+            "covered": true,
+            "keyword_share": 0.67
+          }
+        ],
+        "error": "ValidationError: 1 validation error for CoverageVerdicts\nitems.3.where\n  String should have at most 400 characters [type=string_too_long, input_value=\"'Beyond these academic e.."
+      }
+    },
+    "contradiction_recall": {
+      "name": "contradiction_recall",
+      "score": 1.0,
+      "mode": "model",
+      "details": {
+        "found": 6,
+        "matches_hint": true,
+        "reason": "Multiple found contradictions match the expected disagreement. Contradictions 1 and 5 both capture the core pattern: controlled experiments with students showing clear speed gains (35% reduction in task completion time) contrasted with field studies and professional surveys showing conflicting persp"
+      }
+    }
+  },
+  "total_seconds": 640.9,
+  "total_tokens": 122202,
+  "llm_calls": 22,
+  "mean_score": 1.0
+}

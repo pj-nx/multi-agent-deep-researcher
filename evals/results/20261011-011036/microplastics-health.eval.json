@@ -1,0 +1,112 @@
+{
+  "case_id": "microplastics-health",
+  "question": "Is microplastic exposure a demonstrated risk to human health?",
+  "ok": true,
+  "error": null,
+  "thread_id": "6fe5b4f6-02ef-405d-abea-f5f20a49ae7c",
+  "plan_seconds": 31.7,
+  "run_seconds": 365.8,
+  "judge_seconds": 28.0,
+  "usage": {
+    "models": {
+      "deepseek/deepseek-v4-pro": {
+        "calls": 7,
+        "input_tokens": 11442,
+        "output_tokens": 19975
+      },
+      "anthropic/claude-haiku-4.5": {
+        "calls": 8,
+        "input_tokens": 11637,
+        "output_tokens": 6976
+      },
+      "anthropic/claude-sonnet-5": {
+        "calls": 1,
+        "input_tokens": 4872,
+        "output_tokens": 3350
+      }
+    }
+  },
+  "est_cost_usd": 0.100492,
+  "stats": {
+    "retrieved": 21,
+    "kept": 7,
+    "dropped": 14,
+    "claims": 13,
+    "contradictions": 0,
+    "gaps": 20,
+    "gaps_pursued": 4,
+    "citations_verified": 3,
+    "citations_removed": 0,
+    "embedding_id": "snowflake/snowflake-arctic-embed-m-v1.5@256",
+    "hops": 1,
+    "languages": [
+      "en"
+    ],
+    "filtered_language": 0
+  },
+  "sub_questions": 6,
+  "judges": {
+    "citation_integrity": {
+      "name": "citation_integrity",
+      "score": 1.0,
+      "mode": "deterministic",
+      "details": {
+        "citations": 35,
+        "invalid": [],
+        "sources": 3
+      }
+    },
+    "groundedness": {
+      "name": "groundedness",
+      "score": 1.0,
+      "mode": "structural",
+      "details": {
+        "claims": 13,
+        "structurally_valid": 13,
+        "error": "LengthFinishReasonError: Could not parse response content as the length limit was reached - CompletionUsage(completion_tokens=2000, prompt_tokens=5377, total_tokens=7377, completion_tok"
+      }
+    },
+    "coverage": {
+      "name": "coverage",
+      "score": 1.0,
+      "mode": "keyword",
+      "details": {
+        "facets": [
+          {
+            "facet": "detection of microplastics in human blood, placenta or other tissue",
+            "covered": true,
+            "keyword_share": 0.5
+          },
+          {
+            "facet": "toxicology evidence and dose considerations",
+            "covered": true,
+            "keyword_share": 0.67
+          },
+          {
+            "facet": "epidemiological outcome studies such as the carotid plaque study",
+            "covered": true,
+            "keyword_share": 0.5
+          },
+          {
+            "facet": "measurement, contamination and standardisation limitations",
+            "covered": true,
+            "keyword_share": 0.5
+          }
+        ],
+        "error": "ValidationError: 1 validation error for CoverageVerdicts\nitems.3.where\n  String should have at most 400 characters [type=string_too_long, input_value=\"Multiple limitations dis.."
+      }
+    },
+    "contradiction_recall": {
+      "name": "contradiction_recall",
+      "score": 0.0,
+      "mode": "deterministic",
+      "details": {
+        "found": 0
+      }
+    }
+  },
+  "total_seconds": 397.5,
+  "total_tokens": 58252,
+  "llm_calls": 16,
+  "mean_score": 0.75
+}

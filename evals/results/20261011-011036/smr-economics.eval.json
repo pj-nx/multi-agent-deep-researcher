@@ -1,0 +1,114 @@
+{
+  "case_id": "smr-economics",
+  "question": "Are small modular nuclear reactors economically competitive with wind and solar plus storage?",
+  "ok": true,
+  "error": null,
+  "thread_id": "b13582f1-1a40-4ffb-8770-4acd810122f0",
+  "plan_seconds": 50.3,
+  "run_seconds": 444.9,
+  "judge_seconds": 36.8,
+  "usage": {
+    "models": {
+      "deepseek/deepseek-v4-pro": {
+        "calls": 9,
+        "input_tokens": 18934,
+        "output_tokens": 25946
+      },
+      "anthropic/claude-haiku-4.5": {
+        "calls": 9,
+        "input_tokens": 18747,
+        "output_tokens": 13489
+      },
+      "anthropic/claude-sonnet-5": {
+        "calls": 1,
+        "input_tokens": 6837,
+        "output_tokens": 3018
+      }
+    }
+  },
+  "est_cost_usd": 0.144834,
+  "stats": {
+    "retrieved": 47,
+    "kept": 10,
+    "dropped": 37,
+    "claims": 23,
+    "contradictions": 1,
+    "gaps": 22,
+    "gaps_pursued": 4,
+    "citations_verified": 6,
+    "citations_removed": 0,
+    "embedding_id": "snowflake/snowflake-arctic-embed-m-v1.5@256",
+    "hops": 1,
+    "languages": [
+      "en"
+    ],
+    "filtered_language": 0
+  },
+  "sub_questions": 5,
+  "judges": {
+    "citation_integrity": {
+      "name": "citation_integrity",
+      "score": 1.0,
+      "mode": "deterministic",
+      "details": {
+        "citations": 54,
+        "invalid": [],
+        "sources": 9
+      }
+    },
+    "groundedness": {
+      "name": "groundedness",
+      "score": 1.0,
+      "mode": "structural",
+      "details": {
+        "claims": 23,
+        "structurally_valid": 23,
+        "error": "LengthFinishReasonError: Could not parse response content as the length limit was reached - CompletionUsage(completion_tokens=2000, prompt_tokens=9026, total_tokens=11026, completion_to"
+      }
+    },
+    "coverage": {
+      "name": "coverage",
+      "score": 0.5,
+      "mode": "keyword",
+      "details": {
+        "facets": [
+          {
+            "facet": "cost estimates or levelised cost comparisons",
+            "covered": true,
+            "keyword_share": 0.75
+          },
+          {
+            "facet": "cancelled or delayed projects such as NuScale and UAMPS",
+            "covered": false,
+            "keyword_share": 0.2
+          },
+          {
+            "facet": "first-of-a-kind versus nth-of-a-kind cost arguments",
+            "covered": false,
+            "keyword_share": 0.33
+          },
+          {
+            "facet": "system value of firm capacity versus variable renewables",
+            "covered": true,
+            "keyword_share": 0.67
+          }
+        ],
+        "error": "ValidationError: 1 validation error for CoverageVerdicts\nitems.3.where\n  String should have at most 400 characters [type=string_too_long, input_value=\"The report discusses sys.."
+      }
+    },
+    "contradiction_recall": {
+      "name": "contradiction_recall",
+      "score": 1.0,
+      "mode": "model",
+      "details": {
+        "found": 1,
+        "matches_hint": true,
+        "reason": "The contradiction found compares a low global onshore wind LCOE (0.0331 USD/kWh) suggesting competitive costs at scale against a higher regional/local LCOE (0.14104 USD/kWh) suggesting reduced competitiveness in specific contexts. This aligns with the expected disagreement between claims of competit"
+      }
+    }
+  },
+  "total_seconds": 495.2,
+  "total_tokens": 86971,
+  "llm_calls": 19,
+  "mean_score": 0.875
+}
