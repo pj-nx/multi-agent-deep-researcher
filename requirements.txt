@@ -13,3 +13,5 @@ aiosqlite>=0.20
 pypdf>=6.0
 python-dotenv>=1.0
 langdetect>=1.0.9
+markdown>=3.5
+xhtml2pdf>=0.2.16

@@ -21,6 +21,7 @@ burst cost; move it to Upstash/Redis if the project outgrows that.
 """
 from __future__ import annotations
 
+import asyncio
 import functools
 import json
 import logging
@@ -39,12 +40,13 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, Field
 from starlette.concurrency import iterate_in_threadpool
 from starlette.types import Receive, Scope, Send
 
 from deep_researcher import embeddings, llm, tracing
+from deep_researcher.reports import markdown_to_pdf
 from deep_researcher.schemas import ResearchPlan
 from deep_researcher.store import chunking
 from deep_researcher.tools import language as tool_language
@@ -95,6 +97,11 @@ class ResearchRequest(BaseModel):
 
 class ResumeRequest(BaseModel):
     plan: ResearchPlan
+
+
+class PdfRequest(BaseModel):
+    markdown: str = Field(min_length=1, max_length=2_000_000)
+    title: str | None = Field(default=None, max_length=200)
 
 
 # --------------------------------------------------------------------------- protection
@@ -341,6 +348,20 @@ async def research(req: ResearchRequest) -> StreamingResponse:
     inputs = {"question": req.question, "max_hops": max_hops, "echo": {"question": req.question}}
     return SlotStreamingResponse(_run_stream("api.research", thread_id, inputs, "plan", slot, events),
                                  media_type="text/event-stream", slot=slot)
+
+
+@app.post("/api/report/pdf", dependencies=[Depends(guard)])
+async def report_pdf(req: PdfRequest) -> Response:
+    """Render a report's Markdown (as streamed in the `report` event) to PDF. Stateless, so it works
+    on serverless hosts where nothing is kept between requests."""
+    try:
+        data = await asyncio.to_thread(markdown_to_pdf, req.markdown, title=req.title)
+    except Exception as exc:
+        log.warning("pdf render failed: %s", exc)
+        raise HTTPException(status_code=500, detail="PDF rendering failed.") from exc
+    name = (req.title or "research-report")[:60].replace('"', "")
+    return Response(content=data, media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="{name}.pdf"'})
 
 
 @app.post("/api/research/{thread_id}/resume", dependencies=[Depends(guard)])

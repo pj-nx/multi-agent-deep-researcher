@@ -252,6 +252,11 @@ Each phase ends with something runnable. Estimated effort assumes evenings/weeke
   `reports.write_report`, also used by the CLI).
 - Runs the graph in-process; the plan/table helpers and both streams are Gradio-free so they are tested against
   the fake graph (`tests/test_ui.py`), and failures surface in the log instead of hanging the page.
+- **PDF export** (`reports.markdown_to_pdf`, 2026-10-10): Markdown → HTML (`markdown`, tables extension) →
+  `xhtml2pdf`/reportlab, pure Python so it runs in a serverless function. A4, footer frame on every page,
+  cited ids and URLs preserved. `write_report` emits `.md` + `.json` + `.pdf` (PDF failure is logged, never
+  fatal); the UI shows a PDF download button; the API has a stateless `POST /api/report/pdf` used by the
+  hosted page's download button.
 - **Settings tab** (`settings.py` + `ui._build_settings_tab`): edits `.env` in place (order and comments kept,
   mode 0600), applies to the running process (env + `llm`/`embeddings`/store/graph cache resets), masks secrets
   (`sk-or-…cdef`), blank = keep / `none` = clear, per-tier model dropdowns with a live OpenRouter catalogue

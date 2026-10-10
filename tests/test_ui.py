@@ -88,15 +88,16 @@ async def test_plan_then_run_streams(tmp_path, monkeypatch):
     rows = rows[:2]                                          # user drops the third sub-question
     run_updates = [u async for u in ui.run_stream(thread_id, rows, "Does remote work raise productivity?", 0,
                                                   log_text, graph=graph, out_dir=tmp_path / "out")]
-    log_text, report, md_path, json_path = run_updates[-1]
+    log_text, report, md_path, json_path, pdf_path = run_updates[-1]
     assert "approved 2 sub-questions" in log_text and "report ready" in log_text and "saved" in log_text
+    assert pdf_path and Path(pdf_path).read_bytes()[:5] == b"%PDF-"
     assert "calling fake" not in log_text and ": done in" in log_text and "searching arxiv" in log_text
     assert report.startswith("# Remote work and productivity") and "### gap1_1" in report
     assert Path(md_path).read_text() == report and Path(json_path).exists()
     assert "sq3" not in report
     # streaming: the log grew with each event and the report arrived before the file paths
     assert len(run_updates) > 5
-    assert run_updates[-2][1] == report and run_updates[-2][2] is None
+    assert run_updates[-2][1] == report and run_updates[-2][2] is None and run_updates[-2][4] is None
 
 
 @pytest.mark.anyio

@@ -51,7 +51,8 @@ uv run uvicorn api.index:app --reload      # HTTP API at http://localhost:8000/a
 ```
 
 The Gradio UI streams the agents' activity live, lets you edit the plan table before approving, renders the
-report and offers `.md` / `.json` downloads. Its **Settings** tab edits the git-ignored `.env` in place and
+report and offers `.pdf` / `.md` / `.json` downloads (the PDF is rendered in pure Python via
+`markdown` + `xhtml2pdf`, no system libraries; the CLI writes all three files too). Its **Settings** tab edits the git-ignored `.env` in place and
 applies changes immediately: API keys (OpenRouter, Tavily, newsdata.io, Semantic Scholar, LangSmith; shown masked,
 blank = keep, `none` = clear), the model per tier (dropdowns, with a button that loads the live OpenRouter
 catalogue), fallback models and reasoning effort, the embeddings provider/model/dimensions and Chroma
@@ -222,6 +223,7 @@ public and never exposes secrets.
 | GET | `/api/health` | liveness, graph/tracing/llm/embeddings/chunking config, enabled sources |
 | POST | `/api/research` | `{question, max_hops?}` → SSE stream until plan approval |
 | POST | `/api/research/{thread_id}/resume` | `{plan: ResearchPlan}` → SSE stream to final report |
+| POST | `/api/report/pdf` | `{markdown, title?}` → `application/pdf`; stateless, so the hosted page can turn the streamed report into a download |
 
 SSE events: `started` (with `trace_url`), `plan` (awaiting approval), one `retrieve` per sub-question (parallel),
 `validate` (assessed/kept), `analyze` (claims, contradictions, gaps), `route_gaps` (next hop or stop), repeated per

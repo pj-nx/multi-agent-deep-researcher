@@ -50,8 +50,9 @@ async def _main(args: argparse.Namespace) -> int:
     tracing.flush()
     await G.aclose()
     if report:
-        path, json_path = write_report(args.question, report, report_json, Path(args.out))
-        print(f"\nreport written to {path}" + (" (+ .json)" if json_path else ""))
+        path, json_path, pdf_path = write_report(args.question, report, report_json, Path(args.out))
+        extras = [x for x, ok in ((".json", json_path), (".pdf", pdf_path)) if ok]
+        print(f"\nreport written to {path}" + (f" (+ {', '.join(extras)})" if extras else ""))
     return 0
 
 

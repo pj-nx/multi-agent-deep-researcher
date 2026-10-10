@@ -170,8 +170,8 @@ async def plan_stream(question: str, max_hops: int, budget: int | None, *, graph
 
 async def run_stream(thread_id: str, rows: list[list[Any]], question: str, budget: int | None,
                      log_text: str, *, graph: Any = None, out_dir: Path | None = None,
-                     ) -> AsyncIterator[tuple[str, str, str | None, str | None]]:
-    """Yields (log_text, report_markdown, md_path, json_path) through to the finished report."""
+                     ) -> AsyncIterator[tuple[str, str, str | None, str | None, str | None]]:
+    """Yields (log_text, report_markdown, md_path, json_path, pdf_path) through to the finished report."""
     from deep_researcher import graph as G
     from deep_researcher import tracing
 
@@ -180,11 +180,11 @@ async def run_stream(thread_id: str, rows: list[list[Any]], question: str, budge
         plan = rows_to_plan(rows, question)
     except Exception as exc:  # noqa: BLE001 - validation errors must be shown, not raised
         lines.append(f"[{time.strftime('%H:%M:%S')}] plan invalid: {str(exc)[:300]}")
-        yield "\n".join(lines), "", None, None
+        yield "\n".join(lines), "", None, None, None
         return
     n = len(plan["sub_questions"])
     lines.append(f"[{time.strftime('%H:%M:%S')}] approved {n} sub-questions; running...")
-    yield "\n".join(lines), "", None, None
+    yield "\n".join(lines), "", None, None, None
     cfg = tracing.run_config(thread_id, question, tags=["ui", "research"])
     report_md, report_json = "", None
     try:
@@ -194,16 +194,18 @@ async def run_stream(thread_id: str, rows: list[list[Any]], question: str, budge
             if event == "report":
                 report_md = data.get("report") or ""
                 report_json = data.get("report_json")
-            yield "\n".join(lines), report_md, None, None
+            yield "\n".join(lines), report_md, None, None, None
     except Exception as exc:
         log.exception("run stream failed")
         lines.append(f"[{time.strftime('%H:%M:%S')}] ERROR: {type(exc).__name__}: {str(exc)[:300]}")
-        yield "\n".join(lines), report_md, None, None
+        yield "\n".join(lines), report_md, None, None, None
         return
     if report_md:
-        md_path, json_path = write_report(question, report_md, report_json, out_dir)
-        lines.append(f"[{time.strftime('%H:%M:%S')}] saved {md_path}")
-        yield "\n".join(lines), report_md, str(md_path), str(json_path) if json_path else None
+        md_path, json_path, pdf_path = write_report(question, report_md, report_json, out_dir)
+        lines.append(f"[{time.strftime('%H:%M:%S')}] saved {md_path}"
+                     + (" (+ .json, .pdf)" if pdf_path else " (+ .json; PDF rendering failed)"))
+        yield ("\n".join(lines), report_md, str(md_path), str(json_path) if json_path else None,
+               str(pdf_path) if pdf_path else None)
     tracing.flush()
 
 
@@ -373,6 +375,7 @@ def _build_research_tab(gr: Any, demo: Any, graph: Any) -> None:
             run_btn = gr.Button("3. Approve & run", variant="primary")
         report_md = gr.Markdown(label="Report", max_height=700)
         with gr.Row():
+            dl_pdf = gr.DownloadButton("Download report (.pdf)", visible=False, variant="primary")
             dl_md = gr.DownloadButton("Download report (.md)", visible=False)
             dl_json = gr.DownloadButton("Download data (.json)", visible=False)
 
@@ -397,23 +400,25 @@ def _build_research_tab(gr: Any, demo: Any, graph: Any) -> None:
         async def on_run(tid, rows, q, bud, previous_log):
             hidden = gr.update(visible=False)
             if not tid:
-                yield ((previous_log or "") + "\nRun the planner first.", "", hidden, hidden, "**Ready**",
-                       FREE, FREE)
+                yield ((previous_log or "") + "\nRun the planner first.", "", hidden, hidden, hidden,
+                       "**Ready**", FREE, FREE)
                 return
             stream = run_stream(tid, rows, q, int(bud or 0), previous_log or "", graph=graph)
             try:
-                async for log_text, md, md_path, json_path in stream:
+                async for log_text, md, md_path, json_path, pdf_path in stream:
                     status = _busy("Researching... (see activity)") if not md else "**Report ready**"
                     yield (log_text, md,
+                           gr.update(value=pdf_path, visible=bool(pdf_path)),
                            gr.update(value=md_path, visible=bool(md_path)),
                            gr.update(value=json_path, visible=bool(json_path)), status, BUSY, BUSY)
             finally:
-                yield gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), FREE, FREE
+                yield (gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(),
+                       FREE, FREE)
 
         plan_btn.click(on_plan, [question, max_hops, budget],
                        [activity, plan_table, thread_state, question_state, busy, plan_btn, run_btn])
         run_btn.click(on_run, [thread_state, plan_table, question_state, budget, activity],
-                      [activity, report_md, dl_md, dl_json, busy, plan_btn, run_btn])
+                      [activity, report_md, dl_pdf, dl_md, dl_json, busy, plan_btn, run_btn])
 
 
 def main() -> None:

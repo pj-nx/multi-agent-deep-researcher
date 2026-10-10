@@ -29,10 +29,31 @@
     <button id="go">Research</button>
   </form>
   <div id="log">Ready. Health: <span id="health">checking…</span></div>
+  <button id="pdf" type="button" style="display:none;margin-top:12px">Download report (.pdf)</button>
 </main>
 <script>
   const log = document.getElementById('log');
   const tokenInput = document.getElementById('token');
+  const pdfBtn = document.getElementById('pdf');
+  let lastReport = null;
+
+  pdfBtn.addEventListener('click', async () => {
+    if (!lastReport) return;
+    pdfBtn.disabled = true;
+    try {
+      const res = await fetch('/api/report/pdf', {
+        method: 'POST', headers: { 'content-type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ markdown: lastReport.markdown, title: lastReport.title })
+      });
+      if (!res.ok) { line('error', `PDF failed: ${res.status}`, 'err'); return; }
+      const blob = await res.blob();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `${(lastReport.title || 'research-report').slice(0, 60)}.pdf`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } finally { pdfBtn.disabled = false; }
+  });
 
   // Render untrusted text (user input, retrieved snippets) as text nodes only — never innerHTML.
   function line(ev, text, cls) {
@@ -99,6 +120,12 @@
         while ((i = buf.indexOf('\n\n')) >= 0) {
           const { event, data } = parseBlock(buf.slice(0, i));
           buf = buf.slice(i + 2);
+          if (event === 'report') {
+            try {
+              const parsed = JSON.parse(data);
+              if (parsed.report) { lastReport = { markdown: parsed.report, title: parsed.report_json?.title }; pdfBtn.style.display = 'inline-block'; }
+            } catch (_) {}
+          }
           line(event, data, event === 'error' ? 'err' : 'ev');
         }
       }

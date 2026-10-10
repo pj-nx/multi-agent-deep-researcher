@@ -190,6 +190,17 @@ def _with_graph_module(monkeypatch, tmp_path, source: str):
     _il.invalidate_caches()
 
 
+@pytest.mark.anyio
+async def test_report_pdf_endpoint(monkeypatch):
+    mod = _load_api(monkeypatch)
+    async with _client(mod) as c:
+        r = await c.post("/api/report/pdf", json={"markdown": "# Title\n\nBody [E-1111111111].",
+                                                  "title": "My \"report\""})
+        assert r.status_code == 200 and r.headers["content-type"] == "application/pdf"
+        assert r.content[:5] == b"%PDF-" and 'filename="My report.pdf"' in r.headers["content-disposition"]
+        assert (await c.post("/api/report/pdf", json={"markdown": ""})).status_code == 422
+
+
 def test_graph_available_distinguishes_missing_from_broken(monkeypatch, tmp_path, caplog, request):
     mod = _load_api(monkeypatch)
     real = sys.modules.get("deep_researcher.graph")
