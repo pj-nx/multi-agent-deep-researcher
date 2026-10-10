@@ -93,7 +93,8 @@
       for (;;) {
         const { value, done } = await reader.read();
         if (done) break;
-        buf += dec.decode(value, { stream: true });
+        // Normalise CRLF (some proxies rewrite line endings) before looking for block boundaries.
+        buf = (buf + dec.decode(value, { stream: true })).replace(/\r\n/g, '\n');
         let i;
         while ((i = buf.indexOf('\n\n')) >= 0) {
           const { event, data } = parseBlock(buf.slice(0, i));

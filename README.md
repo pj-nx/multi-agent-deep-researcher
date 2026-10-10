@@ -122,8 +122,9 @@ The research endpoint spends real money per call, so three env vars guard it (al
 | Variable | Default | Effect |
 |---|---|---|
 | `API_AUTH_TOKEN` | unset (open) | When set, `POST /api/research*` require `Authorization: Bearer <token>` or `X-API-Key`. The hosted UI shows a token field when health reports `auth_required`. |
-| `RATE_LIMIT_PER_MINUTE` | `6` | Sliding window per client IP (honours `X-Forwarded-For`); `0` disables. |
-| `MAX_CONCURRENT_RUNS` | `3` | Simultaneous research streams per instance; extra requests get `503` with `Retry-After`. |
+| `RATE_LIMIT_PER_MINUTE` | `6` | Sliding window per client IP; `0` disables. Idle keys are evicted so memory stays bounded. |
+| `MAX_CONCURRENT_RUNS` | `3` | Simultaneous research streams per instance; extra requests get `503` with `Retry-After`. Released on every exit path, including client disconnects. |
+| `TRUST_PROXY_HEADERS` | on when `VERCEL` is set, else off | Use `x-real-ip` / `x-vercel-forwarded-for` / `x-forwarded-for` as the rate-limit key. Off by default locally because those headers are forgeable without a proxy in front. |
 
 Set `API_AUTH_TOKEN` on Vercel before sharing the URL. The limiter is in-process, which bounds
 burst cost per instance; swap in Upstash/Redis if you need a global limit. `/api/health` stays

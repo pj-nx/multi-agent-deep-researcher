@@ -13,12 +13,14 @@ Protection (all configurable by env):
                           or `X-API-Key: <token>`; /api/health stays public
   RATE_LIMIT_PER_MINUTE   per-client sliding window (default 6; 0 disables)
   MAX_CONCURRENT_RUNS     simultaneous research streams per instance (default 3)
+  TRUST_PROXY_HEADERS     true → client IP from x-real-ip / x-vercel-forwarded-for /
+                          x-forwarded-for (default: on when VERCEL is set, else off, because
+                          a client can forge those headers when no proxy is in front)
 The limiter is in-process: on Vercel each instance counts separately, which still bounds
 burst cost; move it to Upstash/Redis if the project outgrows that.
 """
 from __future__ import annotations
 
-import asyncio
 import functools
 import json
 import logging
@@ -28,8 +30,9 @@ import sys
 import time
 import uuid
 from collections import defaultdict, deque
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable, Iterable
 from pathlib import Path
+from typing import Any
 
 # Vercel installs requirements.txt but not the local package; make `src/` importable.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
@@ -37,6 +40,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
+from starlette.concurrency import iterate_in_threadpool
+from starlette.types import Receive, Scope, Send
 
 from deep_researcher import llm, tracing
 from deep_researcher.schemas import ResearchPlan
@@ -64,6 +69,9 @@ RUN_BUDGET_SECONDS = _env_int("RUN_BUDGET_SECONDS", 240)
 RATE_LIMIT_PER_MINUTE = _env_int("RATE_LIMIT_PER_MINUTE", 6)
 MAX_CONCURRENT_RUNS = _env_int("MAX_CONCURRENT_RUNS", 3)
 API_AUTH_TOKEN = os.getenv("API_AUTH_TOKEN") or None
+_TRUTHY = {"1", "true", "yes", "on"}
+_trust_default = "true" if os.getenv("VERCEL") else "false"
+TRUST_PROXY_HEADERS = (os.getenv("TRUST_PROXY_HEADERS") or _trust_default).lower() in _TRUTHY
 API_TAGS = ["api", "vercel" if os.getenv("VERCEL") else "local"]
 
 
@@ -79,9 +87,12 @@ class ResumeRequest(BaseModel):
 # --------------------------------------------------------------------------- protection
 
 def _client_ip(request: Request) -> str:
-    fwd = request.headers.get("x-forwarded-for")
-    if fwd:
-        return fwd.split(",")[0].strip()
+    """Rate-limit key. Proxy headers are only honoured when TRUST_PROXY_HEADERS is on."""
+    if TRUST_PROXY_HEADERS:
+        for header in ("x-real-ip", "x-vercel-forwarded-for", "x-forwarded-for"):
+            value = request.headers.get(header)
+            if value:
+                return value.split(",")[0].strip()
     return request.client.host if request.client else "unknown"
 
 
@@ -96,42 +107,101 @@ def require_auth(request: Request) -> None:
 
 
 class RateLimiter:
-    """Sliding-window limiter keyed by client IP. In-process; see module docstring."""
+    """Sliding-window limiter keyed by client IP. In-process; see module docstring.
 
-    def __init__(self, per_minute: int) -> None:
+    Memory is bounded: a key is dropped as soon as its window empties, and once the table
+    exceeds ``sweep_at`` keys every expired window is evicted before the next check.
+    """
+
+    def __init__(self, per_minute: int, *, window_s: float = 60.0, sweep_at: int = 10_000,
+                 clock: Callable[[], float] = time.monotonic) -> None:
         self.per_minute = per_minute
+        self.window_s = window_s
+        self.sweep_at = sweep_at
+        self._clock = clock
         self._hits: dict[str, deque[float]] = defaultdict(deque)
+
+    def __len__(self) -> int:
+        return len(self._hits)
+
+    def _expire(self, window: deque[float], now: float) -> None:
+        while window and now - window[0] > self.window_s:
+            window.popleft()
+
+    def _sweep(self, now: float) -> None:
+        for key in [k for k, w in self._hits.items() if not w or now - w[-1] > self.window_s]:
+            del self._hits[key]
 
     def check(self, key: str) -> None:
         if self.per_minute <= 0:
             return
-        now = time.monotonic()
+        now = self._clock()
+        if len(self._hits) >= self.sweep_at:
+            self._sweep(now)
         window = self._hits[key]
-        while window and now - window[0] > 60:
-            window.popleft()
+        self._expire(window, now)
         if len(window) >= self.per_minute:
-            retry = max(1, int(60 - (now - window[0])) + 1)
+            retry = max(1, int(self.window_s - (now - window[0])) + 1)
+            if not window:
+                del self._hits[key]
             raise HTTPException(status_code=429, detail="Rate limit exceeded.",
                                 headers={"Retry-After": str(retry)})
         window.append(now)
 
 
+class RunSlots:
+    """Non-blocking concurrency cap (single event loop, so a plain counter is race-free)."""
+
+    def __init__(self, limit: int) -> None:
+        self.limit = limit
+        self.active = 0
+
+    def acquire(self) -> Slot:
+        if self.active >= self.limit:
+            raise HTTPException(status_code=503, detail="Too many research runs in progress; retry shortly.",
+                                headers={"Retry-After": "30"})
+        self.active += 1
+        return Slot(self)
+
+
+class Slot:
+    """Handle for one acquired slot; ``release()`` is idempotent."""
+
+    def __init__(self, pool: RunSlots) -> None:
+        self._pool: RunSlots | None = pool
+
+    def release(self) -> None:
+        if self._pool is not None:
+            self._pool.active -= 1
+            self._pool = None
+
+
+class SlotStreamingResponse(StreamingResponse):
+    """StreamingResponse that releases its slot on every exit path.
+
+    Starlette may never start the body generator (client gone before the first byte) or may
+    raise ClientDisconnect mid-stream and skip background tasks, so the generator's ``finally``
+    alone is not enough. Wrapping ``__call__`` is the one place that always runs.
+    """
+
+    def __init__(self, *args: Any, slot: Slot, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.slot = slot
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        try:
+            await super().__call__(scope, receive, send)
+        finally:
+            self.slot.release()
+
+
 rate_limiter = RateLimiter(RATE_LIMIT_PER_MINUTE)
-run_slots = asyncio.Semaphore(MAX_CONCURRENT_RUNS)
+run_slots = RunSlots(MAX_CONCURRENT_RUNS)
 
 
 def guard(request: Request) -> None:
     require_auth(request)
     rate_limiter.check(_client_ip(request))
-
-
-def acquire_slot() -> None:
-    """Non-blocking concurrency cap; release in the stream's `finally`."""
-    if run_slots.locked():
-        raise HTTPException(status_code=503, detail="Too many research runs in progress; retry shortly.",
-                            headers={"Retry-After": "30"})
-    # Semaphore.acquire() would await; emulate try-acquire since we checked locked() above.
-    run_slots._value -= 1  # noqa: SLF001 - asyncio has no public try_acquire
 
 
 # --------------------------------------------------------------------------- helpers
@@ -184,9 +254,24 @@ async def _stub_events(question: str, thread_id: str) -> AsyncIterator[tuple[str
     }
 
 
-async def _run_stream(name: str, thread_id: str, inputs: dict, stage: str,
-                      events_factory) -> AsyncIterator[str]:
-    """Shared SSE envelope: started → events → done, with error event, tracing and slot release."""
+async def _aiter(events: Any) -> AsyncIterator[tuple[str, dict]]:
+    """Accept an async iterator *or* a sync iterable (e.g. LangGraph ``graph.stream``).
+
+    Sync iterables are pulled in a worker thread so a blocking graph never stalls the loop.
+    """
+    if hasattr(events, "__aiter__"):
+        async for item in events:
+            yield item
+    elif isinstance(events, Iterable):
+        async for item in iterate_in_threadpool(iter(events)):
+            yield item
+    else:
+        raise TypeError(f"events source must be iterable, got {type(events).__name__}")
+
+
+async def _run_stream(name: str, thread_id: str, inputs: dict, stage: str, slot: Slot,
+                      events_factory: Callable[[], Any]) -> AsyncIterator[str]:
+    """Shared SSE envelope: started → events → done, with error event and tracing."""
     started = time.monotonic()
     last_event: dict = {}
     try:
@@ -195,7 +280,7 @@ async def _run_stream(name: str, thread_id: str, inputs: dict, stage: str,
             yield _sse("started", {"thread_id": thread_id, **inputs.get("echo", {}),
                                    "trace_url": tracing.run_url(run)})
             try:
-                async for event, data in events_factory():
+                async for event, data in _aiter(events_factory()):
                     last_event = {"event": event, **data}
                     yield _sse(event, data)
             except Exception:  # must reach the client as an event, not a dropped socket
@@ -210,7 +295,7 @@ async def _run_stream(name: str, thread_id: str, inputs: dict, stage: str,
                 run.end(outputs={"last_event": last_event, "elapsed_s": elapsed})
             yield _sse("done", {"thread_id": thread_id, "elapsed_s": elapsed})
     finally:
-        run_slots.release()
+        slot.release()
         await tracing.aflush()
 
 
@@ -218,7 +303,7 @@ async def _run_stream(name: str, thread_id: str, inputs: dict, stage: str,
 
 @app.post("/api/research", dependencies=[Depends(guard)])
 async def research(req: ResearchRequest) -> StreamingResponse:
-    acquire_slot()
+    slot = run_slots.acquire()
     thread_id = str(uuid.uuid4())
     max_hops = req.max_hops if req.max_hops is not None else MAX_HOPS
 
@@ -234,8 +319,8 @@ async def research(req: ResearchRequest) -> StreamingResponse:
         )
 
     inputs = {"question": req.question, "max_hops": max_hops, "echo": {"question": req.question}}
-    return StreamingResponse(_run_stream("api.research", thread_id, inputs, "plan", events),
-                             media_type="text/event-stream")
+    return SlotStreamingResponse(_run_stream("api.research", thread_id, inputs, "plan", slot, events),
+                                 media_type="text/event-stream", slot=slot)
 
 
 @app.post("/api/research/{thread_id}/resume", dependencies=[Depends(guard)])
@@ -246,7 +331,7 @@ async def resume(thread_id: str, req: ResumeRequest) -> StreamingResponse:
         raise HTTPException(status_code=422, detail="thread_id must be a UUID.") from exc
     if not _graph_available():
         raise HTTPException(status_code=501, detail="Research graph not wired yet (see PLAN.md Phase 6).")
-    acquire_slot()
+    slot = run_slots.acquire()
     from deep_researcher.graph import resume_with_plan  # type: ignore[import-not-found]
 
     def events():
@@ -255,5 +340,5 @@ async def resume(thread_id: str, req: ResumeRequest) -> StreamingResponse:
                                 config=tracing.run_config(thread_id, tags=["research"]))
 
     inputs = {"thread_id": thread_id, "plan": req.plan.model_dump()}
-    return StreamingResponse(_run_stream("api.resume", thread_id, inputs, "research", events),
-                             media_type="text/event-stream")
+    return SlotStreamingResponse(_run_stream("api.resume", thread_id, inputs, "research", slot, events),
+                                 media_type="text/event-stream", slot=slot)

@@ -11,7 +11,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def _load_api(monkeypatch, **env):
-    for var in ("API_AUTH_TOKEN", "RATE_LIMIT_PER_MINUTE", "MAX_CONCURRENT_RUNS", "MAX_HOPS", "RUN_BUDGET_SECONDS"):
+    for var in ("API_AUTH_TOKEN", "RATE_LIMIT_PER_MINUTE", "MAX_CONCURRENT_RUNS", "MAX_HOPS", "RUN_BUDGET_SECONDS",
+                "TRUST_PROXY_HEADERS", "VERCEL"):
         monkeypatch.delenv(var, raising=False)
     for k, v in env.items():
         monkeypatch.setenv(k, v)
@@ -69,10 +70,85 @@ async def test_rate_limit(monkeypatch):
             assert (await c.post("/api/research", json={"question": "Does remote work help?"})).status_code == 200
         r = await c.post("/api/research", json={"question": "Does remote work help?"})
         assert r.status_code == 429 and "retry-after" in r.headers
-        # a different client IP has its own window
+        # without a trusted proxy a forged X-Forwarded-For must NOT open a fresh window
         r = await c.post("/api/research", json={"question": "Does remote work help?"},
                          headers={"x-forwarded-for": "203.0.113.9, 10.0.0.1"})
-        assert r.status_code == 200
+        assert r.status_code == 429
+
+
+@pytest.mark.anyio
+async def test_proxy_headers_honoured_only_when_trusted(monkeypatch):
+    mod = _load_api(monkeypatch, RATE_LIMIT_PER_MINUTE="1", VERCEL="1")   # Vercel ⇒ trusted
+    assert mod.TRUST_PROXY_HEADERS is True
+    async with _client(mod) as c:
+        q = {"question": "Does remote work help?"}
+        assert (await c.post("/api/research", json=q, headers={"x-real-ip": "198.51.100.1"})).status_code == 200
+        assert (await c.post("/api/research", json=q, headers={"x-real-ip": "198.51.100.1"})).status_code == 429
+        # a genuinely different client (as reported by the proxy) has its own window
+        assert (await c.post("/api/research", json=q, headers={"x-real-ip": "198.51.100.2"})).status_code == 200
+        # x-real-ip wins over x-forwarded-for when both are present
+        assert (await c.post("/api/research", json=q, headers={
+            "x-real-ip": "198.51.100.2", "x-forwarded-for": "203.0.113.77"})).status_code == 429
+    mod = _load_api(monkeypatch, TRUST_PROXY_HEADERS="false", VERCEL="1")  # explicit override
+    assert mod.TRUST_PROXY_HEADERS is False
+
+
+def test_rate_limiter_memory_is_bounded(monkeypatch):
+    mod = _load_api(monkeypatch)
+    now = [1000.0]
+    rl = mod.RateLimiter(2, sweep_at=5, clock=lambda: now[0])
+    rl.check("a")
+    assert len(rl) == 1
+    now[0] += 61                      # window expired → key dropped on next touch of that key
+    rl.check("a")
+    assert len(rl) == 1               # re-added once, not accumulated
+    for ip in "bcdef":                # exceed sweep_at with stale keys...
+        rl.check(ip)
+    now[0] += 61
+    rl.check("z")                     # ...sweep evicts every expired key
+    assert len(rl) == 1 and "z" in rl._hits
+
+
+@pytest.mark.anyio
+async def test_slot_released_even_if_body_never_streams(monkeypatch):
+    mod = _load_api(monkeypatch, MAX_CONCURRENT_RUNS="1")
+    slot = mod.run_slots.acquire()
+    assert mod.run_slots.active == 1
+
+    async def never_started():
+        yield "unreachable"
+
+    resp = mod.SlotStreamingResponse(never_started(), slot=slot)
+
+    async def receive():
+        return {"type": "http.disconnect"}
+
+    async def send(message):
+        raise OSError("client went away")      # spec 2.4 path: Starlette raises ClientDisconnect
+
+    from starlette.requests import ClientDisconnect
+    with pytest.raises(ClientDisconnect):
+        await resp({"type": "http", "asgi": {"spec_version": "2.4"}}, receive, send)
+    assert mod.run_slots.active == 0
+    slot.release()                            # idempotent
+    assert mod.run_slots.active == 0
+
+
+@pytest.mark.anyio
+async def test_aiter_accepts_sync_and_async_sources(monkeypatch):
+    mod = _load_api(monkeypatch)
+
+    def sync_events():
+        yield "a", {"n": 1}
+        yield "b", {"n": 2}
+
+    async def async_events():
+        yield "c", {"n": 3}
+
+    assert [e async for e in mod._aiter(sync_events())] == [("a", {"n": 1}), ("b", {"n": 2})]
+    assert [e async for e in mod._aiter(async_events())] == [("c", {"n": 3})]
+    with pytest.raises(TypeError):
+        _ = [e async for e in mod._aiter(42)]
 
 
 @pytest.mark.anyio
@@ -81,7 +157,7 @@ async def test_slots_released_after_stream(monkeypatch):
     async with _client(mod) as c:
         for _ in range(3):  # would 503 on the second call if the slot leaked
             assert (await c.post("/api/research", json={"question": "Does remote work help?"})).status_code == 200
-    assert not mod.run_slots.locked()
+    assert mod.run_slots.active == 0
 
 
 @pytest.mark.anyio
