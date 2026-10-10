@@ -2,7 +2,7 @@
 
 Policy per source type:
 - ``all``   every enabled tool runs (papers: arXiv + Semantic Scholar complement each other)
-- ``first`` the first enabled tool runs (news: NewsAPI when a key exists, else GDELT)
+- ``first`` the first enabled tool runs (news: newsdata.io when a key exists, else GDELT)
 
 Keyless tools (arXiv, Semantic Scholar, Wikipedia, GDELT) are always enabled. ``api`` has no
 built-in tool: register domain APIs with :func:`register` (e.g. FRED, Polygon) when a project
@@ -18,7 +18,7 @@ import httpx
 from deep_researcher.schemas import SourceType
 from deep_researcher.tools.arxiv import ArxivTool
 from deep_researcher.tools.base import RetrievalTool
-from deep_researcher.tools.news import GdeltTool, NewsApiTool
+from deep_researcher.tools.news import GdeltTool, NewsDataTool
 from deep_researcher.tools.semantic_scholar import SemanticScholarTool
 from deep_researcher.tools.web_search import TavilyReportsTool, TavilyTool
 from deep_researcher.tools.wikipedia import WikipediaTool
@@ -33,7 +33,7 @@ class SourcePolicy:
 POLICIES: dict[SourceType, SourcePolicy] = {
     "papers": SourcePolicy([ArxivTool, SemanticScholarTool], "all"),
     "web": SourcePolicy([TavilyTool], "all"),
-    "news": SourcePolicy([NewsApiTool, GdeltTool], "first"),
+    "news": SourcePolicy([NewsDataTool, GdeltTool], "first"),
     "wikipedia": SourcePolicy([WikipediaTool], "all"),
     "reports": SourcePolicy([TavilyReportsTool], "all"),
     "api": SourcePolicy([], "all"),

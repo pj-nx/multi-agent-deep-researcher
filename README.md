@@ -52,7 +52,7 @@ uv run uvicorn api.index:app --reload      # HTTP API at http://localhost:8000/a
 
 The Gradio UI streams the agents' activity live, lets you edit the plan table before approving, renders the
 report and offers `.md` / `.json` downloads. Its **Settings** tab edits the git-ignored `.env` in place and
-applies changes immediately: API keys (OpenRouter, Tavily, NewsAPI, Semantic Scholar, LangSmith; shown masked,
+applies changes immediately: API keys (OpenRouter, Tavily, newsdata.io, Semantic Scholar, LangSmith; shown masked,
 blank = keep, `none` = clear), the model per tier (dropdowns, with a button that loads the live OpenRouter
 catalogue), fallback models and reasoning effort, the embeddings provider/model/dimensions and Chroma
 collection, and run limits. "Test OpenRouter key" makes one tiny call and reports the latency.
@@ -68,7 +68,7 @@ whether its key is present (`/api/health` → `sources`). Keyless tools are alwa
 | `papers` | Semantic Scholar | optional `SEMANTIC_SCHOLAR_API_KEY` | the keyless pool returned 429 on every call in testing; request a free key, it is the right source for social-science papers (arXiv is not) |
 | `web` | Tavily | `TAVILY_API_KEY` | general web search |
 | `reports` | Tavily (reports mode) | `TAVILY_API_KEY` | steered to reports/whitepapers/PDFs |
-| `news` | NewsAPI → GDELT | `NEWSAPI_KEY` optional | NewsAPI when the key is set, otherwise GDELT (keyless, titles only, 1 request / 5 s, strict query syntax: the tool sanitises queries to plain keywords) |
+| `news` | newsdata.io → GDELT | `NEWSDATA_API_KEY` optional | newsdata.io when the key is set (recent news, ~48 h window on `latest`; free plan: 10 articles/request, descriptions only, 30 credits per 15 min), otherwise GDELT (keyless, titles only, 1 request / 5 s). Both tools sanitise queries to plain keywords |
 | `wikipedia` | Wikipedia | none | search + intro extracts |
 | `api` | none built in | per service | `tools.register("api", YourTool)` for FRED, Polygon, etc. |
 

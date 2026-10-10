@@ -12,7 +12,7 @@ from deep_researcher.tools import POLICIES, fetch_text, info, register, tools_fo
 from deep_researcher.tools.arxiv import ArxivTool
 from deep_researcher.tools.base import RetrievalTool, SearchResult, iso_date
 from deep_researcher.tools.fetch import html_to_text
-from deep_researcher.tools.news import GdeltTool, gdelt_query
+from deep_researcher.tools.news import GdeltTool, gdelt_query, newsdata_query
 from deep_researcher.tools.semantic_scholar import SemanticScholarTool
 from deep_researcher.tools.web_search import TavilyReportsTool, TavilyTool
 from deep_researcher.tools.wikipedia import WikipediaTool
@@ -51,8 +51,14 @@ WIKI_JSON = {"query": {"pages": [
 ]}}
 GDELT_JSON = {"articles": [{"url": "https://news.example/a", "title": "Banks order return", "seendate": "20250131T120000Z",
                             "domain": "news.example", "sourcecountry": "UK"}]}
-NEWSAPI_JSON = {"status": "ok", "articles": [{"title": "T", "url": "https://n/1", "description": "D.", "content": "C...",
-                                             "publishedAt": "2025-02-01T10:00:00Z", "source": {"name": "Reuters"}}]}
+NEWSDATA_JSON = {"status": "success", "totalResults": 2, "results": [
+    {"article_id": "a1", "title": "T", "link": "https://n/1", "description": "D.", "content": "ONLY AVAILABLE IN PAID PLANS",
+     "pubDate": "2025-02-01 10:00:00", "source_id": "reuters", "source_name": "Reuters", "source_priority": 12,
+     "country": ["united kingdom"], "category": ["business"], "creator": ["A. Writer"]},
+    {"article_id": "a2", "title": "T2", "link": "https://n/2", "description": "D2.", "content": "Full body text.",
+     "pubDate": "2025-02-02 10:00:00", "source_name": "FT"},
+]}
+NEWSDATA_ERROR = {"status": "error", "results": {"message": "API key is invalid", "code": "Unauthorized"}}
 TAVILY_JSON = {"results": [{"title": "W", "url": "https://w/1?utm_source=x", "content": "Web content", "score": 0.9,
                             "published_date": "2025-03-01"}]}
 
@@ -73,9 +79,12 @@ def _transport(status_by_host=None):
             return httpx.Response(200, json=WIKI_JSON)
         if host == "api.gdeltproject.org":
             return httpx.Response(200, json=GDELT_JSON, headers={"content-type": "application/json"})
-        if host == "newsapi.org":
-            assert request.headers["x-api-key"] == "nk"
-            return httpx.Response(200, json=NEWSAPI_JSON)
+        if host == "newsdata.io":
+            assert request.headers["x-access-key"] == "nk" and "apikey" not in str(request.url)
+            assert request.url.params["size"] == "5" and request.url.params["language"] == "en"
+            if request.url.params["q"] == "bad key":
+                return httpx.Response(200, json=NEWSDATA_ERROR)
+            return httpx.Response(200, json=NEWSDATA_JSON)
         if host == "api.tavily.com":
             body = json.loads(request.content)
             assert body["api_key"] == "tk"
@@ -94,7 +103,7 @@ def client():
 def _fast(monkeypatch):
     for cls in (ArxivTool, SemanticScholarTool, GdeltTool, WikipediaTool):
         monkeypatch.setattr(cls, "min_interval_s", 0.0)
-    for v in ("TAVILY_API_KEY", "NEWSAPI_KEY", "SEMANTIC_SCHOLAR_API_KEY"):
+    for v in ("TAVILY_API_KEY", "NEWSDATA_API_KEY", "SEMANTIC_SCHOLAR_API_KEY", "NEWSDATA_COUNTRY"):
         monkeypatch.delenv(v, raising=False)
 
 
@@ -137,14 +146,23 @@ async def test_wikipedia_parser_orders_by_rank_and_drops_empty(client):
     assert res[0].url.endswith("/Four-day_workweek") and res[0].published_at == "2026-10-07"
 
 
+def test_newsdata_query_strips_operators_and_caps_length():
+    assert newsdata_query("four-day week AND productivity (UK) OR trial") == "four-day week productivity UK trial"
+    assert len(newsdata_query("word " * 200)) <= 512
+
+
 @pytest.mark.anyio
-async def test_news_prefers_newsapi_when_key_present_else_gdelt(client, monkeypatch):
+async def test_news_prefers_newsdata_when_key_present_else_gdelt(client, monkeypatch):
     assert [t.name for t in tools_for(["news"], client)] == ["gdelt"]
-    monkeypatch.setenv("NEWSAPI_KEY", "nk")
+    monkeypatch.setenv("NEWSDATA_API_KEY", "nk")
     tools = tools_for(["news"], client)
-    assert [t.name for t in tools] == ["newsapi"]
-    res = await tools[0].search("x")
-    assert res[0].extra["source"] == "Reuters" and res[0].text == "D. C..."
+    assert [t.name for t in tools] == ["newsdata"]
+    res = await tools[0].search("four-day week", limit=5)
+    assert [r.title for r in res] == ["T", "T2"]
+    assert res[0].extra["source"] == "Reuters" and res[0].text == "D." and res[0].published_at == "2025-02-01"
+    assert res[0].extra["needs_fetch"] is True                      # free-plan placeholder content dropped
+    assert res[1].text == "D2. Full body text." and res[1].extra["needs_fetch"] is False
+    assert await tools[0].search("bad key", limit=5) == []          # API-level error => empty, never raises
     g = await GdeltTool(client).search("banks office return mandate")
     assert g[0].extra["needs_fetch"] is True and g[0].published_at == "2025-01-31" and g[0].text == g[0].title
 
@@ -170,6 +188,21 @@ async def test_http_errors_never_raise(monkeypatch):
         raise httpx.ConnectError("nope")
 
     assert await ArxivTool(httpx.AsyncClient(transport=httpx.MockTransport(boom))).search("x") == []
+
+
+def test_newsdata_size_is_capped_to_plan(monkeypatch):
+    from deep_researcher.tools.news import NewsDataTool
+
+    monkeypatch.setenv("NEWSDATA_API_KEY", "nk")
+    seen = {}
+
+    def handler(request):
+        seen["size"] = request.url.params["size"]
+        return httpx.Response(200, json={"status": "success", "results": []})
+
+    import asyncio
+    asyncio.run(NewsDataTool(httpx.AsyncClient(transport=httpx.MockTransport(handler))).search("x y", limit=40))
+    assert seen["size"] == "10"
 
 
 def test_registry_info_and_dedup(monkeypatch):

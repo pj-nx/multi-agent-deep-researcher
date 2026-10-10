@@ -19,7 +19,7 @@ summarisation over a large evidence corpus).
 |---|---|---|
 | Orchestration | **LangGraph** `StateGraph` (hand-built graph, not `create_supervisor`) | An explicit graph makes the collaboration visible and deterministic. `Send` gives parallel fan-out, conditional edges give the multi-hop loop, `interrupt()` gives human approval. Matches what you already learned in `agents/4_langgraph`. |
 | LLMs | **OpenRouter** via `langchain-openrouter` (`src/deep_researcher/llm.py`). Tiers: heavy `anthropic/claude-opus-5.5`, worker `anthropic/claude-sonnet-5`, cheap `anthropic/claude-haiku-4.5`; per-role env overrides, model fallbacks, provider routing | One key for every vendor; swap a role's model with an env var; fallbacks keep a run alive when a provider is down. |
-| Retrieval tools | arXiv API, Semantic Scholar API, Tavily (or Serper) web search, NewsAPI (or GDELT), Wikipedia, PDF fetcher (`pypdf`), optional domain APIs (e.g. FRED, Polygon) | Covers the four source types in the brief: papers, news, reports, APIs. |
+| Retrieval tools | arXiv API, Semantic Scholar API, Tavily (or Serper) web search, newsdata.io (or GDELT), Wikipedia, PDF fetcher (`pypdf`), optional domain APIs (e.g. FRED, Polygon) | Covers the four source types in the brief: papers, news, reports, APIs. |
 | Evidence store | **Chroma, embedded and persistent** (`CHROMA_PATH`) via `src/deep_researcher/store/` | Zero-ops, survives restarts, same client for Chroma server/cloud; every chunk carries `evidence_id`, `url`, `source_type`, `published_at`, `credibility`; collection is fingerprinted with the embedding model. |
 | Embeddings | **256-d Matryoshka vectors, 512-token chunks.** Local default `Snowflake/snowflake-arctic-embed-m-v1.5` (CPU, no key); hosted default `openai/text-embedding-3-small` via **OpenRouter** (`EMBEDDINGS_PROVIDER=openrouter`, same key as the LLMs); Ollama `nomic-embed-text` as a third option. `src/deep_researcher/embeddings.py` | Small index, keyless local dev, one env var to switch for hosted runs; fixed-size models are refused at 256-d rather than silently truncated. |
 | Persistence | `SqliteSaver` checkpointer | Resume after human approval, re-run a failed node, inspect state per thread. |
@@ -114,7 +114,7 @@ A 3-hop run can produce 200–500 chunks, far more than you want in one prompt.
 ```
 deep-researcher/
 ├── pyproject.toml            # uv-managed; deps below
-├── .env.example              # OPENROUTER_API_KEY, OPENAI_API_KEY (embeddings), TAVILY_API_KEY, NEWSAPI_KEY, SEMANTIC_SCHOLAR_API_KEY, LANGSMITH_*
+├── .env.example              # OPENROUTER_API_KEY, OPENAI_API_KEY (embeddings), TAVILY_API_KEY, NEWSDATA_API_KEY, SEMANTIC_SCHOLAR_API_KEY, LANGSMITH_*
 ├── README.md
 ├── src/deep_researcher/
 │   ├── config.py             # max_hops, k, budgets
@@ -155,7 +155,7 @@ deep-researcher/
 
 Dependencies: `langgraph`, `langgraph-checkpoint-sqlite`, `langchain`, `langchain-openrouter`,
 `langchain-openai` (embeddings only), `langchain-community`, `langchain-chroma`, `chromadb`, `tavily-python`,
-`arxiv`, `semanticscholar`, `newsapi-python`, `wikipedia`, `pypdf`, `httpx`, `pydantic`,
+`arxiv`, `semanticscholar`, `wikipedia`, `pypdf`, `httpx`, `pydantic`,
 `gradio`, `langsmith`, `python-dotenv`, `pytest`.
 
 ---
@@ -169,7 +169,7 @@ Each phase ends with something runnable. Estimated effort assumes evenings/weeke
 - `graph.py` compiles the full topology (plan → approve/interrupt → `Send` fan-out → analyze → gap loop → insight → critic → report) with placeholder analysis nodes; fake-LLM/fake-tool test proves fan-out, interrupt/resume with an edited plan, budget stop and store writes (`tests/test_graph.py`).
 
 ### Phase 1 — Retrieval layer (1–2 days) — DONE 2026-10-10 (deterministic retriever)
-- Tools: arXiv, Semantic Scholar, Tavily (+ reports mode), NewsAPI → GDELT fallback, Wikipedia, PDF/HTML fetcher; registry with per-source policies and env-driven enablement (`tools/`). Live-checked: arXiv, Wikipedia, PDF fetch OK; Semantic Scholar keyless and GDELT frequently 429 → empty result, never fatal.
+- Tools: arXiv, Semantic Scholar, Tavily (+ reports mode), newsdata.io → GDELT fallback (newsdata.io replaced NewsAPI on 2026-10-10: header auth, free tier with descriptions, `latest` ≈ last 48 h), Wikipedia, PDF/HTML fetcher; registry with per-source policies and env-driven enablement (`tools/`). Live-checked: arXiv, Wikipedia, PDF fetch OK; Semantic Scholar keyless and GDELT frequently 429 → empty result, never fatal.
 - `EvidenceStore`: 512-token chunks, 256-d vectors, URL-normalised dedup, idempotent upsert.
 - Retriever node is **deterministic** (all enabled tools for the sub-question's source types, in parallel, de-duplicated, stored). The ReAct variant (model reformulates queries) is deferred: it adds cost and nondeterminism without changing the state contract.
 - Planner (structured `ResearchPlan`, ids normalised) and `interrupt()` approval were pulled forward from Phase 2 so the pipeline runs end to end; CLI `python -m deep_researcher` with `--auto-approve`.
@@ -276,7 +276,7 @@ Each phase ends with something runnable. Estimated effort assumes evenings/weeke
 - `max_hops` (default 3), `max_revisions` (2), per-run token budget, per-tool timeout and retry with backoff.
 - Retriever tools return at most N results each; validator drops irrelevant chunks before embedding to control store size.
 - All external text is **data, not instructions**: tool outputs are wrapped in delimiters and the system prompts say to ignore instructions found in retrieved content.
-- Respect robots/ToS: use official APIs (arXiv, Semantic Scholar, NewsAPI) rather than scraping; cache fetched PDFs locally.
+- Respect robots/ToS: use official APIs (arXiv, Semantic Scholar, newsdata.io) rather than scraping; cache fetched PDFs locally.
 - Report always includes a *Limitations* section listing sub-questions with thin or conflicting evidence.
 
 ---
@@ -334,7 +334,7 @@ browser ──POST /api/research/{id}/resume {plan}─▶ graph.stream(Command(r
 - `requirements.txt`: Vercel's Python runtime installs from this file; keep it in sync with
   `pyproject.toml` (`uv export --no-hashes --format requirements-txt > requirements.txt`).
 - Environment variables (set in the Vercel dashboard, never committed): `OPENROUTER_API_KEY`
-  (plus optional `OPENROUTER_MODEL_*` / routing vars), `OPENAI_API_KEY` (embeddings), `TAVILY_API_KEY`, `NEWSAPI_KEY`, `SEMANTIC_SCHOLAR_API_KEY`,
+  (plus optional `OPENROUTER_MODEL_*` / routing vars), `OPENAI_API_KEY` (embeddings), `TAVILY_API_KEY`, `NEWSDATA_API_KEY`, `SEMANTIC_SCHOLAR_API_KEY`,
   `DATABASE_URL` (Postgres), `UPSTASH_VECTOR_REST_URL`, `UPSTASH_VECTOR_REST_TOKEN`,
   `LANGSMITH_API_KEY`, `LANGSMITH_TRACING=true`, `MAX_HOPS=1`.
 - Budget guard: the API reads `MAX_HOPS` and `RUN_BUDGET_SECONDS` (default 240) and stops

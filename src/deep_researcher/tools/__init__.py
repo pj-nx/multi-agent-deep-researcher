@@ -1,4 +1,4 @@
-"""Retrieval tools: papers (arXiv, Semantic Scholar), web/reports (Tavily), news (NewsAPI/GDELT),
+"""Retrieval tools: papers (arXiv, Semantic Scholar), web/reports (Tavily), news (newsdata.io/GDELT),
 Wikipedia."""
 
 from deep_researcher.tools.base import RetrievalTool, SearchResult

@@ -50,12 +50,12 @@ def test_write_env_updates_in_place_and_appends(env_file):
 def test_normalise_blank_secret_unchanged_none_clears(monkeypatch):
     monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-existing")
     monkeypatch.setenv("MAX_HOPS", "1")
-    form = {"OPENROUTER_API_KEY": "", "TAVILY_API_KEY": "sk-or-…cdef (25 chars)", "NEWSAPI_KEY": "none",
+    form = {"OPENROUTER_API_KEY": "", "TAVILY_API_KEY": "sk-or-…cdef (25 chars)", "NEWSDATA_API_KEY": "none",
             "SEMANTIC_SCHOLAR_API_KEY": " newkey ", "LANGSMITH_TRACING": True, "MAX_HOPS": "1",
             "RUN_BUDGET_SECONDS": "300", "OPENROUTER_MODEL_HEAVY": "none", "UNKNOWN": "x"}
     u = S.normalise(form)
     assert "OPENROUTER_API_KEY" not in u and "TAVILY_API_KEY" not in u      # blank / masked => unchanged
-    assert u["NEWSAPI_KEY"] is None and u["SEMANTIC_SCHOLAR_API_KEY"] == "newkey"
+    assert u["NEWSDATA_API_KEY"] is None and u["SEMANTIC_SCHOLAR_API_KEY"] == "newkey"
     assert u["LANGSMITH_TRACING"] == "true"
     assert "MAX_HOPS" not in u and u["RUN_BUDGET_SECONDS"] == "300"          # unchanged text dropped
     assert u["OPENROUTER_MODEL_HEAVY"] is None and "UNKNOWN" not in u
