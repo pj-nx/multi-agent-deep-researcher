@@ -63,6 +63,32 @@ Or import the GitHub repo in the Vercel dashboard; pushes to `main` deploy autom
 - Human plan approval is split into two requests: `POST /api/research` returns the plan and a
   `thread_id`; `POST /api/research/{thread_id}/resume` continues from the checkpoint.
 
+## LLM provider: OpenRouter
+
+All agents get their chat model from [`src/deep_researcher/llm.py`](src/deep_researcher/llm.py),
+which routes through [OpenRouter](https://openrouter.ai). One key, any vendor, per-role model
+choice, automatic fallbacks.
+
+```bash
+OPENROUTER_API_KEY=sk-or-...
+```
+
+| Tier | Roles | Default model | Override |
+|---|---|---|---|
+| heavy | planner, analysis, insight, critic | `anthropic/claude-opus-5.5` | `OPENROUTER_MODEL_HEAVY` |
+| worker | retriever, report | `anthropic/claude-sonnet-5` | `OPENROUTER_MODEL_WORKER` |
+| cheap | validator, grader | `anthropic/claude-haiku-4.5` | `OPENROUTER_MODEL_CHEAP` |
+
+Any single role can be pinned with `OPENROUTER_MODEL_<ROLE>`, e.g.
+`OPENROUTER_MODEL_INSIGHT=openai/gpt-5.1`. `OPENROUTER_FALLBACK_MODELS` lists backups tried in
+order when the primary is unavailable, and `OPENROUTER_PROVIDER_ORDER` / `OPENROUTER_ZDR` /
+`OPENROUTER_SORT` control provider routing. `/api/health` shows the resolved model per role.
+
+```python
+from deep_researcher.llm import get_llm
+get_llm("planner").invoke("...")           # ChatOpenRouter, traced by LangSmith automatically
+```
+
 ## Tracing with LangSmith
 
 Set three variables (locally in `.env`, on Vercel in the project settings) and every request

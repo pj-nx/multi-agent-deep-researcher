@@ -25,7 +25,7 @@ from fastapi import FastAPI, HTTPException  # noqa: E402
 from fastapi.responses import StreamingResponse  # noqa: E402
 from pydantic import BaseModel, Field  # noqa: E402
 
-from deep_researcher import tracing  # noqa: E402
+from deep_researcher import llm, tracing  # noqa: E402
 
 tracing.configure()
 
@@ -65,6 +65,7 @@ def health() -> dict:
         "max_hops": MAX_HOPS,
         "run_budget_seconds": RUN_BUDGET_SECONDS,
         "tracing": tracing.info(),
+        "llm": llm.info(),
     }
 
 

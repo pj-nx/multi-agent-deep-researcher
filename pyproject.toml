@@ -8,6 +8,9 @@ dependencies = [
     "fastapi>=0.117.1",
     "pydantic>=2.9",
     "langsmith>=0.3",
+    "langchain-openrouter>=0.2.9",
+    "langchain-core>=1.0",
+    "httpx>=0.28",
 ]
 
 [project.optional-dependencies]
@@ -17,8 +20,7 @@ agents = [
     "langgraph-checkpoint-sqlite>=2.0",
     "langgraph-checkpoint-postgres>=2.0",
     "langchain>=1.0",
-    "langchain-anthropic>=1.0",
-    "langchain-openai>=1.0",
+    "langchain-openai>=1.0",      # embeddings only (OpenAI-compatible endpoint)
     "langchain-community>=0.3",
     "langchain-chroma>=0.2",
     "chromadb>=1.0",

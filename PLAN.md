@@ -18,7 +18,7 @@ summarisation over a large evidence corpus).
 | Concern | Choice | Why |
 |---|---|---|
 | Orchestration | **LangGraph** `StateGraph` (hand-built graph, not `create_supervisor`) | An explicit graph makes the collaboration visible and deterministic. `Send` gives parallel fan-out, conditional edges give the multi-hop loop, `interrupt()` gives human approval. Matches what you already learned in `agents/4_langgraph`. |
-| LLMs | Model-agnostic via `init_chat_model`; defaults: `claude-sonnet-5` for workers, `claude-opus-5-5` for analysis/insight, `claude-haiku-4-5-20251001` for relevance grading | Mix cost and quality per role. Swapping to OpenAI is a one-line config change. |
+| LLMs | **OpenRouter** via `langchain-openrouter` (`src/deep_researcher/llm.py`). Tiers: heavy `anthropic/claude-opus-5.5`, worker `anthropic/claude-sonnet-5`, cheap `anthropic/claude-haiku-4.5`; per-role env overrides, model fallbacks, provider routing | One key for every vendor; swap a role's model with an env var; fallbacks keep a run alive when a provider is down. |
 | Retrieval tools | arXiv API, Semantic Scholar API, Tavily (or Serper) web search, NewsAPI (or GDELT), Wikipedia, PDF fetcher (`pypdf`), optional domain APIs (e.g. FRED, Polygon) | Covers the four source types in the brief: papers, news, reports, APIs. |
 | Evidence store | **Chroma** (local, persistent) with `text-embedding-3-small` or `voyage-3` embeddings | Zero-ops for a POC; every chunk carries `evidence_id`, `url`, `source_type`, `published_at`, `credibility`. |
 | Persistence | `SqliteSaver` checkpointer | Resume after human approval, re-run a failed node, inspect state per thread. |
@@ -34,15 +34,15 @@ summarisation over a large evidence corpus).
 The four requested agents plus three additions (Planner, Source Validator, Red-Team Critic)
 that make the system genuinely multi-hop and trustworthy.
 
-| # | Agent | Model | Input | Output | Notes |
+| # | Agent | Tier (OpenRouter) | Input | Output | Notes |
 |---|---|---|---|---|---|
-| 1 | **Research Planner** (orchestrator) | Opus | user question | `ResearchPlan`: 3–7 sub-questions, each with suggested source types and a dependency hint | Structured output (Pydantic). Pauses with `interrupt()` so the user can edit/approve the plan. Also decides when to stop looping. |
-| 2 | **Contextual Retriever** (×N in parallel) | Sonnet | one sub-question | list of `Evidence` chunks written to Chroma | ReAct agent with the retrieval tools. One instance per sub-question via `Send`. Each tool result is chunked, embedded, de-duplicated (URL + simhash), and stored. |
-| 3 | **Source Validator** | Haiku | new evidence batch | credibility score 0–1, flags (primary/secondary, peer-reviewed, date, author/org, retracted?) | Cheap pass; rejects low-relevance chunks (LLM grader) so later agents see less noise. |
-| 4 | **Critical Analysis** | Opus | sub-question + top-k evidence (RAG query) | per-sub-question `Summary` with cited claims, `Contradiction[]`, `Gap[]` (follow-up questions) | Claim extraction → pairwise contradiction check → gap detection. Gaps feed the multi-hop loop. |
-| 5 | **Insight Generation** | Opus | all summaries + contradictions | `Insight[]`: hypothesis/trend, reasoning chain (steps each citing evidence IDs), confidence, what would falsify it | Explicit chain-of-evidence rather than free text. |
-| 6 | **Red-Team Critic** (added) | Sonnet | insights + evidence | `Critique`: unsupported claims, cherry-picking, missing perspectives; verdict `accept` / `revise` / `need_more_evidence` | `need_more_evidence` routes back to Planner with targeted queries. Bounded by `max_hops`. |
-| 7 | **Report Builder** | Sonnet | everything | Markdown report + JSON | Executive summary, findings per sub-question, contradictions table, insights with confidence, limitations, methodology appendix, full bibliography. Runs a **grounding check**: every `[E12]` citation must exist in the store. |
+| 1 | **Research Planner** (orchestrator) | heavy | user question | `ResearchPlan`: 3–7 sub-questions, each with suggested source types and a dependency hint | Structured output (Pydantic). Pauses with `interrupt()` so the user can edit/approve the plan. Also decides when to stop looping. |
+| 2 | **Contextual Retriever** (×N in parallel) | worker | one sub-question | list of `Evidence` chunks written to Chroma | ReAct agent with the retrieval tools. One instance per sub-question via `Send`. Each tool result is chunked, embedded, de-duplicated (URL + simhash), and stored. |
+| 3 | **Source Validator** | cheap | new evidence batch | credibility score 0–1, flags (primary/secondary, peer-reviewed, date, author/org, retracted?) | Cheap pass; rejects low-relevance chunks (LLM grader) so later agents see less noise. |
+| 4 | **Critical Analysis** | heavy | sub-question + top-k evidence (RAG query) | per-sub-question `Summary` with cited claims, `Contradiction[]`, `Gap[]` (follow-up questions) | Claim extraction → pairwise contradiction check → gap detection. Gaps feed the multi-hop loop. |
+| 5 | **Insight Generation** | heavy | all summaries + contradictions | `Insight[]`: hypothesis/trend, reasoning chain (steps each citing evidence IDs), confidence, what would falsify it | Explicit chain-of-evidence rather than free text. |
+| 6 | **Red-Team Critic** (added) | heavy | insights + evidence | `Critique`: unsupported claims, cherry-picking, missing perspectives; verdict `accept` / `revise` / `need_more_evidence` | `need_more_evidence` routes back to Planner with targeted queries. Bounded by `max_hops`. |
+| 7 | **Report Builder** | worker | everything | Markdown report + JSON | Executive summary, findings per sub-question, contradictions table, insights with confidence, limitations, methodology appendix, full bibliography. Runs a **grounding check**: every `[E12]` citation must exist in the store. |
 
 Non-agent services: `EvidenceStore` (Chroma wrapper), `CitationRegistry` (assigns `E1…En`), `Budget` (token/time/hop limits).
 
@@ -113,10 +113,12 @@ A 3-hop run can produce 200–500 chunks, far more than you want in one prompt.
 ```
 deep-researcher/
 ├── pyproject.toml            # uv-managed; deps below
-├── .env.example              # ANTHROPIC_API_KEY, OPENAI_API_KEY, TAVILY_API_KEY, NEWSAPI_KEY, SEMANTIC_SCHOLAR_API_KEY, LANGSMITH_*
+├── .env.example              # OPENROUTER_API_KEY, OPENAI_API_KEY (embeddings), TAVILY_API_KEY, NEWSAPI_KEY, SEMANTIC_SCHOLAR_API_KEY, LANGSMITH_*
 ├── README.md
 ├── src/deep_researcher/
-│   ├── config.py             # models per role, max_hops, k, budgets
+│   ├── config.py             # max_hops, k, budgets
+│   ├── llm.py                # OpenRouter model factory: get_llm(role)
+│   ├── tracing.py            # LangSmith helpers
 │   ├── schemas.py            # Pydantic: ResearchPlan, Evidence, Summary, Contradiction, Insight, Critique
 │   ├── state.py              # ResearchState + reducers
 │   ├── store/
@@ -149,8 +151,8 @@ deep-researcher/
 └── reports/                  # generated .md/.json output
 ```
 
-Dependencies: `langgraph`, `langgraph-checkpoint-sqlite`, `langchain`, `langchain-anthropic`,
-`langchain-openai`, `langchain-community`, `langchain-chroma`, `chromadb`, `tavily-python`,
+Dependencies: `langgraph`, `langgraph-checkpoint-sqlite`, `langchain`, `langchain-openrouter`,
+`langchain-openai` (embeddings only), `langchain-community`, `langchain-chroma`, `chromadb`, `tavily-python`,
 `arxiv`, `semanticscholar`, `newsapi-python`, `wikipedia`, `pypdf`, `httpx`, `pydantic`,
 `gradio`, `langsmith`, `python-dotenv`, `pytest`.
 
@@ -263,8 +265,8 @@ browser ──POST /api/research/{id}/resume {plan}─▶ graph.stream(Command(r
 - `vercel.json`: rewrites `/api/(.*)` to `api/index`, sets `maxDuration: 300` (raise on Pro).
 - `requirements.txt`: Vercel's Python runtime installs from this file; keep it in sync with
   `pyproject.toml` (`uv export --no-hashes --format requirements-txt > requirements.txt`).
-- Environment variables (set in the Vercel dashboard, never committed): `ANTHROPIC_API_KEY`,
-  `OPENAI_API_KEY`, `TAVILY_API_KEY`, `NEWSAPI_KEY`, `SEMANTIC_SCHOLAR_API_KEY`,
+- Environment variables (set in the Vercel dashboard, never committed): `OPENROUTER_API_KEY`
+  (plus optional `OPENROUTER_MODEL_*` / routing vars), `OPENAI_API_KEY` (embeddings), `TAVILY_API_KEY`, `NEWSAPI_KEY`, `SEMANTIC_SCHOLAR_API_KEY`,
   `DATABASE_URL` (Postgres), `UPSTASH_VECTOR_REST_URL`, `UPSTASH_VECTOR_REST_TOKEN`,
   `LANGSMITH_API_KEY`, `LANGSMITH_TRACING=true`, `MAX_HOPS=1`.
 - Budget guard: the API reads `MAX_HOPS` and `RUN_BUDGET_SECONDS` (default 240) and stops
@@ -311,3 +313,28 @@ Conventions:
   per environment in the Vercel dashboard).
 - Evals (Phase 7) reuse these traces: production runs are sampled into a LangSmith dataset and the
   groundedness / coverage judges run as LangSmith evaluators against them.
+
+---
+
+## 12. LLM provider: OpenRouter
+
+Implemented in `src/deep_researcher/llm.py`. Every agent calls `get_llm(role)`; nothing else in the
+codebase imports a vendor SDK.
+
+- **Why**: one API key covers Anthropic, OpenAI, Google, DeepSeek and others; per-role model choice
+  is an env var; OpenRouter's `models` fallback list and `provider` routing keep a multi-minute
+  research run alive when one vendor is rate-limited or down.
+- **Tiers**: heavy (planner, analysis, insight, critic), worker (retriever, report), cheap (validator,
+  grader). Defaults were checked against OpenRouter's live model catalogue on 2026-10-10;
+  `llm.list_models("anthropic/")` prints the current ids and prices.
+- **Per-role settings**: temperature (0 for anything parsed as structured output, 0.6 for insight
+  generation) and max tokens live in `ROLE_TEMPERATURE` / `ROLE_MAX_TOKENS`.
+- **Attribution**: `OPENROUTER_APP_URL` / `OPENROUTER_APP_TITLE` are sent as headers so usage shows
+  up under the project on openrouter.ai.
+- **Tracing**: `ChatOpenRouter` is a LangChain chat model, so LangSmith records tokens, cost and
+  latency per call with `role:<name>` tags added by the factory.
+- **Embeddings** are the one thing not routed through chat models; Phase 1 uses an OpenAI-compatible
+  embeddings endpoint (`OPENAI_API_KEY`) and may switch to OpenRouter's `/embeddings` once the
+  vector store is in place.
+- **Cost guard**: `/api/health` reports the resolved model per role; the Vercel project can pin
+  cheaper models (`OPENROUTER_MODEL_HEAVY=anthropic/claude-sonnet-5`) independently of local dev.
