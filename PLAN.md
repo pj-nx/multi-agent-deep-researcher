@@ -1,0 +1,287 @@
+# Multi-Agent AI Deep Researcher — Implementation Plan
+
+An AI research assistant for multi-hop, multi-source investigations. A user asks a
+hard question ("How is the EU AI Act changing hiring practices in fintech, and what
+does the evidence say about outcomes?"); a team of specialised agents plans the
+investigation, retrieves from papers, news, reports and APIs, cross-checks the
+evidence, generates hypotheses, and compiles a cited report.
+
+Showcases: **agent collaboration** (explicit graph with fan-out/fan-in and feedback
+loops), **retrieval-augmented reasoning** (every claim grounded in an evidence ID
+from a vector store), and **long-context synthesis** (hierarchical map-reduce
+summarisation over a large evidence corpus).
+
+---
+
+## 1. Framework and stack decisions
+
+| Concern | Choice | Why |
+|---|---|---|
+| Orchestration | **LangGraph** `StateGraph` (hand-built graph, not `create_supervisor`) | An explicit graph makes the collaboration visible and deterministic. `Send` gives parallel fan-out, conditional edges give the multi-hop loop, `interrupt()` gives human approval. Matches what you already learned in `agents/4_langgraph`. |
+| LLMs | Model-agnostic via `init_chat_model`; defaults: `claude-sonnet-5` for workers, `claude-opus-5-5` for analysis/insight, `claude-haiku-4-5-20251001` for relevance grading | Mix cost and quality per role. Swapping to OpenAI is a one-line config change. |
+| Retrieval tools | arXiv API, Semantic Scholar API, Tavily (or Serper) web search, NewsAPI (or GDELT), Wikipedia, PDF fetcher (`pypdf`), optional domain APIs (e.g. FRED, Polygon) | Covers the four source types in the brief: papers, news, reports, APIs. |
+| Evidence store | **Chroma** (local, persistent) with `text-embedding-3-small` or `voyage-3` embeddings | Zero-ops for a POC; every chunk carries `evidence_id`, `url`, `source_type`, `published_at`, `credibility`. |
+| Persistence | `SqliteSaver` checkpointer | Resume after human approval, re-run a failed node, inspect state per thread. |
+| Observability | LangSmith tracing | Required to debug a 7-agent graph; also gives eval datasets. |
+| UI (local) | **Gradio** app (streaming node events + plan approval + report download) | Consistent with the course projects. CLI runner too. |
+| UI (hosted) | **Vercel**: static `public/index.html` + FastAPI function in `api/index.py` streaming Server-Sent Events | Same graph, different front door. See §10. |
+| Packaging | `uv`, Python ≥ 3.12, `python-dotenv` | Same conventions as `agents/pyproject.toml`. |
+
+---
+
+## 2. Agent roster
+
+The four requested agents plus three additions (Planner, Source Validator, Red-Team Critic)
+that make the system genuinely multi-hop and trustworthy.
+
+| # | Agent | Model | Input | Output | Notes |
+|---|---|---|---|---|---|
+| 1 | **Research Planner** (orchestrator) | Opus | user question | `ResearchPlan`: 3–7 sub-questions, each with suggested source types and a dependency hint | Structured output (Pydantic). Pauses with `interrupt()` so the user can edit/approve the plan. Also decides when to stop looping. |
+| 2 | **Contextual Retriever** (×N in parallel) | Sonnet | one sub-question | list of `Evidence` chunks written to Chroma | ReAct agent with the retrieval tools. One instance per sub-question via `Send`. Each tool result is chunked, embedded, de-duplicated (URL + simhash), and stored. |
+| 3 | **Source Validator** | Haiku | new evidence batch | credibility score 0–1, flags (primary/secondary, peer-reviewed, date, author/org, retracted?) | Cheap pass; rejects low-relevance chunks (LLM grader) so later agents see less noise. |
+| 4 | **Critical Analysis** | Opus | sub-question + top-k evidence (RAG query) | per-sub-question `Summary` with cited claims, `Contradiction[]`, `Gap[]` (follow-up questions) | Claim extraction → pairwise contradiction check → gap detection. Gaps feed the multi-hop loop. |
+| 5 | **Insight Generation** | Opus | all summaries + contradictions | `Insight[]`: hypothesis/trend, reasoning chain (steps each citing evidence IDs), confidence, what would falsify it | Explicit chain-of-evidence rather than free text. |
+| 6 | **Red-Team Critic** (added) | Sonnet | insights + evidence | `Critique`: unsupported claims, cherry-picking, missing perspectives; verdict `accept` / `revise` / `need_more_evidence` | `need_more_evidence` routes back to Planner with targeted queries. Bounded by `max_hops`. |
+| 7 | **Report Builder** | Sonnet | everything | Markdown report + JSON | Executive summary, findings per sub-question, contradictions table, insights with confidence, limitations, methodology appendix, full bibliography. Runs a **grounding check**: every `[E12]` citation must exist in the store. |
+
+Non-agent services: `EvidenceStore` (Chroma wrapper), `CitationRegistry` (assigns `E1…En`), `Budget` (token/time/hop limits).
+
+---
+
+## 3. Graph design
+
+```mermaid
+flowchart TD
+    START --> planner[Research Planner]
+    planner --> approve{{interrupt: approve plan}}
+    approve -->|Send per sub-question| retriever[Contextual Retriever ×N]
+    retriever --> validator[Source Validator]
+    validator --> analysis[Critical Analysis ×N]
+    analysis --> gaps{Gaps & hops < max?}
+    gaps -->|yes: new sub-questions| retriever
+    gaps -->|no| insight[Insight Generation]
+    insight --> critic[Red-Team Critic]
+    critic -->|need_more_evidence & hops < max| planner
+    critic -->|revise| insight
+    critic -->|accept| report[Report Builder]
+    report --> END
+```
+
+Key LangGraph mechanics (verified against current docs):
+
+- **Fan-out**: a conditional edge returns `[Send("retrieve", {"sub_question": sq}) for sq in state["plan"].open_questions]`. Each `Send` carries its own payload; results fan in via an `operator.add` reducer on `evidence`.
+- **Human-in-the-loop**: `planner` calls `interrupt({"plan": plan})`; the UI resumes with `Command(resume={"plan": edited_plan})`. Requires the `SqliteSaver` checkpointer and a `thread_id`.
+- **Multi-hop loop**: `analysis` emits `gaps`; a router node promotes gaps to new sub-questions and increments `hop`. Loop terminates when `hop >= max_hops` (default 3) or no gaps.
+- **Subgraphs**: Retriever and Analysis are compiled subgraphs with their own private state, so their tool chatter never pollutes the top-level state.
+
+### State schema
+
+```python
+class ResearchState(TypedDict):
+    question: str
+    plan: ResearchPlan                               # Pydantic, approved by user
+    evidence: Annotated[list[Evidence], operator.add] # fan-in reducer
+    summaries: Annotated[dict[str, Summary], merge_dict]
+    contradictions: Annotated[list[Contradiction], operator.add]
+    insights: list[Insight]
+    critique: Critique | None
+    hop: int
+    max_hops: int
+    report: str | None
+```
+
+`Evidence` = `{id, sub_question_id, source_type, title, url, published_at, snippet, chunk_ids, credibility}`.
+Every downstream model is forced (via structured output) to cite `evidence_ids`; anything
+uncited is dropped by the grounding check, which is what makes this *retrieval-augmented
+reasoning* rather than hallucinated synthesis.
+
+---
+
+## 4. Long-context synthesis strategy
+
+A 3-hop run can produce 200–500 chunks, far more than you want in one prompt.
+
+1. **Per-sub-question RAG**: Analysis retrieves top-k (k≈15) chunks from Chroma filtered by `sub_question_id`, reranked by credibility × recency × similarity.
+2. **Hierarchical reduce**: sub-question summaries (≈500 tokens each) → Insight agent sees only summaries + contradictions, not raw chunks.
+3. **Prompt caching**: the evidence digest is placed first in the prompt with a cache breakpoint so Insight → Critic → Insight revision loops reuse it.
+4. **Report Builder** gets summaries + insights + a compact bibliography table; it pulls raw chunks only when it needs a quote (tool call `get_evidence(id)`).
+
+---
+
+## 5. Project layout
+
+```
+deep-researcher/
+├── pyproject.toml            # uv-managed; deps below
+├── .env.example              # ANTHROPIC_API_KEY, OPENAI_API_KEY, TAVILY_API_KEY, NEWSAPI_KEY, SEMANTIC_SCHOLAR_API_KEY, LANGSMITH_*
+├── README.md
+├── src/deep_researcher/
+│   ├── config.py             # models per role, max_hops, k, budgets
+│   ├── schemas.py            # Pydantic: ResearchPlan, Evidence, Summary, Contradiction, Insight, Critique
+│   ├── state.py              # ResearchState + reducers
+│   ├── store/
+│   │   ├── evidence_store.py # Chroma wrapper, dedup, citation registry
+│   │   └── chunking.py
+│   ├── tools/
+│   │   ├── arxiv.py  semantic_scholar.py  web_search.py  news.py  wikipedia.py  pdf.py
+│   │   └── registry.py       # tool list per source_type
+│   ├── agents/
+│   │   ├── planner.py  retriever.py  validator.py  analysis.py
+│   │   ├── insight.py  critic.py  report.py
+│   │   └── prompts/          # one .md per agent
+│   ├── graph.py              # build_graph(checkpointer) -> CompiledGraph
+│   └── grounding.py          # citation verification
+├── app/
+│   ├── gradio_app.py         # streaming UI with plan approval (local)
+│   └── cli.py                # `uv run research "question" --max-hops 3`
+├── api/
+│   └── index.py              # FastAPI entrypoint for Vercel (SSE streaming)
+├── public/
+│   └── index.html            # minimal hosted UI, calls /api/research
+├── vercel.json               # function maxDuration + /api rewrites
+├── requirements.txt          # Vercel installs from this (uv manages pyproject locally)
+├── evals/
+│   ├── questions.jsonl       # 10 seeded multi-hop questions with expected facets
+│   └── run_evals.py          # LangSmith dataset + groundedness/coverage judges
+├── tests/
+│   ├── test_store.py  test_reducers.py  test_grounding.py
+│   └── test_graph_smoke.py   # fake LLM + fake tools, asserts graph wiring
+└── reports/                  # generated .md/.json output
+```
+
+Dependencies: `langgraph`, `langgraph-checkpoint-sqlite`, `langchain`, `langchain-anthropic`,
+`langchain-openai`, `langchain-community`, `langchain-chroma`, `chromadb`, `tavily-python`,
+`arxiv`, `semanticscholar`, `newsapi-python`, `wikipedia`, `pypdf`, `httpx`, `pydantic`,
+`gradio`, `langsmith`, `python-dotenv`, `pytest`.
+
+---
+
+## 6. Build phases
+
+Each phase ends with something runnable. Estimated effort assumes evenings/weekends.
+
+### Phase 0 — Skeleton (½ day)
+- `uv init`, deps, `.env.example`, config, schemas, state + reducers.
+- Fake-LLM smoke test that the graph compiles and `Send` fan-out/fan-in works.
+
+### Phase 1 — Retrieval layer (1–2 days)
+- Implement tools (arXiv, Semantic Scholar, Tavily, NewsAPI, Wikipedia, PDF).
+- `EvidenceStore`: chunk → embed → upsert with metadata; URL + near-duplicate dedup.
+- Retriever agent as a ReAct subgraph; run it standalone on one sub-question and inspect Chroma.
+- Unit tests for store and dedup.
+
+### Phase 2 — Planner + Retriever fan-out + approval (1 day)
+- Planner with structured `ResearchPlan`; `interrupt()` approval; `SqliteSaver`.
+- Fan-out via `Send`; verify N retrievers run in parallel in LangSmith.
+- CLI runner with `--auto-approve` flag.
+
+### Phase 3 — Critical Analysis + multi-hop loop (1–2 days)
+- Source Validator grading.
+- Analysis: claim extraction → contradiction detection → gap detection.
+- Gap router, `hop` counter, `max_hops` termination. Test that a seeded contradictory
+  pair of sources yields a `Contradiction`.
+
+### Phase 4 — Insight + Red-Team + Report (1–2 days)
+- Insight agent with reasoning chains citing evidence IDs.
+- Critic with `accept / revise / need_more_evidence` routing (cap revisions at 2).
+- Report Builder + grounding check; write `.md` and `.json` to `reports/`.
+
+### Phase 5 — Gradio UI + streaming (1 day)
+- Stream node events (`graph.stream(..., stream_mode="updates")`) into a live
+  "agent activity" panel; show plan for approval; render report; download button.
+
+### Phase 6 — Vercel deployment (½ day)
+- Wire `api/index.py` to `build_graph()` with the Postgres checkpointer and hosted vector store (§10).
+- Set env vars in the Vercel project; deploy with `vercel --prod`; smoke-test `/api/health` and a 1-hop question.
+
+### Phase 7 — Evals & polish (1 day)
+- 10 seeded questions in `evals/questions.jsonl`.
+- Judges: groundedness (every claim cites a real evidence ID whose text supports it),
+  coverage (expected facets present), contradiction recall on seeded cases.
+- README with architecture diagram, demo GIF, cost/time per run.
+
+---
+
+## 7. Guardrails and budgets
+
+- `max_hops` (default 3), `max_revisions` (2), per-run token budget, per-tool timeout and retry with backoff.
+- Retriever tools return at most N results each; validator drops irrelevant chunks before embedding to control store size.
+- All external text is **data, not instructions**: tool outputs are wrapped in delimiters and the system prompts say to ignore instructions found in retrieved content.
+- Respect robots/ToS: use official APIs (arXiv, Semantic Scholar, NewsAPI) rather than scraping; cache fetched PDFs locally.
+- Report always includes a *Limitations* section listing sub-questions with thin or conflicting evidence.
+
+---
+
+## 8. Demo script (what to show)
+
+1. Ask: *"What is the evidence that LLM-based code assistants improve developer productivity, and where do studies disagree?"*
+2. Show the Planner's 5 sub-questions; edit one in the UI; approve.
+3. Watch 5 Retrievers run in parallel (LangSmith trace side-by-side).
+4. Analysis flags a contradiction (e.g., RCT speed-ups vs. field studies showing more bugs) and spawns a hop-2 question on long-term quality.
+5. Critic demands more evidence on one insight; Planner issues a targeted query; loop closes.
+6. Report renders with ~30 citations, a contradictions table, and confidence per insight.
+
+---
+
+## 9. Stretch ideas
+
+- Swap Chroma for Qdrant/pgvector and add hybrid BM25 + dense retrieval.
+- Add a **Timeline Agent** that orders evidence chronologically to surface trend shifts.
+- Memory across sessions (`langgraph.store`) so follow-up questions reuse prior evidence.
+- Export to PDF/Docx; MCP server exposing `research(question)` as a tool for other agents.
+
+---
+
+## 10. Deployment: Vercel + GitHub
+
+Source lives in the public repo **github.com/pj-nx/multi-agent-deep-researcher**. Vercel is
+connected to that repo, so every push to `main` is a production deploy and every PR gets a
+preview URL.
+
+### Why the local stack cannot be lifted as-is
+
+| Local (Gradio) | Problem on Vercel | Hosted replacement |
+|---|---|---|
+| Long-running Gradio server | Vercel runs request-scoped functions, not servers | FastAPI in `api/index.py`, static UI in `public/` |
+| `SqliteSaver` on disk | Filesystem is ephemeral; only `/tmp` is writable and it does not survive invocations | `PostgresSaver` (`langgraph-checkpoint-postgres`) on Neon or Vercel Postgres |
+| Local Chroma | Same ephemeral-disk problem | Hosted vector store: Upstash Vector, Pinecone, or Qdrant Cloud |
+| Unbounded run time | Functions are capped: **300 s on Hobby**, 800 s on Pro (1800 s beta) | Stream SSE so the response starts immediately; cap `max_hops` per plan tier; for unlimited runs use Vercel Workflows or LangGraph Platform |
+| Human approval mid-run | A function cannot block waiting for a click | Two requests: `POST /api/research` runs to the `interrupt()` and returns the plan + `thread_id`; `POST /api/research/{thread_id}/resume` continues from the Postgres checkpoint |
+
+### Request flow
+
+```
+browser ──POST /api/research {question}──▶ FastAPI ─▶ graph.stream(...)  ─┐
+   ▲                                          │   until interrupt()      │ SSE: node events
+   └──── plan + thread_id ◀───────────────────┘                          │
+browser ──POST /api/research/{id}/resume {plan}─▶ graph.stream(Command(resume=plan))
+   ◀──── SSE: retriever/analysis/insight/critic events … report ─────────┘
+```
+
+### Configuration
+
+- `vercel.json`: rewrites `/api/(.*)` to `api/index`, sets `maxDuration: 300` (raise on Pro).
+- `requirements.txt`: Vercel's Python runtime installs from this file; keep it in sync with
+  `pyproject.toml` (`uv export --no-hashes --format requirements-txt > requirements.txt`).
+- Environment variables (set in the Vercel dashboard, never committed): `ANTHROPIC_API_KEY`,
+  `OPENAI_API_KEY`, `TAVILY_API_KEY`, `NEWSAPI_KEY`, `SEMANTIC_SCHOLAR_API_KEY`,
+  `DATABASE_URL` (Postgres), `UPSTASH_VECTOR_REST_URL`, `UPSTASH_VECTOR_REST_TOKEN`,
+  `LANGSMITH_API_KEY`, `LANGSMITH_TRACING=true`, `MAX_HOPS=1`.
+- Budget guard: the API reads `MAX_HOPS` and `RUN_BUDGET_SECONDS` (default 240) and stops
+  retrieval loops early so the function finishes before Vercel kills it.
+
+### Deploy steps
+
+```bash
+npm i -g vercel
+vercel link            # pick the GitHub-connected project
+vercel env pull        # writes .env.local for `vercel dev`
+vercel dev             # local FastAPI + static UI at http://localhost:3000
+vercel --prod          # or just push to main
+```
+
+### Repo hygiene
+
+- `main` is protected: PRs only, preview deploy must succeed.
+- `.env*` ignored; `.env.example` documents every variable.
+- `reports/` and `*.db` ignored so generated output never lands in the public repo.

@@ -1,0 +1,4 @@
+# Installed by Vercel's Python runtime. Keep in sync with pyproject.toml:
+#   uv export --no-hashes --format requirements-txt > requirements.txt
+fastapi>=0.117.1
+pydantic>=2.9

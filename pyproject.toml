@@ -1,0 +1,41 @@
+[project]
+name = "deep-researcher"
+version = "0.1.0"
+description = "Multi-agent AI deep researcher: planner, retrievers, critical analysis, insight generation, red-team critic, report builder (LangGraph)"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.117.1",
+    "pydantic>=2.9",
+]
+
+[project.optional-dependencies]
+# Added as the phases in PLAN.md land.
+agents = [
+    "langgraph>=1.0",
+    "langgraph-checkpoint-sqlite>=2.0",
+    "langgraph-checkpoint-postgres>=2.0",
+    "langchain>=1.0",
+    "langchain-anthropic>=1.0",
+    "langchain-openai>=1.0",
+    "langchain-community>=0.3",
+    "langchain-chroma>=0.2",
+    "chromadb>=1.0",
+    "tavily-python>=0.5",
+    "arxiv>=2.1",
+    "semanticscholar>=0.9",
+    "wikipedia>=1.4",
+    "pypdf>=5.4",
+    "httpx>=0.28",
+    "langsmith>=0.3",
+    "python-dotenv>=1.0",
+]
+ui = ["gradio>=5.22"]
+dev = ["pytest>=8", "uvicorn>=0.30", "ruff>=0.6"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/deep_researcher"]
