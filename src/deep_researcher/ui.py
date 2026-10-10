@@ -24,7 +24,8 @@ from deep_researcher.state import ResearchState  # noqa: F401 - documents the st
 
 log = logging.getLogger(__name__)
 
-PLAN_HEADERS = ["id", "question", "source_types", "search_queries", "depends_on"]
+# Display labels for the editable plan table; columns are positional (see plan_to_rows / rows_to_plan).
+PLAN_HEADERS = ["ID", "Question", "Source types", "Search queries", "Depends on"]
 SOURCE_TYPES: tuple[str, ...] = tuple(SourceType.__args__)  # type: ignore[attr-defined]
 
 
