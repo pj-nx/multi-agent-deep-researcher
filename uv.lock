@@ -895,6 +895,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiosqlite" },
+    { name = "chromadb" },
     { name = "fastapi" },
     { name = "httpx" },
     { name = "langchain-core" },
@@ -962,6 +963,7 @@ requires-dist = [
     { name = "aiosqlite", specifier = ">=0.22.1" },
     { name = "anyio", marker = "extra == 'dev'", specifier = ">=4" },
     { name = "arxiv", marker = "extra == 'agents'", specifier = ">=2.1" },
+    { name = "chromadb", specifier = ">=1.0" },
     { name = "chromadb", marker = "extra == 'dev'", specifier = ">=1.0" },
     { name = "chromadb", marker = "extra == 'vectordb'", specifier = ">=1.0" },
     { name = "fastapi", specifier = ">=0.117.1" },
