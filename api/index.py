@@ -43,7 +43,7 @@ from pydantic import BaseModel, Field
 from starlette.concurrency import iterate_in_threadpool
 from starlette.types import Receive, Scope, Send
 
-from deep_researcher import llm, tracing
+from deep_researcher import embeddings, llm, tracing
 from deep_researcher.schemas import ResearchPlan
 
 log = logging.getLogger("deep_researcher.api")
@@ -241,6 +241,9 @@ async def health() -> dict:
         "rate_limit_per_minute": RATE_LIMIT_PER_MINUTE,
         "tracing": tracing.info(),
         "llm": llm.info(),
+        "embeddings": embeddings.info(),
+        "vector_db": {"backend": "chroma", "path": os.getenv("CHROMA_PATH") or ".chroma",
+                      "collection": os.getenv("CHROMA_COLLECTION") or "evidence"},
     }
 
 

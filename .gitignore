@@ -19,6 +19,7 @@ build/
 *.db-shm
 *.db-wal
 chroma/
+.chroma/
 reports/
 *.log
 

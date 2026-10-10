@@ -1,0 +1,172 @@
+"""Persistent vector store for retrieved evidence, backed by Chroma.
+
+Why Chroma: embedded, zero-ops, persists to a directory, and the same code talks to Chroma
+Cloud / a Chroma server by swapping the client. The store never embeds on its own; it takes a
+LangChain ``Embeddings`` so the model choice (local, Ollama, OpenAI-compatible) lives in
+``deep_researcher.embeddings``.
+
+Invariants
+- Every chunk id is deterministic (sha1 of url + chunk index), so re-ingesting a source is an
+  idempotent upsert rather than a duplicate.
+- A collection records the ``embedding_id`` that built it; opening it with a different model
+  raises ``EmbeddingMismatchError`` instead of silently returning garbage similarities.
+- Chroma is not multi-process safe on one path: one writer process per CHROMA_PATH.
+"""
+from __future__ import annotations
+
+import hashlib
+import logging
+import os
+from collections.abc import Iterable, Sequence
+from dataclasses import dataclass
+from typing import Any
+
+from deep_researcher.schemas import Evidence, EvidenceChunk
+from deep_researcher.store.chunking import chunk_text
+
+log = logging.getLogger(__name__)
+
+DEFAULT_PATH = ".chroma"
+DEFAULT_COLLECTION = "evidence"
+_META_EMBEDDING_ID = "embedding_id"
+_META_EMBEDDING_DIM = "embedding_dim"
+
+
+class EmbeddingMismatchError(RuntimeError):
+    pass
+
+
+@dataclass(frozen=True)
+class Hit:
+    chunk: EvidenceChunk
+    distance: float
+
+    @property
+    def score(self) -> float:
+        """Cosine similarity in [0, 1] (Chroma returns cosine *distance*)."""
+        return max(0.0, 1.0 - self.distance)
+
+
+def chunk_id(url: str, index: int) -> str:
+    return hashlib.sha1(f"{url}#{index}".encode()).hexdigest()[:24]
+
+
+def _clean_meta(d: dict[str, Any]) -> dict[str, str | int | float | bool]:
+    """Chroma metadata must be flat scalars; drop None and stringify the rest."""
+    out: dict[str, str | int | float | bool] = {}
+    for k, v in d.items():
+        if v is None:
+            continue
+        out[k] = v if isinstance(v, str | int | float | bool) else str(v)
+    return out
+
+
+class EvidenceStore:
+    def __init__(self, embeddings: Any, *, embedding_id: str, path: str | None = None,
+                 collection: str | None = None, client: Any = None) -> None:
+        import chromadb
+
+        self.embeddings = embeddings
+        self.embedding_id = embedding_id
+        self.path = path or os.getenv("CHROMA_PATH") or DEFAULT_PATH
+        self.collection_name = collection or os.getenv("CHROMA_COLLECTION") or DEFAULT_COLLECTION
+        self.client = client or chromadb.PersistentClient(path=self.path)
+        self.collection = self._open()
+
+    # ------------------------------------------------------------------ setup
+    def _open(self):
+        existing = {c.name for c in self.client.list_collections()}
+        if self.collection_name in existing:
+            coll = self.client.get_collection(self.collection_name)
+            stored = (coll.metadata or {}).get(_META_EMBEDDING_ID)
+            if stored and stored != self.embedding_id:
+                raise EmbeddingMismatchError(
+                    f"collection {self.collection_name!r} at {self.path} was built with {stored!r} "
+                    f"but the configured embeddings are {self.embedding_id!r}. Use a different "
+                    "CHROMA_COLLECTION or re-ingest."
+                )
+            return coll
+        return self.client.create_collection(
+            self.collection_name,
+            metadata={_META_EMBEDDING_ID: self.embedding_id},
+            configuration={"hnsw": {"space": "cosine"}},
+        )
+
+    def _record_dim(self, dim: int) -> None:
+        meta = dict(self.collection.metadata or {})
+        if meta.get(_META_EMBEDDING_DIM) in (None, dim):
+            if _META_EMBEDDING_DIM not in meta:
+                meta[_META_EMBEDDING_DIM] = dim
+                self.collection.modify(metadata=meta)
+            return
+        raise EmbeddingMismatchError(
+            f"collection {self.collection_name!r} holds {meta[_META_EMBEDDING_DIM]}-d vectors; "
+            f"the configured model produced {dim}-d"
+        )
+
+    # ------------------------------------------------------------------ write
+    def add_evidence(self, items: Iterable[Evidence], *, chunk_size: int = 1200, overlap: int = 150) -> int:
+        """Chunk, embed and upsert. Returns the number of chunks written."""
+        chunks: list[EvidenceChunk] = []
+        for ev in items:
+            for i, piece in enumerate(chunk_text(ev.text, size=chunk_size, overlap=overlap)):
+                chunks.append(EvidenceChunk(
+                    id=chunk_id(ev.url, i), evidence_id=ev.id, chunk_index=i, text=piece,
+                    sub_question_id=ev.sub_question_id, source_type=ev.source_type, title=ev.title,
+                    url=ev.url, published_at=ev.published_at, credibility=ev.credibility,
+                ))
+        return self.add_chunks(chunks)
+
+    def add_chunks(self, chunks: Sequence[EvidenceChunk]) -> int:
+        if not chunks:
+            return 0
+        vectors = self.embeddings.embed_documents([c.text for c in chunks])
+        self._record_dim(len(vectors[0]))
+        self.collection.upsert(
+            ids=[c.id for c in chunks],
+            embeddings=vectors,
+            documents=[c.text for c in chunks],
+            metadatas=[_clean_meta(c.model_dump(exclude={"id", "text"})) for c in chunks],
+        )
+        return len(chunks)
+
+    # ------------------------------------------------------------------ read
+    def query(self, text: str, *, k: int = 10, sub_question_id: str | None = None,
+              where: dict[str, Any] | None = None) -> list[Hit]:
+        if self.count() == 0:
+            return []
+        clauses: list[dict[str, Any]] = []
+        if sub_question_id:
+            clauses.append({"sub_question_id": sub_question_id})
+        if where:
+            clauses.append(where)
+        filt = None if not clauses else (clauses[0] if len(clauses) == 1 else {"$and": clauses})
+        vec = self.embeddings.embed_query(text)
+        res = self.collection.query(query_embeddings=[vec], n_results=min(k, self.count()), where=filt,
+                                    include=["documents", "metadatas", "distances"])
+        hits: list[Hit] = []
+        for cid, doc, meta, dist in zip(res["ids"][0], res["documents"][0], res["metadatas"][0],
+                                        res["distances"][0], strict=True):
+            hits.append(Hit(chunk=EvidenceChunk(id=cid, text=doc, **meta), distance=float(dist)))
+        return hits
+
+    def get(self, ids: Sequence[str]) -> list[EvidenceChunk]:
+        res = self.collection.get(ids=list(ids), include=["documents", "metadatas"])
+        return [EvidenceChunk(id=cid, text=doc, **meta)
+                for cid, doc, meta in zip(res["ids"], res["documents"], res["metadatas"], strict=True)]
+
+    def has_url(self, url: str) -> bool:
+        res = self.collection.get(where={"url": url}, limit=1, include=[])
+        return bool(res["ids"])
+
+    def count(self) -> int:
+        return self.collection.count()
+
+    def reset(self) -> None:
+        """Drop and recreate the collection (keeps the embedding fingerprint)."""
+        self.client.delete_collection(self.collection_name)
+        self.collection = self._open()
+
+    def info(self) -> dict[str, Any]:
+        return {"backend": "chroma", "path": self.path, "collection": self.collection_name,
+                "count": self.count(), "metadata": dict(self.collection.metadata or {})}

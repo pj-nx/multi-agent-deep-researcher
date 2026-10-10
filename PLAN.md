@@ -20,7 +20,8 @@ summarisation over a large evidence corpus).
 | Orchestration | **LangGraph** `StateGraph` (hand-built graph, not `create_supervisor`) | An explicit graph makes the collaboration visible and deterministic. `Send` gives parallel fan-out, conditional edges give the multi-hop loop, `interrupt()` gives human approval. Matches what you already learned in `agents/4_langgraph`. |
 | LLMs | **OpenRouter** via `langchain-openrouter` (`src/deep_researcher/llm.py`). Tiers: heavy `anthropic/claude-opus-5.5`, worker `anthropic/claude-sonnet-5`, cheap `anthropic/claude-haiku-4.5`; per-role env overrides, model fallbacks, provider routing | One key for every vendor; swap a role's model with an env var; fallbacks keep a run alive when a provider is down. |
 | Retrieval tools | arXiv API, Semantic Scholar API, Tavily (or Serper) web search, NewsAPI (or GDELT), Wikipedia, PDF fetcher (`pypdf`), optional domain APIs (e.g. FRED, Polygon) | Covers the four source types in the brief: papers, news, reports, APIs. |
-| Evidence store | **Chroma** (local, persistent) with `text-embedding-3-small` or `voyage-3` embeddings | Zero-ops for a POC; every chunk carries `evidence_id`, `url`, `source_type`, `published_at`, `credibility`. |
+| Evidence store | **Chroma, embedded and persistent** (`CHROMA_PATH`) via `src/deep_researcher/store/` | Zero-ops, survives restarts, same client for Chroma server/cloud; every chunk carries `evidence_id`, `url`, `source_type`, `published_at`, `credibility`; collection is fingerprinted with the embedding model. |
+| Embeddings | **Local by default**: `BAAI/bge-small-en-v1.5` on CPU via `langchain-huggingface`; or Ollama (`nomic-embed-text`); or any OpenAI-compatible endpoint. `src/deep_researcher/embeddings.py` | Local dev needs no key for indexing; hosted runs switch provider with one env var. |
 | Persistence | `SqliteSaver` checkpointer | Resume after human approval, re-run a failed node, inspect state per thread. |
 | Observability | LangSmith tracing via `src/deep_researcher/tracing.py` | Required to debug a 7-agent graph; also gives eval datasets. See §11. |
 | UI (local) | **Gradio** app (streaming node events + plan approval + report download) | Consistent with the course projects. CLI runner too. |
@@ -118,12 +119,13 @@ deep-researcher/
 ├── src/deep_researcher/
 │   ├── config.py             # max_hops, k, budgets
 │   ├── llm.py                # OpenRouter model factory: get_llm(role)
+│   ├── embeddings.py         # local / ollama / openai-compatible embeddings factory
 │   ├── tracing.py            # LangSmith helpers
 │   ├── schemas.py            # Pydantic: ResearchPlan, Evidence, Summary, Contradiction, Insight, Critique
 │   ├── state.py              # ResearchState + reducers
 │   ├── store/
-│   │   ├── evidence_store.py # Chroma wrapper, dedup, citation registry
-│   │   └── chunking.py
+│   │   ├── evidence_store.py # persistent Chroma wrapper, idempotent upsert, model fingerprint
+│   │   └── chunking.py       # overlap chunking on paragraph/sentence boundaries
 │   ├── tools/
 │   │   ├── arxiv.py  semantic_scholar.py  web_search.py  news.py  wikipedia.py  pdf.py
 │   │   └── registry.py       # tool list per source_type
@@ -246,7 +248,8 @@ preview URL.
 |---|---|---|
 | Long-running Gradio server | Vercel runs request-scoped functions, not servers | FastAPI in `api/index.py`, static UI in `public/` |
 | `SqliteSaver` on disk | Filesystem is ephemeral; only `/tmp` is writable and it does not survive invocations | `PostgresSaver` (`langgraph-checkpoint-postgres`) on Neon or Vercel Postgres |
-| Local Chroma | Same ephemeral-disk problem | Hosted vector store: Upstash Vector, Pinecone, or Qdrant Cloud |
+| Local Chroma directory | Same ephemeral-disk problem | Chroma server / Chroma Cloud via `chromadb.HttpClient`/`CloudClient` (same `EvidenceStore`), or Qdrant Cloud |
+| Local embedding model | Too large for a function bundle | `EMBEDDINGS_PROVIDER=openai` with an OpenAI-compatible endpoint |
 | Unbounded run time | Functions are capped: **300 s on Hobby**, 800 s on Pro (1800 s beta) | Stream SSE so the response starts immediately; cap `max_hops` per plan tier; for unlimited runs use Vercel Workflows or LangGraph Platform |
 | Human approval mid-run | A function cannot block waiting for a click | Two requests: `POST /api/research` runs to the `interrupt()` and returns the plan + `thread_id`; `POST /api/research/{thread_id}/resume` continues from the Postgres checkpoint |
 
@@ -333,8 +336,38 @@ codebase imports a vendor SDK.
   up under the project on openrouter.ai.
 - **Tracing**: `ChatOpenRouter` is a LangChain chat model, so LangSmith records tokens, cost and
   latency per call with `role:<name>` tags added by the factory.
-- **Embeddings** are the one thing not routed through chat models; Phase 1 uses an OpenAI-compatible
-  embeddings endpoint (`OPENAI_API_KEY`) and may switch to OpenRouter's `/embeddings` once the
-  vector store is in place.
+- **Embeddings** are the one thing not routed through chat models; see §13 (local model by default).
 - **Cost guard**: `/api/health` reports the resolved model per role; the Vercel project can pin
   cheaper models (`OPENROUTER_MODEL_HEAVY=anthropic/claude-sonnet-5`) independently of local dev.
+
+---
+
+## 13. Embeddings and persistent vector DB
+
+Implemented: `src/deep_researcher/embeddings.py`, `src/deep_researcher/store/` (Phase 1's
+`EvidenceStore` landed early because the API surface was needed to settle the schema).
+
+**Local embeddings by default.** `EMBEDDINGS_PROVIDER=local` runs `BAAI/bge-small-en-v1.5`
+(384-d, ~130 MB) through sentence-transformers on CPU. No key, no server; the model downloads once
+into the Hugging Face cache. `tool.uv.sources` pins CPU-only PyTorch on Linux so the install does
+not pull CUDA libraries. Alternatives: `ollama` (`nomic-embed-text`, 768-d) if an Ollama server is
+running, or `openai` for any OpenAI-compatible endpoint (OpenAI, OpenRouter, vLLM, LM Studio).
+Each is an optional extra so the API deployment stays slim.
+
+**Persistent store.** Embedded Chroma at `CHROMA_PATH` (default `.chroma/`, git-ignored).
+Rules enforced by `EvidenceStore`:
+
+| Rule | Mechanism |
+|---|---|
+| One embedding model per collection | Collection metadata records `embedding_id` (`provider:model[@dims]`) and `embedding_dim`; mismatch raises `EmbeddingMismatchError` instead of returning meaningless neighbours |
+| Re-ingestion is idempotent | Chunk id = sha1(url, chunk_index); `upsert` |
+| Filterable retrieval | Flat metadata (`sub_question_id`, `source_type`, `url`, `published_at`, `credibility`) → `query(text, k, sub_question_id=…, where=…)` |
+| Cosine space | `configuration={"hnsw": {"space": "cosine"}}`; `Hit.score = 1 - distance` |
+| Single writer | Chroma embedded mode is not multi-process safe; one process per path (the API on Vercel uses a Chroma server/cloud instead) |
+
+**Changing models later.** Pick a new `CHROMA_COLLECTION` (or `store.reset()`) and re-ingest; the
+fingerprint check makes the old collection unusable with the new model on purpose.
+
+**Hosted path.** Same `EvidenceStore` with `client=chromadb.HttpClient(...)` or `CloudClient(...)`,
+plus `EMBEDDINGS_PROVIDER=openai`. Qdrant remains the alternative if hybrid BM25 + dense search
+becomes a requirement (stretch §9).

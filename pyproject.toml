@@ -20,10 +20,7 @@ agents = [
     "langgraph-checkpoint-sqlite>=2.0",
     "langgraph-checkpoint-postgres>=2.0",
     "langchain>=1.0",
-    "langchain-openai>=1.0",      # embeddings only (OpenAI-compatible endpoint)
     "langchain-community>=0.3",
-    "langchain-chroma>=0.2",
-    "chromadb>=1.0",
     "tavily-python>=0.5",
     "arxiv>=2.1",
     "semanticscholar>=0.9",
@@ -33,7 +30,22 @@ agents = [
     "python-dotenv>=1.0",
 ]
 ui = ["gradio>=5.22"]
-dev = ["pytest>=8", "anyio>=4", "httpx>=0.28", "uvicorn>=0.30", "ruff>=0.6"]
+# Persistent vector DB (embedded Chroma; same client talks to Chroma server/cloud).
+vectordb = ["chromadb>=1.0"]
+# Pick ONE embeddings backend. `local` needs no API key and no server.
+embeddings-local = ["langchain-huggingface>=0.3", "sentence-transformers>=3.0"]
+embeddings-ollama = ["langchain-ollama>=0.3"]
+embeddings-openai = ["langchain-openai>=1.0"]
+dev = ["pytest>=8", "anyio>=4", "httpx>=0.28", "uvicorn>=0.30", "ruff>=0.6", "chromadb>=1.0"]
+
+# CPU-only PyTorch for the local embedding model (the default PyPI wheel drags in CUDA libraries).
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
 
 [build-system]
 requires = ["hatchling"]

@@ -58,8 +58,9 @@ Or import the GitHub repo in the Vercel dashboard; pushes to `main` deploy autom
 
 - Functions are capped at 300 s on Hobby (800 s on Pro), so the API streams events immediately and
   honours `MAX_HOPS` / `RUN_BUDGET_SECONDS`.
-- The filesystem is ephemeral, so hosted runs use a Postgres checkpointer and a hosted vector
-  store instead of SQLite + local Chroma.
+- The filesystem is ephemeral, so hosted runs use a Postgres checkpointer and a Chroma server /
+  Chroma Cloud (or another hosted store) instead of SQLite + the local Chroma directory. A local
+  embedding model will not fit in a function, so set `EMBEDDINGS_PROVIDER=openai` there.
 - Human plan approval is split into two requests: `POST /api/research` returns the plan and a
   `thread_id`; `POST /api/research/{thread_id}/resume` continues from the checkpoint.
 
@@ -87,6 +88,33 @@ order when the primary is unavailable, and `OPENROUTER_PROVIDER_ORDER` / `OPENRO
 ```python
 from deep_researcher.llm import get_llm
 get_llm("planner").invoke("...")           # ChatOpenRouter, traced by LangSmith automatically
+```
+
+## Embeddings and the vector DB
+
+Evidence is chunked, embedded and stored in a **persistent embedded Chroma** collection
+(`CHROMA_PATH`, default `.chroma/`). The embedding model is chosen by `EMBEDDINGS_PROVIDER`, and
+the default needs **no API key and no server**:
+
+| Provider | Default model | Install | Notes |
+|---|---|---|---|
+| `local` (default) | `BAAI/bge-small-en-v1.5` (384-d) | `uv sync --extra embeddings-local` | sentence-transformers on CPU (CPU-only torch is pinned via `tool.uv.sources`); set `EMBEDDINGS_DEVICE=cuda`/`mps` to use a GPU |
+| `ollama` | `nomic-embed-text` | `uv sync --extra embeddings-ollama` | `ollama pull nomic-embed-text`; `EMBEDDINGS_BASE_URL` for a remote server |
+| `openai` | `text-embedding-3-small` | `uv sync --extra embeddings-openai` | any OpenAI-compatible endpoint via `EMBEDDINGS_BASE_URL` (OpenAI, OpenRouter, vLLM, LM Studio) |
+
+The store writes the embedding fingerprint (`provider:model[@dims]`) and vector dimension into
+the collection's metadata and refuses to open it with a different model, so you cannot mix
+embeddings in one collection by accident. Chunk ids are deterministic, so re-ingesting a source is
+an idempotent upsert. Chroma is embedded and single-writer; the same code talks to a Chroma server
+or Chroma Cloud by swapping the client.
+
+```python
+from deep_researcher import embeddings
+from deep_researcher.store import EvidenceStore
+
+store = EvidenceStore(embeddings.get_embeddings(), embedding_id=embeddings.embedding_id())
+store.add_evidence([...])                       # Evidence -> chunks -> vectors, persisted
+hits = store.query("four-day week productivity", k=10, sub_question_id="sq1")
 ```
 
 ## Tracing with LangSmith
