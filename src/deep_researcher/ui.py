@@ -349,8 +349,17 @@ def build_app(graph: Any = None):
     import gradio as gr
 
     with gr.Blocks(title="Multi-Agent Deep Researcher") as demo:
-        gr.Markdown("# Multi-Agent Deep Researcher\n_Every claim in the report cites stored evidence._")
+        from deep_researcher.theme import THEME_INIT_JS, THEME_TOGGLE_JS
+
+        with gr.Row():
+            gr.Markdown("# Deep Researcher", elem_id="dr-header")
+            theme_btn = gr.Button("☾ Dark mode", variant="secondary", size="sm", elem_id="dr-theme-toggle")
+        gr.Markdown("Multi-agent research: plan, retrieve, validate, analyse, synthesise, critique, report. "
+                    "Every claim cites stored evidence.", elem_id="dr-sub")
         pipeline = gr.HTML(PipelineProgress().render())
+        # Pure client-side: no server round trip, preference kept in localStorage.
+        theme_btn.click(None, None, [theme_btn], js=THEME_TOGGLE_JS)
+        demo.load(None, None, [theme_btn], js=THEME_INIT_JS)
         with gr.Tabs():
             with gr.Tab("Research"):
                 _build_research_tab(gr, demo, graph, pipeline)
@@ -363,6 +372,7 @@ def _build_research_tab(gr: Any, demo: Any, graph: Any, pipeline: Any) -> None:
     if True:
         thread_state = gr.State("")
         question_state = gr.State("")
+        gr.Markdown("Step 1 · Ask", elem_classes=["dr-step"])
         with gr.Row():
             question = gr.Textbox(label="Research question", lines=2, scale=4,
                                   placeholder="Does the four-day work week raise productivity, "
@@ -371,37 +381,39 @@ def _build_research_tab(gr: Any, demo: Any, graph: Any, pipeline: Any) -> None:
                 max_hops = gr.Slider(0, 3, value=1, step=1, label="Max follow-up hops")
                 budget = gr.Number(value=0, label="Budget (seconds, 0 = none)", precision=0)
         with gr.Row():
-            plan_btn = gr.Button("1. Plan", variant="primary", scale=4)
-            busy = gr.Markdown("**Ready**", elem_id="busy")
-        with gr.Accordion("Agent activity (expand for the per-agent log)", open=False):
+            plan_btn = gr.Button("Plan the research", variant="primary", scale=4)
+            busy = gr.Markdown("Ready", elem_id="dr-busy")
+        with gr.Accordion("Agent activity log", open=False):
             activity = gr.Textbox(show_label=False, lines=14, max_lines=30, interactive=False,
-                                  autoscroll=True)
-        gr.Markdown("### 2. Review the plan (edit cells, clear a question to drop it), then approve")
+                                  autoscroll=True, elem_id="dr-activity")
+        gr.Markdown("Step 2 · Review the plan (edit cells; clear a question to drop it)",
+                    elem_classes=["dr-step"])
         plan_table = gr.Dataframe(headers=PLAN_HEADERS, datatype=["str"] * 5, type="array", interactive=True,
                                   row_count=(0, "dynamic"), column_count=(5, "fixed"), wrap=True,
                                   column_widths=["7%", "43%", "15%", "25%", "10%"], label="Plan")
         with gr.Row():
-            run_btn = gr.Button("3. Approve & run", variant="primary")
-        report_md = gr.Markdown(label="Report", max_height=700)
-        with gr.Row():
-            dl_pdf = gr.DownloadButton("Download report (.pdf)", visible=False, variant="primary")
-            dl_md = gr.DownloadButton("Download report (.md)", visible=False)
-            dl_json = gr.DownloadButton("Download data (.json)", visible=False)
+            run_btn = gr.Button("Approve and run", variant="primary")
+        gr.Markdown("Step 3 · Report", elem_classes=["dr-step"])
+        report_md = gr.Markdown(label="Report", max_height=760, elem_id="dr-report")
+        with gr.Row(elem_id="dr-downloads"):
+            dl_pdf = gr.DownloadButton("Download PDF", visible=False, variant="primary")
+            dl_md = gr.DownloadButton("Download Markdown", visible=False)
+            dl_json = gr.DownloadButton("Download JSON", visible=False)
 
         BUSY = gr.update(interactive=False)
         FREE = gr.update(interactive=True)
 
         def _busy(text: str) -> str:
-            return f"⏳ **{text}**"
+            return f"⏳ {text}"
 
         async def on_plan(q, hops, bud):
             q = (q or "").strip()
             if len(q) < 5:
-                yield "Enter a question first.", [], "", "", "**Ready**", FREE, FREE, gr.update()
+                yield "Enter a question first.", [], "", "", "Ready", FREE, FREE, gr.update()
                 return
             try:
                 async for log_text, rows, tid, pipe in plan_stream(q, int(hops), int(bud or 0), graph=graph):
-                    status = _busy("Planning...") if not rows else "**Plan ready: review and approve**"
+                    status = _busy("Planning...") if not rows else "✓ Plan ready, review and approve"
                     yield log_text, rows, tid, q, status, BUSY, BUSY, pipe
             finally:
                 yield (gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), FREE, FREE,
@@ -411,12 +423,12 @@ def _build_research_tab(gr: Any, demo: Any, graph: Any, pipeline: Any) -> None:
             hidden = gr.update(visible=False)
             if not tid:
                 yield ((previous_log or "") + "\nRun the planner first.", "", hidden, hidden, hidden,
-                       "**Ready**", FREE, FREE, gr.update())
+                       "Ready", FREE, FREE, gr.update())
                 return
             stream = run_stream(tid, rows, q, int(bud or 0), previous_log or "", graph=graph)
             try:
                 async for log_text, md, md_path, json_path, pdf_path, pipe in stream:
-                    status = _busy("Researching... (see activity)") if not md else "**Report ready**"
+                    status = _busy("Researching...") if not md else "✓ Report ready"
                     yield (log_text, md,
                            gr.update(value=pdf_path, visible=bool(pdf_path)),
                            gr.update(value=md_path, visible=bool(md_path)),
@@ -441,10 +453,13 @@ def main() -> None:
     from deep_researcher import tracing
 
     tracing.configure()
+    from deep_researcher.theme import CSS, build_theme
+
     demo = build_app()
     demo.queue().launch(server_name=os.getenv("GRADIO_HOST", "127.0.0.1"),
                         server_port=int(os.getenv("GRADIO_PORT") or 7860),
-                        allowed_paths=[str(Path(os.getenv("REPORTS_DIR") or "reports").resolve())])
+                        allowed_paths=[str(Path(os.getenv("REPORTS_DIR") or "reports").resolve())],
+                        theme=build_theme(), css=CSS)
 
 
 if __name__ == "__main__":

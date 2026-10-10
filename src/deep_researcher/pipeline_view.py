@@ -24,24 +24,41 @@ ROLE_STAGE = {"planner": "plan", "validator": "validate", "analysis": "analyze",
 
 CSS = """
 <style>
-.dr-pipe{display:flex;flex-wrap:wrap;align-items:stretch;gap:6px;margin:4px 0 10px 0;font-size:12px}
-.dr-box{flex:1 1 110px;min-width:110px;border:2px solid rgba(128,128,128,.45);border-radius:8px;
-        padding:6px 8px;background:rgba(128,128,128,.08);position:relative}
-.dr-box .t{font-weight:600;font-size:13px}
-.dr-box .n{opacity:.8;margin-top:2px;min-height:14px;white-space:nowrap;overflow:hidden;
-           text-overflow:ellipsis}
-.dr-box.done{border-color:#2e9e5b;background:rgba(46,158,91,.12)}
-.dr-box.done .t::before{content:"\\2713  ";color:#2e9e5b}
-.dr-box.active{border-color:#e8741c;background:rgba(232,116,28,.12);
-               animation:dr-pulse 1.2s ease-in-out infinite}
-.dr-box.active .t::before{content:"\\25B6  ";color:#e8741c}
-.dr-box.error{border-color:#c0392b;background:rgba(192,57,43,.12)}
-.dr-box.error .t::before{content:"\\2716  ";color:#c0392b}
-.dr-box.waiting{border-color:#2f6fd6;background:rgba(47,111,214,.12)}
-.dr-box.waiting .t::before{content:"\\23F8  ";color:#2f6fd6}
-.dr-hop{position:absolute;top:4px;right:6px;font-size:10px;opacity:.7}
-@keyframes dr-pulse{0%,100%{box-shadow:0 0 0 0 rgba(232,116,28,.35)}
-                    50%{box-shadow:0 0 0 5px rgba(232,116,28,0)}}
+.dr-pipe{display:flex;flex-wrap:wrap;align-items:stretch;gap:8px;margin:2px 0 14px 0;
+         font-family:Inter,ui-sans-serif,system-ui,sans-serif;font-size:12px}
+.dr-box{flex:1 1 120px;min-width:120px;border:1.5px solid #D4D4D8;border-radius:10px;padding:8px 10px;
+        background:#FFFFFF;color:#0A0A0A;position:relative;transition:background .2s,border-color .2s}
+.dr-box .t{font-weight:600;font-size:13px;letter-spacing:-0.01em}
+.dr-box .n{color:#71717A;margin-top:3px;min-height:15px;white-space:nowrap;overflow:hidden;
+           text-overflow:ellipsis;font-size:11.5px}
+.dr-box.done{border-color:#00CC00;background:#E6FFE6}
+.dr-box.done .n{color:#006600}
+.dr-box.done .t::before{content:"\\2713  ";color:#00AA00}
+.dr-box.active{border-color:#0A0A0A;background:#0A0A0A;color:#FFFFFF;
+               animation:dr-pulse 1.4s ease-in-out infinite}
+.dr-box.active .n{color:#88FF88}
+.dr-box.active .t::before{content:"\\25B6  ";color:#00CC00}
+.dr-box.waiting{border-color:#0A0A0A;border-style:dashed}
+.dr-box.waiting .t::before{content:"\\23F8  ";color:#0A0A0A}
+.dr-box.error{border-color:#DC2626;background:#FEE2E2}
+.dr-box.error .t::before{content:"\\2716  ";color:#DC2626}
+.dr-hop{position:absolute;top:6px;right:8px;font-size:10px;font-weight:600;color:#006600;
+        background:#E6FFE6;border-radius:999px;padding:1px 6px}
+.dr-box.active .dr-hop{background:#003300;color:#88FF88}
+@keyframes dr-pulse{0%,100%{box-shadow:0 0 0 0 rgba(0,204,0,.6)}
+                    50%{box-shadow:0 0 0 6px rgba(0,204,0,0)}}
+.dark .dr-box{border-color:#006600;background:#080808;color:#DDFFDD}
+.dark .dr-box .n{color:#88FF88}
+.dark .dr-box.done{border-color:#00CC00;background:#003300}
+.dark .dr-box.done .n{color:#BBFFBB}
+.dark .dr-box.active{border-color:#00CC00;background:#00CC00;color:#000000}
+.dark .dr-box.active .n{color:#003300}
+.dark .dr-box.active .t::before{color:#003300}
+.dark .dr-box.waiting{border-color:#88FF88}
+.dark .dr-box.waiting .t::before{color:#88FF88}
+.dark .dr-box.error{border-color:#B40000;background:#2A0000}
+.dark .dr-hop{background:#003300;color:#88FF88}
+.dark .dr-box.active .dr-hop{background:#003300;color:#88FF88}
 </style>
 """
 

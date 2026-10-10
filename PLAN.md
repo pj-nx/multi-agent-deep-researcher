@@ -252,6 +252,11 @@ Each phase ends with something runnable. Estimated effort assumes evenings/weeke
   `reports.write_report`, also used by the CLI).
 - Runs the graph in-process; the plan/table helpers and both streams are Gradio-free so they are tested against
   the fake graph (`tests/test_ui.py`), and failures surface in the log instead of hanging the page.
+- **Visual system** (`theme.py`, 2026-10-10): flat, minimalist, white canvas, black Inter type, one accent
+  taken from the Matrix VS Code theme (`#00CC00`, bright `#88FF88`, deep `#008800`/`#006600`/`#003300`);
+  every button is a green fill with black type; text/links on white use `#006600` for contrast. Dark mode
+  (toggle in the header, client-side, remembered in localStorage, OS preference as default) is the Matrix
+  theme proper: its blacks, green borders and green-tinted type. Pipeline boxes restyled for both modes.
 - **PDF export** (`reports.markdown_to_pdf`, 2026-10-10): Markdown → HTML (`markdown`, tables extension) →
   `xhtml2pdf`/reportlab, pure Python so it runs in a serverless function. A4, footer frame on every page,
   cited ids and URLs preserved. `write_report` emits `.md` + `.json` + `.pdf` (PDF failure is logged, never

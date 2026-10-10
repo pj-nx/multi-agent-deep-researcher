@@ -50,8 +50,9 @@ uv run python -m deep_researcher.ui        # Gradio UI at http://127.0.0.1:7860 
 uv run uvicorn api.index:app --reload      # HTTP API at http://localhost:8000/api/health, UI at public/index.html
 ```
 
-The Gradio UI streams the agents' activity live, lets you edit the plan table before approving, renders the
-report and offers `.pdf` / `.md` / `.json` downloads (the PDF is rendered in pure Python via
+The Gradio UI (flat, minimalist; Matrix-green accent on white, with a dark mode toggle that remembers your
+choice) streams the agents' activity live through a row of pipeline stage boxes, lets you edit the plan table
+before approving, renders the report and offers `.pdf` / `.md` / `.json` downloads (the PDF is rendered in pure Python via
 `markdown` + `xhtml2pdf`, no system libraries; the CLI writes all three files too). Its **Settings** tab edits the git-ignored `.env` in place and
 applies changes immediately: API keys (OpenRouter, Tavily, newsdata.io, Semantic Scholar, LangSmith; shown masked,
 blank = keep, `none` = clear), the model per tier (dropdowns, with a button that loads the live OpenRouter

@@ -83,6 +83,11 @@ async def test_plan_then_run_streams(tmp_path, monkeypatch):
     plan_updates = [u async for u in ui.plan_stream("Does remote work raise productivity?", 1, 0, graph=graph)]
     log_text, rows, thread_id, pipe = plan_updates[-1]
     assert "dr-box done" in pipe and "3 sub-questions" in pipe and "awaiting approval" in pipe
+    from deep_researcher.theme import CSS, DARK, PALETTE, THEME_INIT_JS, THEME_TOGGLE_JS, build_theme
+    theme = build_theme()
+    assert PALETTE["green"] in CSS and theme is not None
+    assert theme.body_background_fill_dark == DARK["bg"] and ".dark #dr-report" in CSS
+    assert "localStorage" in THEME_TOGGLE_JS and "prefers-color-scheme" in THEME_INIT_JS
     assert "dr-box active" in plan_updates[0][3]                       # planner box pulses while planning
     assert thread_id and "plan ready: 3 sub-questions" in log_text
     assert [r[0] for r in rows] == ["sq1", "sq2", "sq3"]
