@@ -105,11 +105,15 @@ class EvidenceStore:
         )
 
     # ------------------------------------------------------------------ write
-    def add_evidence(self, items: Iterable[Evidence], *, chunk_size: int = 1200, overlap: int = 150) -> int:
-        """Chunk, embed and upsert. Returns the number of chunks written."""
+    def add_evidence(self, items: Iterable[Evidence], *, chunk_size: int | None = None,
+                     overlap: int | None = None, unit: str | None = None) -> int:
+        """Chunk (CHUNK_SIZE / CHUNK_OVERLAP / CHUNK_UNIT defaults), embed and upsert.
+
+        Returns the number of chunks written.
+        """
         chunks: list[EvidenceChunk] = []
         for ev in items:
-            for i, piece in enumerate(chunk_text(ev.text, size=chunk_size, overlap=overlap)):
+            for i, piece in enumerate(chunk_text(ev.text, size=chunk_size, overlap=overlap, unit=unit)):
                 chunks.append(EvidenceChunk(
                     id=chunk_id(ev.url, i), evidence_id=ev.id, chunk_index=i, text=piece,
                     sub_question_id=ev.sub_question_id, source_type=ev.source_type, title=ev.title,

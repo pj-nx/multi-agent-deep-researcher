@@ -21,7 +21,7 @@ summarisation over a large evidence corpus).
 | LLMs | **OpenRouter** via `langchain-openrouter` (`src/deep_researcher/llm.py`). Tiers: heavy `anthropic/claude-opus-5.5`, worker `anthropic/claude-sonnet-5`, cheap `anthropic/claude-haiku-4.5`; per-role env overrides, model fallbacks, provider routing | One key for every vendor; swap a role's model with an env var; fallbacks keep a run alive when a provider is down. |
 | Retrieval tools | arXiv API, Semantic Scholar API, Tavily (or Serper) web search, NewsAPI (or GDELT), Wikipedia, PDF fetcher (`pypdf`), optional domain APIs (e.g. FRED, Polygon) | Covers the four source types in the brief: papers, news, reports, APIs. |
 | Evidence store | **Chroma, embedded and persistent** (`CHROMA_PATH`) via `src/deep_researcher/store/` | Zero-ops, survives restarts, same client for Chroma server/cloud; every chunk carries `evidence_id`, `url`, `source_type`, `published_at`, `credibility`; collection is fingerprinted with the embedding model. |
-| Embeddings | **Local by default**: `BAAI/bge-base-en-v1.5` on CPU via `langchain-huggingface`; **OpenRouter** serves the identical model for hosted runs (`EMBEDDINGS_PROVIDER=openrouter`, same `OPENROUTER_API_KEY` as the LLMs); Ollama or any OpenAI-compatible endpoint as alternatives. `src/deep_researcher/embeddings.py` | Local dev needs no key for indexing; hosted runs switch provider with one env var and keep the same vectors. |
+| Embeddings | **256-d Matryoshka vectors, 512-token chunks.** Local default `Snowflake/snowflake-arctic-embed-m-v1.5` (CPU, no key); hosted default `openai/text-embedding-3-small` via **OpenRouter** (`EMBEDDINGS_PROVIDER=openrouter`, same key as the LLMs); Ollama `nomic-embed-text` as a third option. `src/deep_researcher/embeddings.py` | Small index, keyless local dev, one env var to switch for hosted runs; fixed-size models are refused at 256-d rather than silently truncated. |
 | Persistence | `SqliteSaver` checkpointer | Resume after human approval, re-run a failed node, inspect state per thread. |
 | Observability | LangSmith tracing via `src/deep_researcher/tracing.py` | Required to debug a 7-agent graph; also gives eval datasets. See §11. |
 | UI (local) | **Gradio** app (streaming node events + plan approval + report download) | Consistent with the course projects. CLI runner too. |
@@ -249,7 +249,7 @@ preview URL.
 | Long-running Gradio server | Vercel runs request-scoped functions, not servers | FastAPI in `api/index.py`, static UI in `public/` |
 | `SqliteSaver` on disk | Filesystem is ephemeral; only `/tmp` is writable and it does not survive invocations | `PostgresSaver` (`langgraph-checkpoint-postgres`) on Neon or Vercel Postgres |
 | Local Chroma directory | Same ephemeral-disk problem | Chroma server / Chroma Cloud via `chromadb.HttpClient`/`CloudClient` (same `EvidenceStore`), or Qdrant Cloud |
-| Local embedding model | Too large for a function bundle | `EMBEDDINGS_PROVIDER=openrouter` (same bge-base model, same vectors, same key as the LLMs) |
+| Local embedding model | Too large for a function bundle | `EMBEDDINGS_PROVIDER=openrouter` (text-embedding-3-small @256, same key as the LLMs) |
 | Unbounded run time | Functions are capped: **300 s on Hobby**, 800 s on Pro (1800 s beta) | Stream SSE so the response starts immediately; cap `max_hops` per plan tier; for unlimited runs use Vercel Workflows or LangGraph Platform |
 | Human approval mid-run | A function cannot block waiting for a click | Two requests: `POST /api/research` runs to the `interrupt()` and returns the plan + `thread_id`; `POST /api/research/{thread_id}/resume` continues from the Postgres checkpoint |
 
@@ -344,56 +344,82 @@ codebase imports a vendor SDK.
 
 ## 13. Embeddings and persistent vector DB
 
-Implemented: `src/deep_researcher/embeddings.py`, `src/deep_researcher/store/` (Phase 1's
-`EvidenceStore` landed early because the API surface was needed to settle the schema).
+Implemented: `src/deep_researcher/embeddings.py`, `src/deep_researcher/store/`.
 
-**Local embeddings by default.** `EMBEDDINGS_PROVIDER=local` runs `BAAI/bge-base-en-v1.5`
-(768-d, ~440 MB) through sentence-transformers on CPU. No key, no server; the model downloads once
-into the Hugging Face cache. `tool.uv.sources` pins CPU-only PyTorch on Linux so the install does
-not pull CUDA libraries.
+### Decisions: 512-token chunks, 256-dimensional vectors
 
-**OpenRouter embeddings for hosted runs.** `EMBEDDINGS_PROVIDER=openrouter` calls OpenRouter's
-`/embeddings` endpoint with the same `OPENROUTER_API_KEY` the LLMs use. The default model is
-`baai/bge-base-en-v1.5`, i.e. the same weights as the local default. Measured on 2026-10-10: the
-hosted and local vectors agree to cosine 1.0000 on every test text, rankings are identical, and a
-query embedded remotely against a locally built index ranks correctly. Consequences:
+| Setting | Value | Rationale |
+|---|---|---|
+| `CHUNK_SIZE` / `CHUNK_OVERLAP` / `CHUNK_UNIT` | 512 / 64 / tokens | Fits every candidate model's window (arctic 512, text-embedding-3 8k); one chunk ≈ two or three paragraphs, enough for a self-contained claim plus context. Tokens counted with tiktoken `cl100k_base` (approximate for non-OpenAI models, within a few %), falling back to 4 chars/token offline. Chunking converts the budget to characters via the text's own ratio, splits on paragraph/sentence boundaries, then tightens until every chunk fits; measured chunks land at 445–455 tokens. |
+| `EMBEDDINGS_DIMENSIONS` | 256 | 3× smaller than 768-d, 6× smaller than 1536-d: faster HNSW, cheaper hosted vector storage. Only valid for **Matryoshka-trained** models, whose leading components carry most of the signal; the factory refuses known fixed-size families (bge, e5, gte, MiniLM, mpnet, ada-002, mistral-embed) at reduced size, and OpenRouter rejects them server-side too (verified: 400 "does not support matryoshka representation" for bge-base). `EMBEDDINGS_DIMENSIONS=native` restores full size. |
 
-- One collection works from both environments; the fingerprint is the canonical model name, not the
-  provider, so no re-ingest is needed when moving between laptop and cloud.
-- The chunker's 1200-character chunks (~300 tokens) stay well under bge-base's 512-token window.
-- Cost is negligible: $0.005 per million tokens; a 500-chunk research run embeds for well under a cent.
-- The `langchain-openai` client is configured with `check_embedding_ctx_length=False` and
-  `tiktoken_enabled=False` so it sends raw strings (third-party endpoints reject tiktoken token
-  arrays and their model ids are unknown to tiktoken).
-- Trade-offs vs. local: ~4–5 s round trip for a small batch vs. 0.1 s locally after a ~27 s model
-  load; a network dependency; and the embedding provider is now the same vendor as the LLMs, which
-  concentrates outage risk. Note that falling back to a *different* model is not a drop-in
-  mitigation: a new model means a new collection, so pick the model deliberately and, if outage
-  tolerance matters, keep `local` available as the same-model fallback.
+### Model choice per provider (all 256-d)
 
-Other OpenRouter embedding options checked against the live catalogue (33 models): `baai/bge-m3`
-(8k context, multilingual, $0.01/M), `qwen/qwen3-embedding-8b` (32k, $0.01/M),
-`openai/text-embedding-3-small` ($0.02/M), `voyageai/voyage-4-lite` ($0.02/M); `bge-small` is **not**
-offered, which is why the local default moved from small to base. Alternatives outside OpenRouter:
-`ollama` (`nomic-embed-text`) or `openai` for any OpenAI-compatible endpoint. Each is an optional
-extra so the API deployment stays slim.
+| Provider | Model | Verified on 2026-10-10 |
+|---|---|---|
+| `local` (default) | `Snowflake/snowflake-arctic-embed-m-v1.5` | 109M params, ~440 MB, 512-token window, MRL-trained *for* 256-d. Loads in ~11–30 s on CPU; ships a query prompt (`Represent this sentence for searching relevant passages:`) which the factory applies to queries only. 256-d, unit-norm, correct ranking on the smoke set. |
+| `openrouter` | `openai/text-embedding-3-small` | `dimensions=256` honoured; 256-d unit-norm vectors; $0.02 / M tokens; correct ranking. Also honoured on OpenRouter: `qwen/qwen3-embedding-8b` ($0.01/M, 32k ctx), `voyageai/voyage-4-lite` ($0.02/M), `google/gemini-embedding-2` ($0.20/M). |
+| `openai` | `text-embedding-3-small` | Same weights as the OpenRouter default → shared fingerprint `text-embedding-3-small@256`. |
+| `ollama` | `nomic-embed-text` | v1.5 is MRL; `OllamaEmbeddings(dimensions=256)` passes it through. Not live-tested (no Ollama here). |
 
-**Persistent store.** Embedded Chroma at `CHROMA_PATH` (default `.chroma/`, git-ignored).
-Rules enforced by `EvidenceStore`:
+Why not bge-base any more: it is fixed at 768-d, so it cannot meet the 256-d requirement. The
+earlier property that local and hosted shared one model is therefore lost under these defaults:
+**no Matryoshka model is both runnable locally and offered by OpenRouter** (OpenRouter has no
+arctic, nomic or EmbeddingGemma; the local-runnable Qwen3-Embedding-0.6B differs from the hosted
+4B/8B weights). Consequences and the chosen mitigation:
+
+- A collection is bound to one model (`embedding_id` + `embedding_dim` in Chroma metadata), so the
+  hosted deployment builds its own collection from scratch; it never reads the laptop's.
+- Developers who want laptop ↔ cloud portability set `EMBEDDINGS_PROVIDER=openrouter` locally
+  (cost: $0.02 / M tokens; a full research run embeds for well under a cent).
+- Switching models later = new `CHROMA_COLLECTION` + re-ingest; the fingerprint check makes the old
+  collection unusable with the new model on purpose.
+
+### EmbeddingGemma (checked at the user's request)
+
+`google/embeddinggemma-2` (Apache 2.0, not gated): 740M params total (270M text + 170M vision +
+300M audio), native 768-d with MRL truncation to 512/256/128, Google reports quality "close to
+lossless down to 256"; 8k-token context; multimodal (text, image, video, audio). Requires
+`prompt_name="SearchQuery"` for queries and `"Document"` for passages, plus Pillow for its
+processor even for text-only use. Not available on OpenRouter. The older `google/embeddinggemma-300m`
+(text-only, 300M, MRL to 128) is **gated** on Hugging Face (licence acceptance + token), which
+rules it out as a keyless default.
+
+**Live measurement (CPU, this machine, 256-d, `truncate_dim`):**
+
+| | arctic-embed-m-v1.5 (default) | embeddinggemma-2 |
+|---|---|---|
+| Parameters / download | 109M / ~0.9 GB on disk | 744M / ~1.5 GB |
+| Load time | 11–30 s | 20 s |
+| 8 × ~450-token chunks | **1.5 s** | 9.3 s (≈ 6× slower) |
+| Context window | 512 tokens | 8,192 tokens |
+| Ranking on smoke set | correct (0.48 / 0.31 / 0.06) | correct (0.80 / 0.71 / 0.56) |
+| Extra deps | none | Pillow + torchvision (multimodal processor) |
+| Prompts | `query` auto-applied | ships `query`/`document` → auto-applied too |
+
+**Verdict:** keep arctic as the default; it is the right speed/size for a laptop ingest loop and
+was trained specifically for 256-d. EmbeddingGemma 2 is the better *model* (multilingual, 8k
+context, multimodal, near-lossless at 256-d) and is a supported opt-in:
+`EMBEDDINGS_MODEL=google/embeddinggemma-2` with `uv sync --extra embeddings-local --extra embeddings-gemma`.
+Pick it when the corpus is multilingual or chunks would benefit from >512-token context, or when
+a GPU is available (the 6× CPU penalty largely disappears). Not on OpenRouter, so a hosted
+deployment cannot share its collection.
+
+### Persistent store
+
+Embedded Chroma at `CHROMA_PATH` (default `.chroma/`, git-ignored). Rules enforced by
+`EvidenceStore`:
 
 | Rule | Mechanism |
 |---|---|
-| One embedding model per collection | Collection metadata records `embedding_id` (`provider:model[@dims]`) and `embedding_dim`; mismatch raises `EmbeddingMismatchError` instead of returning meaningless neighbours |
+| One embedding model per collection | Collection metadata records `embedding_id` (`model[@dims]`) and `embedding_dim`; mismatch raises `EmbeddingMismatchError` instead of returning meaningless neighbours |
 | Re-ingestion is idempotent | Chunk id = sha1(url, chunk_index); `upsert` |
 | Filterable retrieval | Flat metadata (`sub_question_id`, `source_type`, `url`, `published_at`, `credibility`) → `query(text, k, sub_question_id=…, where=…)` |
 | Cosine space | `configuration={"hnsw": {"space": "cosine"}}`; `Hit.score = 1 - distance` |
-| Single writer | Chroma embedded mode is not multi-process safe; one process per path (the API on Vercel uses a Chroma server/cloud instead) |
-
-**Changing models later.** Pick a new `CHROMA_COLLECTION` (or `store.reset()`) and re-ingest; the
-fingerprint check makes the old collection unusable with the new model on purpose.
+| Single writer | Chroma embedded mode is not multi-process safe; one process per path (the API on AWS uses S3 Vectors or a Chroma server instead) |
 
 **Hosted path.** Same `EvidenceStore` with `client=chromadb.HttpClient(...)` or `CloudClient(...)`,
-plus `EMBEDDINGS_PROVIDER=openai`. Qdrant remains the alternative if hybrid BM25 + dense search
+plus `EMBEDDINGS_PROVIDER=openrouter`. Qdrant remains the alternative if hybrid BM25 + dense search
 becomes a requirement (stretch §9).
 
 ---
@@ -412,7 +438,7 @@ Vercel's 300 s function cap is the main reason to prefer AWS. Two paths, one rec
 | Duration | sync ceiling **15 min** → `RUN_BUDGET_SECONDS≈840`, `MAX_HOPS=2` | 3× Vercel; the existing budget guard already ends hops early |
 | Checkpoints | Postgres (Aurora Serverless v2 / RDS) via `langgraph-checkpoint-postgres`, or DynamoDB | `/tmp` is ephemeral |
 | Vector store | **Amazon S3 Vectors** (cheapest, serverless) or a Chroma server on a small ECS task; same `EvidenceStore` API via a client swap | embedded Chroma cannot live on ephemeral disk |
-| Embeddings | **`EMBEDDINGS_PROVIDER=openrouter`** (§13) | identical vectors to local dev, no torch in the image (hundreds of MB and ~27 s cold start saved), one key for LLMs and embeddings |
+| Embeddings | **`EMBEDDINGS_PROVIDER=openrouter`** (§13), text-embedding-3-small @256 | no torch in the image (hundreds of MB and a ~10–30 s cold start saved), one key for LLMs and embeddings; the hosted collection is built in the cloud (different model from local dev) |
 | LLMs | OpenRouter unchanged | — |
 | Secrets | `OPENROUTER_API_KEY`, `API_AUTH_TOKEN`, `DATABASE_URL`, `LANGSMITH_API_KEY` in Secrets Manager → Lambda env | never in the image |
 | IaC | CDK (Python) or SAM; GitHub Actions deploys from `main` | — |

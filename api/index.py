@@ -45,6 +45,7 @@ from starlette.types import Receive, Scope, Send
 
 from deep_researcher import embeddings, llm, tracing
 from deep_researcher.schemas import ResearchPlan
+from deep_researcher.store import chunking
 
 log = logging.getLogger("deep_researcher.api")
 tracing.configure()
@@ -244,6 +245,8 @@ async def health() -> dict:
         "embeddings": embeddings.info(),
         "vector_db": {"backend": "chroma", "path": os.getenv("CHROMA_PATH") or ".chroma",
                       "collection": os.getenv("CHROMA_COLLECTION") or "evidence"},
+        "chunking": {"size": chunking.default_chunk_size(), "overlap": chunking.default_chunk_overlap(),
+                     "unit": chunking.default_chunk_unit()},
     }
 
 

@@ -92,31 +92,40 @@ get_llm("planner").invoke("...")           # ChatOpenRouter, traced by LangSmith
 
 ## Embeddings and the vector DB
 
-Evidence is chunked, embedded and stored in a **persistent embedded Chroma** collection
-(`CHROMA_PATH`, default `.chroma/`). The embedding model is chosen by `EMBEDDINGS_PROVIDER`, and
-the default needs **no API key and no server**:
+Evidence is chunked into **512-token** pieces (64-token overlap, sentence/paragraph boundaries,
+`CHUNK_SIZE` / `CHUNK_OVERLAP` / `CHUNK_UNIT`), embedded as **256-dimensional** vectors
+(`EMBEDDINGS_DIMENSIONS`), and stored in a **persistent embedded Chroma** collection
+(`CHROMA_PATH`, default `.chroma/`). 256 dimensions means a 3–6× smaller index than the models'
+native sizes; it is only honest for Matryoshka-trained models, so the factory refuses fixed-size
+models (bge, e5, gte, MiniLM) at reduced dimensions instead of silently truncating them.
 
-| Provider | Default model | Install | Notes |
+The embedding model is chosen by `EMBEDDINGS_PROVIDER`; the default needs **no API key and no
+server**:
+
+| Provider | Default model (all 256-d) | Install | Notes |
 |---|---|---|---|
-| `local` (default) | `BAAI/bge-base-en-v1.5` (768-d) | `uv sync --extra embeddings-local` | sentence-transformers on CPU (CPU-only torch is pinned via `tool.uv.sources`); set `EMBEDDINGS_DEVICE=cuda`/`mps` to use a GPU |
-| `openrouter` | `baai/bge-base-en-v1.5` (768-d) | `uv sync --extra embeddings-openai` | **Same weights as `local`**: identical vectors (cosine 1.0 measured), so collections are portable between laptop and cloud. Uses `OPENROUTER_API_KEY`. $0.005 / M tokens. Use this on AWS / Vercel. |
-| `ollama` | `nomic-embed-text` | `uv sync --extra embeddings-ollama` | `ollama pull nomic-embed-text`; `EMBEDDINGS_BASE_URL` for a remote server |
-| `openai` | `text-embedding-3-small` | `uv sync --extra embeddings-openai` | OpenAI, or any OpenAI-compatible endpoint via `EMBEDDINGS_BASE_URL` (vLLM, LM Studio) |
+| `local` (default) | `Snowflake/snowflake-arctic-embed-m-v1.5` | `uv sync --extra embeddings-local` | MRL-trained specifically for 256-d; 109M params, 512-token window, ~440 MB, CPU; the model's query prompt is applied automatically. `EMBEDDINGS_DEVICE=cuda`/`mps` for a GPU |
+| `openrouter` | `openai/text-embedding-3-small` | `uv sync --extra embeddings-openai` | `dimensions=256` honoured by OpenRouter (verified). Uses `OPENROUTER_API_KEY`. $0.02 / M tokens. **Use this on AWS / Vercel.** |
+| `openai` | `text-embedding-3-small` | `uv sync --extra embeddings-openai` | Same weights as the `openrouter` default → same collection. Any OpenAI-compatible endpoint via `EMBEDDINGS_BASE_URL` |
+| `ollama` | `nomic-embed-text` | `uv sync --extra embeddings-ollama` | v1.5 is Matryoshka; `dimensions` passed through |
 
-The store writes the embedding fingerprint (canonical model name, e.g. `baai/bge-base-en-v1.5`,
-plus requested dimensions) and the vector dimension into the collection's metadata and refuses to
-open it with a different model, so you cannot mix embeddings in one collection by accident. The
-fingerprint is model-based rather than provider-based on purpose: `local` and `openrouter` serving
-the same model share a collection. Chunk ids are deterministic, so re-ingesting a source is
-an idempotent upsert. Chroma is embedded and single-writer; the same code talks to a Chroma server
-or Chroma Cloud by swapping the client.
+Opt-in local alternative: `EMBEDDINGS_MODEL=google/embeddinggemma-2` (`--extra embeddings-gemma`), multilingual
+and 8k-context, near-lossless at 256-d, but ~6× slower than arctic on CPU (PLAN §13 has the numbers).
+
+The store writes the embedding fingerprint (canonical model name plus dimensions, e.g.
+`text-embedding-3-small@256`) and the vector dimension into the collection's metadata and refuses
+to open it with a different model. The fingerprint is model-based rather than provider-based, so
+`openrouter` and `openai` share a collection; the local default is a *different* model, so a
+laptop-built collection is not portable to a hosted deployment under these defaults (set
+`EMBEDDINGS_PROVIDER=openrouter` locally if you need that). Chunk ids are deterministic, so
+re-ingesting a source is an idempotent upsert. Chroma is embedded and single-writer.
 
 ```python
 from deep_researcher import embeddings
 from deep_researcher.store import EvidenceStore
 
 store = EvidenceStore(embeddings.get_embeddings(), embedding_id=embeddings.embedding_id())
-store.add_evidence([...])                       # Evidence -> chunks -> vectors, persisted
+store.add_evidence([...])                       # Evidence -> 512-token chunks -> 256-d vectors, persisted
 hits = store.query("four-day week productivity", k=10, sub_question_id="sq1")
 ```
 
