@@ -210,8 +210,13 @@ _graph: Any = None
 _graph_lock = asyncio.Lock()
 
 
+def checkpointer_kind() -> str:
+    return (os.getenv("CHECKPOINTER") or "sqlite").lower()
+
+
 async def get_checkpointer():
-    kind = (os.getenv("CHECKPOINTER") or "sqlite").lower()
+    """memory (tests) | sqlite (local, CHECKPOINT_DB) | postgres (hosted, DATABASE_URL)."""
+    kind = checkpointer_kind()
     if kind == "memory":
         from langgraph.checkpoint.memory import InMemorySaver
 
@@ -224,7 +229,21 @@ async def get_checkpointer():
         saver = AsyncSqliteSaver(conn)
         await saver.setup()
         return saver
-    raise ValueError(f"CHECKPOINTER={kind!r}; expected memory or sqlite (postgres arrives with Phase 6)")
+    if kind == "postgres":
+        url = os.getenv("DATABASE_URL")
+        if not url:
+            raise ValueError("CHECKPOINTER=postgres needs DATABASE_URL (postgresql://user:pass@host:5432/db)")
+        from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+        from psycopg import AsyncConnection
+        from psycopg.rows import dict_row
+
+        # Same connection settings the library uses in from_conn_string(), but long-lived: the
+        # graph is built once per process and aclose() closes the connection on shutdown.
+        conn = await AsyncConnection.connect(url, autocommit=True, prepare_threshold=0, row_factory=dict_row)
+        saver = AsyncPostgresSaver(conn)
+        await saver.setup()
+        return saver
+    raise ValueError(f"CHECKPOINTER={kind!r}; expected memory, sqlite or postgres")
 
 
 async def get_graph(deps: Deps | None = None):

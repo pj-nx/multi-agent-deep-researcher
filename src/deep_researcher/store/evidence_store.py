@@ -214,12 +214,59 @@ class EvidenceStore:
                 "count": self.count(), "metadata": dict(self.collection.metadata or {})}
 
 
+def chroma_mode() -> str:
+    return (os.getenv("CHROMA_MODE") or "persistent").lower()
+
+
+def make_chroma_client() -> Any:
+    """Chroma client for CHROMA_MODE: persistent (CHROMA_PATH, embedded, single writer), http
+    (CHROMA_HOST/CHROMA_PORT/CHROMA_SSL, optional CHROMA_API_KEY header) or cloud (CHROMA_API_KEY,
+    CHROMA_TENANT, CHROMA_DATABASE). The same EvidenceStore runs on all three."""
+    import chromadb
+
+    mode = chroma_mode()
+    if mode == "persistent":
+        return chromadb.PersistentClient(path=os.getenv("CHROMA_PATH") or DEFAULT_PATH)
+    if mode == "http":
+        host = os.getenv("CHROMA_HOST")
+        if not host:
+            raise ValueError("CHROMA_MODE=http needs CHROMA_HOST (and CHROMA_PORT, default 8000)")
+        headers = {"x-chroma-token": os.environ["CHROMA_API_KEY"]} if os.getenv("CHROMA_API_KEY") else None
+        return chromadb.HttpClient(host=host, port=int(os.getenv("CHROMA_PORT") or 8000),
+                                   ssl=(os.getenv("CHROMA_SSL") or "false").lower() in {"1", "true", "yes"},
+                                   headers=headers)
+    if mode == "cloud":
+        missing = [k for k in ("CHROMA_API_KEY", "CHROMA_TENANT", "CHROMA_DATABASE") if not os.getenv(k)]
+        if missing:
+            raise ValueError(f"CHROMA_MODE=cloud needs {', '.join(missing)}")
+        return chromadb.CloudClient(tenant=os.environ["CHROMA_TENANT"],
+                                    database=os.environ["CHROMA_DATABASE"],
+                                    api_key=os.environ["CHROMA_API_KEY"])
+    raise ValueError(f"CHROMA_MODE={mode!r}; expected persistent, http or cloud")
+
+
+def store_info() -> dict[str, Any]:
+    mode = chroma_mode()
+    out: dict[str, Any] = {"backend": "chroma", "mode": mode,
+                           "collection": os.getenv("CHROMA_COLLECTION") or DEFAULT_COLLECTION}
+    if mode == "persistent":
+        out["path"] = os.getenv("CHROMA_PATH") or DEFAULT_PATH
+    elif mode == "http":
+        out["host"] = os.getenv("CHROMA_HOST")
+        out["port"] = os.getenv("CHROMA_PORT") or "8000"
+    else:
+        out["tenant"] = os.getenv("CHROMA_TENANT")
+        out["database"] = os.getenv("CHROMA_DATABASE")
+    return out
+
+
 @functools.cache
 def get_store() -> EvidenceStore:
-    """Process-wide store built from the configured embeddings (CHROMA_PATH / CHROMA_COLLECTION)."""
+    """Process-wide store built from the configured embeddings and CHROMA_MODE."""
     from deep_researcher import embeddings
 
-    return EvidenceStore(embeddings.get_embeddings(), embedding_id=embeddings.embedding_id())
+    return EvidenceStore(embeddings.get_embeddings(), embedding_id=embeddings.embedding_id(),
+                         client=make_chroma_client())
 
 
 def reset_store_cache() -> None:

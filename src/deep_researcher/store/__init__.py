@@ -6,8 +6,10 @@ from deep_researcher.store.evidence_store import (
     EvidenceStore,
     Hit,
     get_store,
+    make_chroma_client,
     reset_store_cache,
+    store_info,
 )
 
 __all__ = ["EmbeddingMismatchError", "EvidenceStore", "Hit", "chunk_text", "count_tokens", "get_store",
-           "reset_store_cache"]
+           "make_chroma_client", "reset_store_cache", "store_info"]

@@ -269,9 +269,19 @@ Each phase ends with something runnable. Estimated effort assumes evenings/weeke
   key test button and an "effective configuration" summary. Local-only by design: never expose this page from
   a hosted deployment (it edits files and holds secrets); the API has no equivalent.
 
-### Phase 6 — Vercel deployment (½ day)
-- Wire `api/index.py` to `build_graph()` with the Postgres checkpointer and hosted vector store (§10).
-- Set env vars in the Vercel project; deploy with `vercel --prod`; smoke-test `/api/health` and a 1-hop question.
+### Phase 6 — Deployment wiring (½ day) — DONE 2026-10-11 (artifacts + local verification; no cloud deploy)
+- `CHECKPOINTER=postgres` (`langgraph-checkpoint-postgres`, long-lived `AsyncConnection`, closed by
+  `graph.aclose()`); `CHROMA_MODE=persistent|http|cloud` (`store.make_chroma_client`, same `EvidenceStore`);
+  `/api/health` reports both. The API has used the real graph since Phase 0.
+- `Dockerfile` (python 3.12-slim + Lambda Web Adapter extension, hosted defaults baked in, healthcheck),
+  `.dockerignore`, `docker-compose.yml` (API + Postgres 16 + Chroma server), `deploy/template.yaml` (SAM:
+  container image, 900 s, 2 GB, streaming Function URL, all secrets as NoEcho parameters), `.github/workflows/ci.yml`
+  (lint + tests, then build the image and smoke `/api/health`).
+- Verified locally against a throwaway Postgres container and a local Chroma server: a plan interrupt written by
+  one graph instance is resumed by a second one on the same database and the final state (report) lands in
+  Postgres shortly after the stream ends; evidence round-trips through Chroma over HTTP; the image builds and
+  serves `/api/health`. **Not done:** deploying to AWS/Vercel, which needs account credentials (none configured
+  here), and the Gradio UI is local-only by design (Settings page edits files).
 
 ### Phase 7 — Evals & polish (1 day)
 - 10 seeded questions in `evals/questions.jsonl`.

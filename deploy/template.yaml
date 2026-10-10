@@ -1,0 +1,69 @@
+# AWS SAM template: Deep Researcher API as a Lambda container image behind a streaming Function URL.
+#
+#   sam build && sam deploy --guided \
+#     --parameter-overrides OpenRouterApiKey=... ApiAuthToken=... DatabaseUrl=postgresql://... \
+#                           ChromaHost=... ChromaPort=8000 ChromaApiKey=...
+#
+# Prerequisites you provision separately (see PLAN.md §14): a Postgres database reachable from Lambda
+# (Aurora Serverless v2 / RDS / Neon) and a Chroma server or Chroma Cloud for the evidence store.
+# Function URL + RESPONSE_STREAM keeps the SSE stream alive for up to 15 minutes (the sync ceiling).
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Multi-agent deep researcher API (FastAPI + LangGraph) on Lambda
+
+Parameters:
+  OpenRouterApiKey: { Type: String, NoEcho: true }
+  ApiAuthToken: { Type: String, NoEcho: true, Description: Bearer / X-API-Key required by /api/research* }
+  DatabaseUrl: { Type: String, NoEcho: true, Description: postgresql://user:pass@host:5432/db }
+  ChromaMode: { Type: String, Default: http, AllowedValues: [http, cloud] }
+  ChromaHost: { Type: String, Default: "" }
+  ChromaPort: { Type: String, Default: "8000" }
+  ChromaApiKey: { Type: String, NoEcho: true, Default: "" }
+  ChromaTenant: { Type: String, Default: "" }
+  ChromaDatabase: { Type: String, Default: "" }
+  LangSmithApiKey: { Type: String, NoEcho: true, Default: "" }
+  HeavyModel: { Type: String, Default: anthropic/claude-sonnet-5 }
+  MaxHops: { Type: String, Default: "1" }
+  RunBudgetSeconds: { Type: String, Default: "840" }
+
+Resources:
+  ApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      PackageType: Image
+      MemorySize: 2048
+      Timeout: 900                     # 15 min: the synchronous ceiling; RUN_BUDGET_SECONDS stops earlier
+      Architectures: [x86_64]
+      FunctionUrlConfig:
+        AuthType: NONE                 # the app enforces API_AUTH_TOKEN itself; put CloudFront + WAF in front
+        InvokeMode: RESPONSE_STREAM
+      Environment:
+        Variables:
+          OPENROUTER_API_KEY: !Ref OpenRouterApiKey
+          API_AUTH_TOKEN: !Ref ApiAuthToken
+          CHECKPOINTER: postgres
+          DATABASE_URL: !Ref DatabaseUrl
+          CHROMA_MODE: !Ref ChromaMode
+          CHROMA_HOST: !Ref ChromaHost
+          CHROMA_PORT: !Ref ChromaPort
+          CHROMA_API_KEY: !Ref ChromaApiKey
+          CHROMA_TENANT: !Ref ChromaTenant
+          CHROMA_DATABASE: !Ref ChromaDatabase
+          EMBEDDINGS_PROVIDER: openrouter
+          OPENROUTER_MODEL_HEAVY: !Ref HeavyModel
+          MAX_HOPS: !Ref MaxHops
+          RUN_BUDGET_SECONDS: !Ref RunBudgetSeconds
+          TRUST_PROXY_HEADERS: "true"
+          LANGSMITH_API_KEY: !Ref LangSmithApiKey
+          LANGSMITH_TRACING: "true"
+          LANGSMITH_PROJECT: deep-researcher-prod
+          REPORTS_DIR: ""              # ephemeral filesystem: reports are streamed, not written
+    Metadata:
+      Dockerfile: Dockerfile
+      DockerContext: ..
+      DockerTag: api
+
+Outputs:
+  ApiUrl:
+    Description: Streaming Function URL (serve public/index.html from S3/CloudFront pointing here)
+    Value: !GetAtt ApiFunctionUrl.FunctionUrl

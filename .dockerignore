@@ -1,0 +1,15 @@
+.venv
+.git
+.chroma
+.checkpoints.sqlite*
+reports
+.env
+.env.*
+!.env.example
+__pycache__
+*.pyc
+tests
+.pytest_cache
+.ruff_cache
+.claude
+deploy

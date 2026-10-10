@@ -84,29 +84,54 @@ parameter are asked for those languages up front, everything else is detected fr
 **For useful results on non-CS topics, add `TAVILY_API_KEY` and `SEMANTIC_SCHOLAR_API_KEY`.** With
 only the keyless sources, `papers` means arXiv, which is thin outside maths/physics/CS.
 
-## Deploy to Vercel
+## Deployment
 
-The repo is Vercel-ready: `api/index.py` is a FastAPI function (Server-Sent Events streaming),
-`public/index.html` is the hosted UI, and `vercel.json` sets `maxDuration` and `/api` rewrites.
+The same FastAPI app runs locally, in a container, on AWS Lambda and on Vercel. Hosted runs need
+three things the local defaults do not: `CHECKPOINTER=postgres` with `DATABASE_URL` (plan approval
+resumes from the database), `CHROMA_MODE=http` or `cloud` (the evidence store cannot live on an
+ephemeral disk), and `EMBEDDINGS_PROVIDER=openrouter` (no local model in the image). The container
+image sets all three by default.
+
+### Docker / docker compose (local stand-in for production)
 
 ```bash
-npm i -g vercel
-vercel link
-vercel env add ANTHROPIC_API_KEY   # repeat for the variables in .env.example
-vercel --prod
+cp .env.example .env                 # OPENROUTER_API_KEY, API_AUTH_TOKEN
+docker compose up --build            # API on :8000 + Postgres + Chroma server
+curl -s localhost:8000/api/health | jq .checkpointer,.vector_db
 ```
 
-Or import the GitHub repo in the Vercel dashboard; pushes to `main` deploy automatically.
+`Dockerfile` bundles the AWS Lambda Web Adapter extension, so one image serves plain uvicorn hosts
+(ECS Fargate, any VM) and Lambda alike.
 
-**Constraints that shape the hosted design** (details in PLAN.md §10):
+### AWS Lambda (recommended; PLAN.md §14)
 
-- Functions are capped at 300 s on Hobby (800 s on Pro), so the API streams events immediately and
-  honours `MAX_HOPS` / `RUN_BUDGET_SECONDS`.
-- The filesystem is ephemeral, so hosted runs use a Postgres checkpointer and a Chroma server /
-  Chroma Cloud (or another hosted store) instead of SQLite + the local Chroma directory. A local
-  embedding model will not fit in a function, so set `EMBEDDINGS_PROVIDER=openrouter` there.
-- Human plan approval is split into two requests: `POST /api/research` returns the plan and a
-  `thread_id`; `POST /api/research/{thread_id}/resume` continues from the checkpoint.
+```bash
+pip install aws-sam-cli
+cd deploy && sam build && sam deploy --guided \
+  --parameter-overrides OpenRouterApiKey=sk-or-... ApiAuthToken=... \
+      DatabaseUrl=postgresql://user:pass@host:5432/db ChromaHost=chroma.example ChromaPort=8000
+```
+
+`deploy/template.yaml` creates a container-image function (15-minute ceiling, 2 GB) behind a
+**streaming Function URL**, which is what keeps the SSE stream alive; API Gateway's 30 s integration
+timeout would cut it. Provision Postgres (Aurora Serverless v2 / RDS / Neon) and a Chroma server or
+Chroma Cloud separately and pass their endpoints as parameters. Put CloudFront + WAF in front for a
+domain and rate limiting, and serve `public/index.html` from S3/CloudFront pointing at the URL.
+
+### Vercel
+
+`vercel.json` routes `/api/*` to `api/index.py` with the 300 s Hobby maximum. Set the same hosted env
+vars in the project settings (`CHECKPOINTER=postgres`, `DATABASE_URL`, `CHROMA_MODE=cloud` + Chroma
+Cloud credentials, `EMBEDDINGS_PROVIDER=openrouter`, `API_AUTH_TOKEN`, `RUN_BUDGET_SECONDS=240`) and
+`vercel --prod`. Keep `MAX_HOPS` low: a hop that outruns the function cap is cut off.
+
+### What is and is not verified
+
+Verified locally: the image builds and answers `/api/health`; the Postgres checkpointer persists a
+plan interrupt that a second process resumes; the Chroma http mode stores and queries evidence against
+a Chroma server (both via `tests/test_deploy.py` when `DR_TEST_DATABASE_URL` / `DR_TEST_CHROMA_HOST` are
+set; `ci.yml` builds and smoke-tests the image on every push). Not verified: an actual deployment to
+AWS or Vercel, which needs your account credentials.
 
 ## LLM provider: OpenRouter
 

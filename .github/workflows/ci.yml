@@ -1,0 +1,26 @@
+name: ci
+on:
+  push: { branches: [main] }
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv python install 3.12
+      - run: uv sync --extra dev --extra vectordb --extra embeddings-openai
+      - run: uv run ruff check .
+      - run: uv run pytest -q
+  docker:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t deep-researcher:ci .
+      - name: smoke /api/health
+        run: |
+          docker run -d --name api -p 8000:8000 -e CHECKPOINTER=memory -e CHROMA_MODE=persistent \
+            -e EMBEDDINGS_PROVIDER=openrouter deep-researcher:ci
+          for i in $(seq 1 20); do curl -fs http://127.0.0.1:8000/api/health && break || sleep 2; done
+          curl -fs http://127.0.0.1:8000/api/health | grep -q '"status":"ok"'
