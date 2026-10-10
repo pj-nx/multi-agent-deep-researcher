@@ -7,9 +7,8 @@ from typing import Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from deep_researcher.agents.common import bibliography, contradictions_text, summaries_text
+from deep_researcher.agents.common import bibliography, call_structured, contradictions_text, summaries_text
 from deep_researcher.agents.deps import Deps
-from deep_researcher.llm import structured
 from deep_researcher.schemas import Insight, InsightOutput, ReasoningStep
 
 log = logging.getLogger(__name__)
@@ -73,8 +72,9 @@ async def insight_node(state: dict[str, Any], deps: Deps) -> dict[str, Any]:
         )
     try:
         llm = deps.llm("insight")
-        out: InsightOutput = await structured(llm, InsightOutput).ainvoke(
-            [SystemMessage(SYSTEM), HumanMessage(prompt)]
+        out: InsightOutput = await call_structured(
+            llm, InsightOutput, [SystemMessage(SYSTEM), HumanMessage(prompt)],
+            role="insight", label="hypotheses"
         )
     except Exception as exc:  # noqa: BLE001 - degrade: a report without insights beats no report
         log.warning("insight generation failed: %s", str(exc)[:300])

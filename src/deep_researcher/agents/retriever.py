@@ -15,6 +15,7 @@ import time
 from typing import Any
 from urllib.parse import urlsplit, urlunsplit
 
+from deep_researcher.agents.common import emit
 from deep_researcher.agents.deps import Deps
 from deep_researcher.schemas import Evidence, SubQuestion
 from deep_researcher.tools.base import SearchResult
@@ -95,10 +96,12 @@ def search_queries(sq: SubQuestion) -> list[str]:
     return [" ".join(w for w in words if w)[:120]]
 
 
-async def _search_tool(tool: Any, queries: list[str], deps: Deps) -> list[SearchResult]:
+async def _search_tool(tool: Any, queries: list[str], deps: Deps, sq_id: str = "") -> list[SearchResult]:
     """Run every query against one tool, bounded by a per-tool timeout; partial results survive."""
     out: list[SearchResult] = []
     seen: set[str] = set()
+    started = time.monotonic()
+    emit("tool_start", tool=tool.name, sub_question_id=sq_id, queries=len(queries))
 
     async def run() -> None:
         for q in queries:
@@ -112,6 +115,11 @@ async def _search_tool(tool: Any, queries: list[str], deps: Deps) -> list[Search
         await asyncio.wait_for(run(), timeout=deps.tool_timeout_s)
     except TimeoutError:
         log.warning("%s: timed out after %ss (%d results kept)", tool.name, deps.tool_timeout_s, len(out))
+        emit("tool_timeout", tool=tool.name, sub_question_id=sq_id, results=len(out),
+             elapsed_s=round(time.monotonic() - started, 1))
+        return out
+    emit("tool_end", tool=tool.name, sub_question_id=sq_id, results=len(out),
+         elapsed_s=round(time.monotonic() - started, 1))
     return out
 
 
@@ -131,7 +139,8 @@ async def retrieve_node(payload: dict[str, Any], deps: Deps) -> dict[str, Any]:
                 "notes": [f"{sq.id}: no enabled tools for {sq.source_types}"]}
 
     queries = search_queries(sq)
-    batches = await asyncio.gather(*(_search_tool(t, queries, deps) for t in tools), return_exceptions=True)
+    batches = await asyncio.gather(*(_search_tool(t, queries, deps, sq.id) for t in tools),
+                                   return_exceptions=True)
     per_tool: dict[str, int] = {}
     seen: set[str] = set()
     results: list[SearchResult] = []
@@ -162,7 +171,9 @@ async def retrieve_node(payload: dict[str, Any], deps: Deps) -> dict[str, Any]:
     stored = 0
     if evidence:
         store = deps.store()
+        emit("embed_start", sub_question_id=sq.id, sources=len(evidence))
         stored = await asyncio.to_thread(store.add_evidence, evidence)   # embedding is CPU-bound
+        emit("embed_end", sub_question_id=sq.id, chunks=stored)
 
     elapsed = round(time.monotonic() - started, 1)
     return {

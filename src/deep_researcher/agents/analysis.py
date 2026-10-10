@@ -13,8 +13,8 @@ from typing import Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
+from deep_researcher.agents.common import call_structured, emit
 from deep_researcher.agents.deps import Deps
-from deep_researcher.llm import structured
 from deep_researcher.schemas import AnalysisOutput, Claim, Contradiction, Gap, Summary
 
 log = logging.getLogger(__name__)
@@ -113,6 +113,7 @@ async def _analyse_one(sq: dict[str, Any], state: dict[str, Any], deps: Deps, ll
         evidence_ids=None if kept is None else sorted(kept),
     )
     hits = rerank(hits, state.get("assessments") or {})[: deps.analysis_k]
+    emit("retrieval", label=f"{sq_id}: {len(hits)} chunks from the vector store")
     if not hits:
         summary = Summary(sub_question_id=sq_id, evidence_ids=[],
                           summary="No usable evidence was retrieved for this sub-question.")
@@ -126,7 +127,8 @@ async def _analyse_one(sq: dict[str, Any], state: dict[str, Any], deps: Deps, ll
     async with sem:
         messages = [SystemMessage(SYSTEM), HumanMessage(prompt)]
         try:
-            out: AnalysisOutput = await structured(llm, AnalysisOutput).ainvoke(messages)
+            out: AnalysisOutput = await call_structured(llm, AnalysisOutput, messages, role="analysis",
+                                                        label=f"{sq_id} ({len(hits)} chunks)")
         except Exception as exc:  # noqa: BLE001 - degrade: keep the evidence list, lose the analysis
             log.warning("analysis failed for %s: %s", sq_id, str(exc)[:300])
             summary = Summary(sub_question_id=sq_id, evidence_ids=sorted(shown),

@@ -63,6 +63,8 @@ async def test_plan_interrupt_then_parallel_retrieval_and_report(deps):
     graph = G.build_graph(InMemorySaver(), deps)
     events = [e async for e in G.stream_until_interrupt(question="Does remote work raise productivity?",
                                                         thread_id="t1", graph=graph)]
+    assert any(k == "activity" and d["kind"] == "llm_start" and d["role"] == "planner" for k, d in events)
+    events = [e for e in events if e[0] != "activity"]
     kinds = [k for k, _ in events]
     assert kinds[-1] == "plan" and events[-1][1]["status"] == "awaiting_approval"
     plan = events[-1][1]["plan"]
@@ -71,6 +73,14 @@ async def test_plan_interrupt_then_parallel_retrieval_and_report(deps):
     # user edits the plan before approving: drop the wikipedia sub-question
     plan["sub_questions"] = plan["sub_questions"][:2]
     events = [e async for e in G.resume_with_plan(thread_id="t1", plan=plan, graph=graph)]
+    activity = [d for k, d in events if k == "activity"]
+    assert {a["kind"] for a in activity} >= {"llm_start", "llm_end", "tool_start", "tool_end", "embed_start",
+                                              "embed_end", "retrieval"}
+    llm_ends = [a for a in activity if a["kind"] == "llm_end"]
+    assert {a["role"] for a in llm_ends} == {"validator", "analysis", "insight", "critic", "report"}
+    assert all(a["tokens"] == 1200 and a["elapsed_s"] >= 0 for a in llm_ends)
+    assert any(a["kind"] == "tool_end" and a["tool"] == "arxiv" and a["sub_question_id"] == "sq1" for a in activity)
+    events = [e for e in events if e[0] != "activity"]
     kinds = [k for k, _ in events]
     # hop 0: two Send branches; hop 1: one gap-derived branch (max_hops=1 default)
     assert kinds.count("retrieve") == 3 and kinds.count("validate") == 2 and kinds.count("analyze") == 2
@@ -132,7 +142,7 @@ async def test_resume_with_true_accepts_plan_as_is(deps):
     graph = G.build_graph(InMemorySaver(), deps)
     _ = [e async for e in G.stream_until_interrupt(question="Does remote work raise productivity?", thread_id="t2",
                                                    graph=graph)]
-    events = [e async for e in G.resume_with_plan(thread_id="t2", plan=True, graph=graph)]
+    events = [e async for e in G.resume_with_plan(thread_id="t2", plan=True, graph=graph) if e[0] != "activity"]
     kinds = [k for k, _ in events]
     assert kinds.count("retrieve") == 4                       # 3 planned + 1 gap hop
     validates = [d for k, d in events if k == "validate"]
@@ -147,7 +157,7 @@ async def test_hop_limit_zero_disables_multi_hop(deps):
     graph = G.build_graph(InMemorySaver(), deps)
     _ = [e async for e in G.stream_until_interrupt(question="Does remote work raise productivity?", thread_id="t2b",
                                                    max_hops=0, graph=graph)]
-    events = [e async for e in G.resume_with_plan(thread_id="t2b", plan=True, graph=graph)]
+    events = [e async for e in G.resume_with_plan(thread_id="t2b", plan=True, graph=graph) if e[0] != "activity"]
     kinds = [k for k, _ in events]
     assert kinds.count("retrieve") == 3 and kinds.count("analyze") == 1
     route = next(d for k, d in events if k == "route_gaps")
@@ -162,7 +172,7 @@ async def test_gap_loop_stops_at_hop_limit_even_when_gaps_keep_coming(deps):
     graph = G.build_graph(InMemorySaver(), deps)
     _ = [e async for e in G.stream_until_interrupt(question="Does remote work raise productivity?", thread_id="t2c",
                                                    max_hops=2, graph=graph)]
-    events = [e async for e in G.resume_with_plan(thread_id="t2c", plan=True, graph=graph)]
+    events = [e async for e in G.resume_with_plan(thread_id="t2c", plan=True, graph=graph) if e[0] != "activity"]
     kinds = [k for k, _ in events]
     assert kinds.count("analyze") == 3                        # hop 0, 1, 2
     state = await graph.aget_state({"configurable": {"thread_id": "t2c"}})
@@ -174,7 +184,7 @@ async def test_budget_exhausted_skips_retrieval(deps):
     graph = G.build_graph(InMemorySaver(), deps)
     _ = [e async for e in G.stream_until_interrupt(question="Does remote work raise productivity?", thread_id="t3",
                                                    budget_seconds=-5, graph=graph)]
-    events = [e async for e in G.resume_with_plan(thread_id="t3", plan=True, graph=graph)]
+    events = [e async for e in G.resume_with_plan(thread_id="t3", plan=True, graph=graph) if e[0] != "activity"]
     skipped = [d for k, d in events if k == "retrieve"]
     assert skipped and all(d.get("skipped") == "budget exhausted" for d in skipped)
     assert deps.fake_store.count() == 0
@@ -187,7 +197,7 @@ async def test_no_enabled_tools_is_reported_not_fatal(deps):
     graph = G.build_graph(InMemorySaver(), deps)
     _ = [e async for e in G.stream_until_interrupt(question="Does remote work raise productivity?", thread_id="t4",
                                                    graph=graph)]
-    events = [e async for e in G.resume_with_plan(thread_id="t4", plan=True, graph=graph)]
+    events = [e async for e in G.resume_with_plan(thread_id="t4", plan=True, graph=graph) if e[0] != "activity"]
     warns = [d for k, d in events if k == "retrieve"]
     assert all("no enabled tools" in d.get("warning", "") for d in warns) and [k for k, _ in events][-1] == "report"
 
@@ -206,7 +216,7 @@ async def test_slow_tool_is_bounded_by_timeout(deps):
     graph = G.build_graph(InMemorySaver(), deps)
     _ = [e async for e in G.stream_until_interrupt(question="Does remote work raise productivity?", thread_id="t5",
                                                    graph=graph)]
-    events = [e async for e in G.resume_with_plan(thread_id="t5", plan=True, graph=graph)]
+    events = [e async for e in G.resume_with_plan(thread_id="t5", plan=True, graph=graph) if e[0] != "activity"]
     sq1 = next(d for k, d in events if k == "retrieve" and d["sub_question_id"] == "sq1")
     assert sq1["tools"] == {"slow": 0} and sq1["elapsed_s"] < 3
 
@@ -217,7 +227,7 @@ async def test_critic_revise_regenerates_insights_once(deps):
     graph = G.build_graph(InMemorySaver(), deps)
     _ = [e async for e in G.stream_until_interrupt(question="Does remote work raise productivity?", thread_id="c1",
                                                    max_hops=0, graph=graph)]
-    events = [e async for e in G.resume_with_plan(thread_id="c1", plan=True, graph=graph)]
+    events = [e async for e in G.resume_with_plan(thread_id="c1", plan=True, graph=graph) if e[0] != "activity"]
     kinds = [k for k, _ in events]
     assert kinds.count("insight") == 2 and kinds.count("critic") == 2 and kinds[-1] == "report"
     insights = [d for k, d in events if k == "insight"]
@@ -234,7 +244,7 @@ async def test_critic_need_more_evidence_triggers_a_retrieval_hop(deps):
     graph = G.build_graph(InMemorySaver(), deps)
     _ = [e async for e in G.stream_until_interrupt(question="Does remote work raise productivity?", thread_id="c2",
                                                    max_hops=1, graph=graph)]
-    events = [e async for e in G.resume_with_plan(thread_id="c2", plan=True, graph=graph)]
+    events = [e async for e in G.resume_with_plan(thread_id="c2", plan=True, graph=graph) if e[0] != "activity"]
     kinds = [k for k, _ in events]
     assert kinds.count("retrieve") == 4                        # 3 planned + 1 critic-requested
     gap = next(d for k, d in events if k == "retrieve" and d["sub_question_id"] == "gap1_1")
@@ -253,7 +263,7 @@ async def test_critic_need_more_evidence_without_hops_left_proceeds_to_report(de
     graph = G.build_graph(InMemorySaver(), deps)
     _ = [e async for e in G.stream_until_interrupt(question="Does remote work raise productivity?", thread_id="c3",
                                                    max_hops=0, graph=graph)]
-    events = [e async for e in G.resume_with_plan(thread_id="c3", plan=True, graph=graph)]
+    events = [e async for e in G.resume_with_plan(thread_id="c3", plan=True, graph=graph) if e[0] != "activity"]
     kinds = [k for k, _ in events]
     assert kinds.count("retrieve") == 3 and kinds.count("critic") == 1 and kinds.count("insight") == 1
     assert kinds[-1] == "report"
@@ -269,7 +279,7 @@ async def test_revision_cap_forces_acceptance(deps):
     graph = G.build_graph(InMemorySaver(), deps)
     _ = [e async for e in G.stream_until_interrupt(question="Does remote work raise productivity?", thread_id="c4",
                                                    max_hops=0, graph=graph)]
-    events = [e async for e in G.resume_with_plan(thread_id="c4", plan=True, graph=graph)]
+    events = [e async for e in G.resume_with_plan(thread_id="c4", plan=True, graph=graph) if e[0] != "activity"]
     kinds = [k for k, _ in events]
     assert kinds.count("critic") == 3 and kinds.count("insight") == 3 and kinds[-1] == "report"
     last = [d for k, d in events if k == "critic"][-1]
@@ -299,7 +309,7 @@ async def test_synthesis_failures_degrade_instead_of_killing_the_run(deps):
     graph = G.build_graph(InMemorySaver(), deps)
     _ = [e async for e in G.stream_until_interrupt(question="Does remote work raise productivity?", thread_id="f1",
                                                    max_hops=0, graph=graph)]
-    events = [e async for e in G.resume_with_plan(thread_id="f1", plan=True, graph=graph)]
+    events = [e async for e in G.resume_with_plan(thread_id="f1", plan=True, graph=graph) if e[0] != "activity"]
     kinds = [k for k, _ in events]
     assert kinds[-1] == "report" and "error" not in kinds
     analyze = next(d for k, d in events if k == "analyze")

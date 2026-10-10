@@ -59,6 +59,18 @@ def test_format_event_lines():
     assert "critic round 1: revise (2 issues)" in ui.format_event("critic", {"round": 1, "verdict": "revise", "issues": ["a", "b"]})
     assert "requesting: Q?" in ui.format_event("critic", {"round": 1, "verdict": "need_more_evidence", "follow_up": ["Q?"]})
     assert "report ready" in ui.format_event("report", {"stats": {"kept": 3}})
+    a = ui.format_event("activity", {"kind": "llm_start", "role": "analysis", "label": "sq2 (9 chunks)",
+                                     "model": "anthropic/claude-sonnet-5"})
+    assert "analysis[sq2 (9 chunks)]: calling anthropic/claude-sonnet-5" in a
+    a = ui.format_event("activity", {"kind": "llm_end", "role": "critic", "label": "round 1", "elapsed_s": 7.2,
+                                     "tokens": 12345})
+    assert "critic[round 1]: done in 7.2s, 12.3k tokens" in a
+    assert "sq1: searching arxiv (2 queries)" in ui.format_event("activity", {"kind": "tool_start", "tool": "arxiv",
+                                                                             "sub_question_id": "sq1", "queries": 2})
+    assert "sq1: gdelt timed out after 45s (0 kept)" in ui.format_event(
+        "activity", {"kind": "tool_timeout", "tool": "gdelt", "sub_question_id": "sq1", "elapsed_s": 45, "results": 0})
+    assert "sq3: stored 12 chunks" in ui.format_event("activity", {"kind": "embed_end", "sub_question_id": "sq3",
+                                                                   "chunks": 12})
     assert "ERROR: boom" in ui.format_event("error", {"message": "boom"})
 
 
@@ -78,6 +90,7 @@ async def test_plan_then_run_streams(tmp_path, monkeypatch):
                                                   log_text, graph=graph, out_dir=tmp_path / "out")]
     log_text, report, md_path, json_path = run_updates[-1]
     assert "approved 2 sub-questions" in log_text and "report ready" in log_text and "saved" in log_text
+    assert "calling fake" not in log_text and ": done in" in log_text and "searching arxiv" in log_text
     assert report.startswith("# Remote work and productivity") and "### gap1_1" in report
     assert Path(md_path).read_text() == report and Path(json_path).exists()
     assert "sq3" not in report

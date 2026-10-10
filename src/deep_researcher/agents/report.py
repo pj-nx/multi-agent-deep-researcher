@@ -11,6 +11,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 
 from deep_researcher.agents.common import (
     bibliography,
+    call_structured,
     cited_ids,
     contradictions_text,
     kept_evidence,
@@ -18,7 +19,6 @@ from deep_researcher.agents.common import (
     summaries_text,
 )
 from deep_researcher.agents.deps import Deps
-from deep_researcher.llm import structured
 from deep_researcher.schemas import ReportOutput
 
 log = logging.getLogger(__name__)
@@ -125,8 +125,8 @@ async def report_node(state: dict[str, Any], deps: Deps) -> dict[str, Any]:
     )
     try:
         llm = deps.llm("report")
-        out: ReportOutput = await structured(llm, ReportOutput).ainvoke(
-            [SystemMessage(SYSTEM), HumanMessage(prompt)]
+        out: ReportOutput = await call_structured(
+            llm, ReportOutput, [SystemMessage(SYSTEM), HumanMessage(prompt)], role="report", label="narrative"
         )
     except Exception as exc:  # noqa: BLE001 - degrade: assemble the report from state without the narrative
         log.warning("report narrative failed: %s", str(exc)[:300])

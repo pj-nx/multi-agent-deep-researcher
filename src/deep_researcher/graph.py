@@ -299,7 +299,12 @@ def _event_for(node: str, update: dict[str, Any] | None) -> tuple[str, dict[str,
 
 
 async def _stream(graph: Any, inp: Any, cfg: dict[str, Any]) -> AsyncIterator[tuple[str, dict[str, Any]]]:
-    async for chunk in graph.astream(inp, config=cfg, stream_mode="updates"):
+    """Node updates plus the agents' fine-grained ``activity`` events (model calls, tool searches)."""
+    async for mode, chunk in graph.astream(inp, config=cfg, stream_mode=["updates", "custom"]):
+        if mode == "custom":
+            if isinstance(chunk, dict):
+                yield "activity", chunk
+            continue
         for node, update in chunk.items():
             if node == "__interrupt__":
                 payload = update[0].value if update else {}

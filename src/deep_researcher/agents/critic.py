@@ -13,9 +13,8 @@ from typing import Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from deep_researcher.agents.common import bibliography, contradictions_text, summaries_text
+from deep_researcher.agents.common import bibliography, call_structured, contradictions_text, summaries_text
 from deep_researcher.agents.deps import Deps
-from deep_researcher.llm import structured
 from deep_researcher.schemas import Critique, CritiqueOut, Gap
 
 log = logging.getLogger(__name__)
@@ -61,8 +60,9 @@ async def critic_node(state: dict[str, Any], deps: Deps) -> dict[str, Any]:
     )
     try:
         llm = deps.llm("critic")
-        out: CritiqueOut = await structured(llm, CritiqueOut).ainvoke(
-            [SystemMessage(SYSTEM), HumanMessage(prompt)]
+        out: CritiqueOut = await call_structured(
+            llm, CritiqueOut, [SystemMessage(SYSTEM), HumanMessage(prompt)], role="critic",
+            label=f"round {revisions + 1}"
         )
     except Exception as exc:  # noqa: BLE001 - degrade: unreviewed insights are reported as such
         log.warning("critic failed: %s", str(exc)[:300])

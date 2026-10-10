@@ -97,12 +97,48 @@ def format_event(event: str, data: dict[str, Any]) -> str:
         return line
     if event == "report":
         return f"[{stamp}] report ready: {json.dumps(data.get('stats') or {}, default=str)}"
+    if event == "activity":
+        return format_activity(data, stamp)
     if event == "error":
         return f"[{stamp}] ERROR: {data.get('message')}"
     if event in ("started", "done", "approve"):
         return f"[{stamp}] {event}" + (f" ({data.get('elapsed_s')}s)" if data.get("elapsed_s") else "")
     rest = json.dumps({k: v for k, v in data.items() if k != "notes"}, default=str)[:200]
     return f"[{stamp}] {event}: {rest}"
+
+
+def _tokens(n: Any) -> str:
+    return f", {n / 1000:.1f}k tokens" if isinstance(n, int | float) and n else ""
+
+
+def format_activity(data: dict[str, Any], stamp: str) -> str:
+    """Indented line for a fine-grained event (model call, tool search, embedding)."""
+    kind = data.get("kind")
+    role, label, model = data.get("role"), data.get("label"), data.get("model")
+    who = f"{role}[{label}]" if label else str(role)
+    if kind == "llm_start":
+        return f"[{stamp}]     {who}: calling {model} ..."
+    if kind == "llm_end":
+        return f"[{stamp}]     {who}: done in {data.get('elapsed_s')}s{_tokens(data.get('tokens'))}"
+    if kind == "llm_error":
+        return f"[{stamp}]     {who}: FAILED after {data.get('elapsed_s')}s ({data.get('error')})"
+    sq = data.get("sub_question_id")
+    if kind == "tool_start":
+        return f"[{stamp}]     {sq}: searching {data.get('tool')} ({data.get('queries')} queries) ..."
+    if kind == "tool_end":
+        return (f"[{stamp}]     {sq}: {data.get('tool')} returned {data.get('results')} "
+                f"in {data.get('elapsed_s')}s")
+    if kind == "tool_timeout":
+        return (f"[{stamp}]     {sq}: {data.get('tool')} timed out after {data.get('elapsed_s')}s "
+                f"({data.get('results')} kept)")
+    if kind == "embed_start":
+        return f"[{stamp}]     {sq}: embedding {data.get('sources')} sources ..."
+    if kind == "embed_end":
+        return f"[{stamp}]     {sq}: stored {data.get('chunks')} chunks"
+    if kind == "retrieval":
+        return f"[{stamp}]     {label}"
+    rest = {k: v for k, v in data.items() if k not in ("kind", "t")}
+    return f"[{stamp}]     {kind}: {json.dumps(rest, default=str)[:160]}"
 
 
 # ----------------------------------------------------------------------------- streams
@@ -323,7 +359,9 @@ def _build_research_tab(gr: Any, demo: Any, graph: Any) -> None:
             with gr.Column(scale=1):
                 max_hops = gr.Slider(0, 3, value=1, step=1, label="Max follow-up hops")
                 budget = gr.Number(value=0, label="Budget (seconds, 0 = none)", precision=0)
-        plan_btn = gr.Button("1. Plan", variant="primary")
+        with gr.Row():
+            plan_btn = gr.Button("1. Plan", variant="primary", scale=4)
+            busy = gr.Markdown("**Ready**", elem_id="busy")
         activity = gr.Textbox(label="Agent activity", lines=14, max_lines=30, interactive=False,
                               autoscroll=True)
         gr.Markdown("### 2. Review the plan (edit cells, clear a question to drop it), then approve")
@@ -337,29 +375,44 @@ def _build_research_tab(gr: Any, demo: Any, graph: Any) -> None:
             dl_md = gr.DownloadButton("Download report (.md)", visible=False)
             dl_json = gr.DownloadButton("Download data (.json)", visible=False)
 
+        BUSY = gr.update(interactive=False)
+        FREE = gr.update(interactive=True)
+
+        def _busy(text: str) -> str:
+            return f"⏳ **{text}**"
+
         async def on_plan(q, hops, bud):
             q = (q or "").strip()
             if len(q) < 5:
-                yield "Enter a question first.", [], "", ""
+                yield "Enter a question first.", [], "", "", "**Ready**", FREE, FREE
                 return
-            async for log_text, rows, tid in plan_stream(q, int(hops), int(bud or 0), graph=graph):
-                yield log_text, rows, tid, q
+            try:
+                async for log_text, rows, tid in plan_stream(q, int(hops), int(bud or 0), graph=graph):
+                    status = _busy("Planning...") if not rows else "**Plan ready: review and approve**"
+                    yield log_text, rows, tid, q, status, BUSY, BUSY
+            finally:
+                yield gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), FREE, FREE
 
         async def on_run(tid, rows, q, bud, previous_log):
             hidden = gr.update(visible=False)
             if not tid:
-                yield (previous_log or "") + "\nRun the planner first.", "", hidden, hidden
+                yield ((previous_log or "") + "\nRun the planner first.", "", hidden, hidden, "**Ready**",
+                       FREE, FREE)
                 return
             stream = run_stream(tid, rows, q, int(bud or 0), previous_log or "", graph=graph)
-            async for log_text, md, md_path, json_path in stream:
-                yield (log_text, md,
-                       gr.update(value=md_path, visible=bool(md_path)),
-                       gr.update(value=json_path, visible=bool(json_path)))
+            try:
+                async for log_text, md, md_path, json_path in stream:
+                    status = _busy("Researching... (see activity)") if not md else "**Report ready**"
+                    yield (log_text, md,
+                           gr.update(value=md_path, visible=bool(md_path)),
+                           gr.update(value=json_path, visible=bool(json_path)), status, BUSY, BUSY)
+            finally:
+                yield gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), FREE, FREE
 
         plan_btn.click(on_plan, [question, max_hops, budget],
-                       [activity, plan_table, thread_state, question_state])
+                       [activity, plan_table, thread_state, question_state, busy, plan_btn, run_btn])
         run_btn.click(on_run, [thread_state, plan_table, question_state, budget, activity],
-                      [activity, report_md, dl_md, dl_json])
+                      [activity, report_md, dl_md, dl_json, busy, plan_btn, run_btn])
 
 
 def main() -> None:

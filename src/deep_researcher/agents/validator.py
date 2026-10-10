@@ -13,8 +13,8 @@ from typing import Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
+from deep_researcher.agents.common import call_structured
 from deep_researcher.agents.deps import Deps
-from deep_researcher.llm import structured
 from deep_researcher.schemas import SourceAssessment, SourceAssessments
 
 log = logging.getLogger(__name__)
@@ -53,8 +53,9 @@ async def _grade_batch(llm: Any, sub_question: str, batch: list[dict[str, Any]],
     prompt = f"Sub-question: {sub_question}\n\nSources:\n" + "\n\n".join(_render(ev) for ev in batch)
     async with sem:
         try:
-            out: SourceAssessments = await structured(llm, SourceAssessments).ainvoke(
-                [SystemMessage(SYSTEM), HumanMessage(prompt)])
+            out: SourceAssessments = await call_structured(
+                llm, SourceAssessments, [SystemMessage(SYSTEM), HumanMessage(prompt)],
+                role="validator", label=f"grade {len(batch)} sources")
         except Exception as exc:  # noqa: BLE001 - grading must never sink the run
             log.warning("validator batch failed (%d sources): %s", len(batch), str(exc)[:200])
             return [_fallback(ev) for ev in batch]

@@ -45,6 +45,11 @@ class FakeLLM:
 
     def with_structured_output(self, schema, **kwargs):
         assert kwargs.get("method") == "json_schema"
+        if kwargs.get("include_raw"):
+            class Raw:
+                usage_metadata = {"input_tokens": 1000, "output_tokens": 200, "total_tokens": 1200}
+            return FakeStructured(lambda msgs: {"raw": Raw(), "parsed": self._answer(schema, msgs),
+                                                "parsing_error": None})
         return FakeStructured(lambda msgs: self._answer(schema, msgs))
 
     def _answer(self, schema, msgs):
