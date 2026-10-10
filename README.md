@@ -10,12 +10,14 @@ cited report.
 Showcases **agent collaboration**, **retrieval-augmented reasoning** (every claim cites a stored
 evidence ID that is verified before the report ships) and **long-context synthesis**.
 
-**Status:** Phases 0-3 done. Planner (structured output) → human approval → parallel retrievers over
-real sources → persistent vector store → **Source Validator** (model-graded relevance/credibility)
-→ **Critical Analysis** (retrieval-augmented: claims, contradictions, gaps, every citation checked
-against the chunks shown) → multi-hop loop on the most valuable gaps (capped per hop, incremental
-re-analysis) → digest report with a contradictions table. The
-insight, critic and report-builder agents are Phase 4 placeholders. See [PLAN.md](PLAN.md).
+**Status:** all seven agents are live (Phases 0-4). Planner (structured output) → human approval →
+parallel retrievers over real sources → persistent vector store → **Source Validator** (model-graded
+relevance/credibility) → **Critical Analysis** (retrieval-augmented: claims, contradictions, gaps,
+every citation checked against the chunks shown) → multi-hop loop on the most valuable gaps →
+**Insight Generation** (reasoning chains with citations, confidence, falsifier) → **Red-Team Critic**
+(accept / revise / request more evidence, capped) → **Report Builder** (executive summary, findings,
+disagreements, insights, limitations, methodology, bibliography; every citation verified). Remaining:
+Gradio UI, deployment wiring, evals. See [PLAN.md](PLAN.md).
 
 ## Architecture
 
@@ -114,7 +116,9 @@ OPENROUTER_API_KEY=sk-or-...
 Any single role can be pinned with `OPENROUTER_MODEL_<ROLE>`, e.g.
 `OPENROUTER_MODEL_INSIGHT=openai/gpt-5.1`. `OPENROUTER_FALLBACK_MODELS` lists backups tried in
 order when the primary is unavailable, and `OPENROUTER_PROVIDER_ORDER` / `OPENROUTER_ZDR` /
-`OPENROUTER_SORT` control provider routing. `/api/health` shows the resolved model per role.
+`OPENROUTER_SORT` control provider routing; `OPENROUTER_REASONING_EFFORT` caps hidden reasoning (its
+tokens count against each role's `max_tokens`, which are set generously for that reason).
+`/api/health` shows the resolved model per role.
 
 ```python
 from deep_researcher.llm import get_llm
@@ -211,7 +215,8 @@ public and never exposes secrets.
 
 SSE events: `started` (with `trace_url`), `plan` (awaiting approval), one `retrieve` per sub-question (parallel),
 `validate` (assessed/kept), `analyze` (claims, contradictions, gaps), `route_gaps` (next hop or stop), repeated per
-hop, then `insight`, `critic`, `report` (Markdown in `report`), `error`, `done`.
+hop, then `insight` (hypotheses), `critic` (verdict, issues, follow-up; may loop back), `report` (Markdown in
+`report`, structured record in `report_json`, `stats`), `error`, `done`.
 
 ## License
 

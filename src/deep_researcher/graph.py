@@ -1,8 +1,8 @@
 """The research graph: planner → approval → parallel retrievers → analysis loop → synthesis → report.
 
-Phase status: planner, retrievers, source validator and critical analysis (with the multi-hop gap
-loop) are real; insight, critic and report are placeholders that keep the state contract, so the
-full pipeline runs end to end today and Phase 4 replaces the last three nodes.
+All seven agents are real: planner, retrievers, source validator, critical analysis (with the
+multi-hop gap loop), insight generation, red-team critic (accept / revise / need_more_evidence) and
+the report builder with a citation check.
 
 Public entry points used by the API and CLI:
     stream_until_interrupt(question, thread_id, ...)  -> async (event, data) until the plan needs approval
@@ -22,8 +22,11 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.types import Command, Send, interrupt
 
 from deep_researcher.agents.analysis import analyze_node
+from deep_researcher.agents.critic import critic_node
 from deep_researcher.agents.deps import Deps
+from deep_researcher.agents.insight import insight_node
 from deep_researcher.agents.planner import plan_node
+from deep_researcher.agents.report import report_node
 from deep_researcher.agents.retriever import retrieve_node
 from deep_researcher.agents.validator import validate_node
 from deep_researcher.schemas import ResearchPlan, SubQuestion
@@ -119,8 +122,11 @@ def route_gaps(state: ResearchState, *, max_branches: int = 4) -> dict[str, Any]
     out_of_budget = bool(deadline) and time.time() > deadline
     if not raised or hop >= state.get("max_hops", DEFAULT_MAX_HOPS) or out_of_budget:
         why = "no gaps" if not raised else ("hop limit reached" if not out_of_budget else "budget exhausted")
-        return {"next_action": "insight", "pending_gaps": [], "hop": hop,
-                "notes": [f"gap router: stop ({why}; {len(raised)} gaps left for the report)"]}
+        # Critic-requested gaps we cannot pursue: insights are unchanged, go straight to the report.
+        nxt = "report" if state.get("gap_source") == "critic" else "insight"
+        return {"next_action": nxt, "pending_gaps": [], "hop": hop,
+                "notes": [f"gap router: stop ({why}; {len(raised)} gaps left for the report)"
+                          + (" -> report" if nxt == "report" else "")]}
     gaps = select_gaps(raised, state.get("summaries") or {}, max_branches)
     new_subs = []
     for i, g in enumerate(gaps, start=1):
@@ -133,7 +139,10 @@ def route_gaps(state: ResearchState, *, max_branches: int = 4) -> dict[str, Any]
 
 
 def after_route_gaps(state: ResearchState) -> str | list[Send]:
-    if state.get("next_action") != "retrieve":
+    nxt = state.get("next_action")
+    if nxt == "report":
+        return "report"
+    if nxt != "retrieve":
         return "insight"
     hop = state.get("hop", 0)
     current = [sq for sq in state.get("extra_sub_questions", []) if sq["id"].startswith(f"gap{hop}_")]
@@ -141,70 +150,32 @@ def after_route_gaps(state: ResearchState) -> str | list[Send]:
             for sq in current]
 
 
-def insight(state: ResearchState) -> dict[str, Any]:
-    """Placeholder for Insight Generation (Phase 4)."""
-    return {"insights": [], "notes": ["insight placeholder"]}
+def _mk_insight(deps: Deps):
+    async def insight(state: ResearchState) -> dict[str, Any]:
+        return await insight_node(state, deps)
+    return insight
 
 
-def critic(state: ResearchState) -> dict[str, Any]:
-    """Placeholder for the Red-Team Critic (Phase 4): accepts."""
-    return {"critique": {"verdict": "accept", "issues": [], "follow_up": []},
-            "notes": ["critic placeholder: accept"]}
+def _mk_critic(deps: Deps):
+    async def critic(state: ResearchState) -> dict[str, Any]:
+        return await critic_node(state, deps)
+    return critic
 
 
-def report(state: ResearchState) -> dict[str, Any]:
-    """Placeholder for the Report Builder (Phase 4): analysis digest with claims, contradictions, gaps."""
-    plan = ResearchPlan.model_validate(state["plan"])
-    extra = [SubQuestion.model_validate(sq) for sq in state.get("extra_sub_questions", [])]
-    subs = list(plan.sub_questions) + extra
-    evidence = state.get("evidence", [])
-    assessments = state.get("assessments") or {}
-    kept = [e for e in evidence if (assessments.get(e["id"]) or {}).get("keep", True)]
-    summaries = state.get("summaries", {})
-    contradictions = state.get("contradictions", [])
-    gaps = state.get("gaps", [])
-    lines = [f"# Research digest: {plan.question}", "",
-             f"_{len(evidence)} sources retrieved, {len(kept)} kept after validation; "
-             f"{len(subs)} sub-questions; hops used: {state.get('hop', 0)}; "
-             f"{len(contradictions)} contradictions; {len(gaps)} gaps raised. "
-             "Insights and critique arrive in Phase 4._", ""]
-    for sq in subs:
-        summ = summaries.get(sq.id, {})
-        lines += [f"## {sq.id}: {sq.question}", "", summ.get("summary", "_not analysed_"), ""]
-        for c in summ.get("claims", []):
-            cites = " ".join(f"[{i}]" for i in c["evidence_ids"])
-            lines.append(f"- {c['text']} {cites} (confidence {c['confidence']:.2f})")
-        if summ.get("claims"):
-            lines.append("")
-    if contradictions:
-        lines += ["## Contradictions", "", "| Sub-question | Claim A | Claim B | Why they differ |",
-                  "|---|---|---|---|"]
-        for c in contradictions:
-            a_ = f"{c['claim_a']} {' '.join(f'[{i}]' for i in c['evidence_ids_a'])}"
-            b_ = f"{c['claim_b']} {' '.join(f'[{i}]' for i in c['evidence_ids_b'])}"
-            lines.append(f"| {c['sub_question_id']} | {a_} | {b_} | {c.get('explanation', '')} |")
-        lines.append("")
-    if gaps:
-        lines += ["## Gaps raised", ""]
-        lines += [f"- ({g['parent_sub_question_id']}) {g['question']} — {g.get('reason', '')}" for g in gaps]
-        lines.append("")
-    lines += ["## Sources", ""]
-    for e in sorted(kept, key=lambda e: e["sub_question_id"]):
-        a_ = assessments.get(e["id"]) or {}
-        cred = a_.get("credibility", e.get("credibility"))
-        date = f" ({e['published_at']})" if e.get("published_at") else ""
-        flags = f" | {', '.join(a_['issues'])}" if a_.get("issues") else ""
-        title = e["title"] or e["url"]
-        lines.append(f"- [{e['id']}] **{title}**{date} | {e['source_type']} | cred {cred:.2f}{flags} "
-                     f"| {e['url']}")
-    dropped = [e for e in evidence if e not in kept]
-    if dropped:
-        lines += ["", f"_{len(dropped)} sources dropped by the validator:_ "
-                  + ", ".join(f"[{e['id']}] {e['title'][:50]}" for e in dropped[:20])]
-    lines += ["", "## Retrieval log", ""]
-    for row in state.get("retrieval_log", []):
-        lines.append(f"- {row}")
-    return {"report": "\n".join(lines), "notes": ["report digest written"]}
+def _mk_report(deps: Deps):
+    async def report(state: ResearchState) -> dict[str, Any]:
+        return await report_node(state, deps)
+    return report
+
+
+def after_critic(state: ResearchState) -> str:
+    """accept → report; revise → insight; need_more_evidence → route_gaps (which may still stop)."""
+    verdict = (state.get("critique") or {}).get("verdict", "accept")
+    if verdict == "revise":
+        return "insight"
+    if verdict == "need_more_evidence" and state.get("pending_gaps"):
+        return "route_gaps"
+    return "report"
 
 
 # ----------------------------------------------------------------------------- graph
@@ -218,9 +189,9 @@ def build_graph(checkpointer: Any = None, deps: Deps | None = None):
     g.add_node("validate", _mk_validate(deps))
     g.add_node("analyze", _mk_analyze(deps))
     g.add_node("route_gaps", _mk_route_gaps(deps))
-    g.add_node("insight", insight)
-    g.add_node("critic", critic)
-    g.add_node("report", report)
+    g.add_node("insight", _mk_insight(deps))
+    g.add_node("critic", _mk_critic(deps))
+    g.add_node("report", _mk_report(deps))
 
     g.add_edge(START, "plan")
     g.add_edge("plan", "approve")
@@ -228,9 +199,9 @@ def build_graph(checkpointer: Any = None, deps: Deps | None = None):
     g.add_edge("retrieve", "validate")
     g.add_edge("validate", "analyze")
     g.add_edge("analyze", "route_gaps")
-    g.add_conditional_edges("route_gaps", after_route_gaps, ["retrieve", "insight"])
+    g.add_conditional_edges("route_gaps", after_route_gaps, ["retrieve", "insight", "report"])
     g.add_edge("insight", "critic")
-    g.add_edge("critic", "report")
+    g.add_conditional_edges("critic", after_critic, ["report", "insight", "route_gaps"])
     g.add_edge("report", END)
     return g.compile(checkpointer=checkpointer)
 
@@ -311,8 +282,17 @@ def _event_for(node: str, update: dict[str, Any] | None) -> tuple[str, dict[str,
     elif node == "route_gaps":
         data.update({"next": update.get("next_action"), "hop": update.get("hop"),
                      "new_sub_questions": [sq["id"] for sq in update.get("extra_sub_questions") or []]})
+    elif node == "insight":
+        data["insights"] = [i["hypothesis"] for i in update.get("insights") or []]
+    elif node == "critic":
+        c = update.get("critique") or {}
+        data.update({"verdict": c.get("verdict"), "issues": c.get("issues", []),
+                     "follow_up": [g["question"] for g in c.get("follow_up", [])],
+                     "round": update.get("revisions")})
     elif node == "report":
         data["report"] = update.get("report")
+        data["report_json"] = update.get("report_json")
+        data["stats"] = (update.get("report_json") or {}).get("stats")
     elif node == "plan":
         data["plan"] = update.get("plan")
     return node, data

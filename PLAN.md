@@ -210,10 +210,32 @@ Each phase ends with something runnable. Estimated effort assumes evenings/weeke
   ~20-30) because keyless arXiv/Wikipedia hits are mostly off-topic for this question; keyed sources (Semantic
   Scholar, Tavily) are the lever, not the agents.
 
-### Phase 4 — Insight + Red-Team + Report (1–2 days) — NEXT
-- Insight agent with reasoning chains citing evidence IDs.
-- Critic with `accept / revise / need_more_evidence` routing (cap revisions at 2).
-- Report Builder + grounding check; write `.md` and `.json` to `reports/`.
+### Phase 4 — Insight + Red-Team + Report (1–2 days) — DONE 2026-10-10
+- **Insight Generation** (`agents/insight.py`, heavy model): 3-6 hypotheses/trends, each a 2-5 step reasoning
+  chain with evidence ids, a confidence and a falsifier. Input = all summaries + claims, contradictions and a
+  compact bibliography of kept sources. Grounding: unknown ids are stripped from steps (a step may remain as a
+  logical link); an insight citing nothing is dropped. On `revise` the previous insights and the critic's issues
+  are fed back.
+- **Red-Team Critic** (`agents/critic.py`, heavy model): attacks unsupported leaps, cherry-picking, missing
+  perspectives and overclaiming; verdict `accept` → report, `revise` → insight (with issues), `need_more_evidence`
+  → ≤4 follow-up questions (source types + keyword queries, tied to a sub-question) become a retrieval hop via
+  `route_gaps`. `max_revisions` (2) caps critic-triggered loops: past it the model's verdict is recorded and the
+  run proceeds; a `need_more_evidence` that cannot run (hop limit / budget) goes straight to the report.
+- **Report Builder** (`agents/report.py`, worker model): the model writes title, executive summary, key findings,
+  limitations and open questions; everything else is assembled from state (findings per sub-question with cited
+  claims, contradictions table, insights with reasoning chains, open gaps, methodology appendix with validator /
+  critic / citation statistics and models used, research plan, bibliography with credibility and issues). **Citation
+  check:** every `[E-id]` in model text is verified against kept evidence; unknown ones are removed and counted.
+  The node also emits `report_json` (full structured record); the CLI writes `.md` + `.json`.
+- Tests: accept path (fake citations stripped from insights and report, methodology stats), revise once then
+  accept, critic-requested evidence triggers a hop and uses its keyword queries, critic request with no hops left
+  goes straight to report, revision cap forces acceptance, insight grounding, citation stripping, and a
+  degradation test: analysis/insight/critic/report model failures each fall back (evidence-only summary, no
+  insights, "accept" with an "unreviewed" limitation, state-assembled report) and the run still ends in a report.
+- **Live finding:** the first full run died in the critic with `LengthFinishReasonError`: Sonnet spent 3.3k of a
+  4k `max_tokens` budget on hidden reasoning before emitting JSON. Fixes: per-role budgets raised (critic 12k,
+  insight/analysis 16k, report 24k), optional `OPENROUTER_REASONING_EFFORT`, and the fallbacks above so a single
+  failed call can no longer sink a ten-minute run.
 
 ### Phase 5 — Gradio UI + streaming (1 day)
 - Stream node events (`graph.stream(..., stream_mode="updates")`) into a live

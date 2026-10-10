@@ -26,6 +26,7 @@ Routing knobs (all optional):
     OPENROUTER_ALLOW_FALLBACKS   true|false (default true)
     OPENROUTER_ZDR               true → only zero-data-retention endpoints
     OPENROUTER_SORT              price|throughput|latency
+    OPENROUTER_REASONING_EFFORT  none|minimal|low|medium|high  (`reasoning.effort`; "none" disables)
     OPENROUTER_APP_URL / OPENROUTER_APP_TITLE   attribution headers shown on openrouter.ai
 
 Usage::
@@ -68,9 +69,12 @@ ROLE_TEMPERATURE: dict[str, float] = {
     "planner": 0.2, "retriever": 0.0, "validator": 0.0, "analysis": 0.1,
     "insight": 0.6, "critic": 0.2, "report": 0.3, "grader": 0.0,
 }
+# Generous on purpose: on OpenRouter a model's hidden reasoning tokens count against max_tokens, and a
+# structured-output call that runs out of budget fails outright (LengthFinishReasonError) rather than
+# degrading. Observed: the critic spent 3.3k reasoning tokens before writing any JSON.
 ROLE_MAX_TOKENS: dict[str, int] = {
-    "planner": 4_000, "retriever": 4_000, "validator": 1_000, "analysis": 8_000,
-    "insight": 8_000, "critic": 4_000, "report": 16_000, "grader": 500,
+    "planner": 8_000, "retriever": 4_000, "validator": 4_000, "analysis": 16_000,
+    "insight": 16_000, "critic": 12_000, "report": 24_000, "grader": 2_000,
 }
 
 _TRUTHY = {"1", "true", "yes", "on"}
@@ -127,6 +131,15 @@ def provider_preferences() -> dict[str, Any] | None:
     return prefs or None
 
 
+def reasoning_effort() -> str | None:
+    v = (os.getenv("OPENROUTER_REASONING_EFFORT") or "").strip().lower()
+    if not v:
+        return None
+    if v not in {"none", "minimal", "low", "medium", "high"}:
+        raise LLMConfigError(f"OPENROUTER_REASONING_EFFORT={v!r}; expected none|minimal|low|medium|high")
+    return v
+
+
 def fallback_models() -> list[str]:
     return _env_list("OPENROUTER_FALLBACK_MODELS")
 
@@ -151,6 +164,8 @@ def build_kwargs(role: str, **overrides: Any) -> dict[str, Any]:
         extra_body["models"] = [model, *[m for m in fb if m != model]]
     if (prefs := provider_preferences()) and "provider" not in extra_body:
         extra_body["provider"] = prefs
+    if (effort := reasoning_effort()) and "reasoning" not in extra_body:
+        extra_body["reasoning"] = {"enabled": False} if effort == "none" else {"effort": effort}
     kwargs: dict[str, Any] = {
         "model": model,
         "temperature": ROLE_TEMPERATURE[role],

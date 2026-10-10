@@ -40,28 +40,33 @@ async def _main(args: argparse.Namespace) -> int:
             await G.aclose()
             return 2
     report = None
+    report_json = None
     async for event, data in G.resume_with_plan(thread_id=thread_id, plan=plan, budget_seconds=args.budget,
                                                 config=cfg):
         _print(event, data)
         if event == "report":
             report = data.get("report")
+            report_json = data.get("report_json")
     tracing.flush()
     await G.aclose()
     if report:
         out = Path(args.out)
         out.mkdir(parents=True, exist_ok=True)
         slug = re.sub(r"[^a-z0-9]+", "-", args.question.lower())[:60].strip("-")
-        path = out / f"{time.strftime('%Y%m%d-%H%M%S')}-{slug}.md"
+        stem = f"{time.strftime('%Y%m%d-%H%M%S')}-{slug}"
+        path = out / f"{stem}.md"
         path.write_text(report)
-        print(f"\nreport written to {path}")
+        if report_json:
+            (out / f"{stem}.json").write_text(json.dumps(report_json, indent=2, default=str))
+        print(f"\nreport written to {path} (+ .json)")
     return 0
 
 
 def _print(event: str, data: dict) -> None:
     if event == "report":
-        print("[report] ready")
+        print(f"[report] ready {json.dumps(data.get('stats'), default=str)}")
         return
-    short = {k: v for k, v in data.items() if k not in ("plan", "report")}
+    short = {k: v for k, v in data.items() if k not in ("plan", "report", "report_json")}
     print(f"[{event}] {json.dumps(short, default=str)[:300]}")
 
 

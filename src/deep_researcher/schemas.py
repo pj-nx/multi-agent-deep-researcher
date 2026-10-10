@@ -155,3 +155,36 @@ class AnalysisOutput(BaseModel):
     contradictions: list[ContradictionOut] = Field(default_factory=list, max_length=10)
     gaps: list[GapOut] = Field(default_factory=list, max_length=3)
     confidence: float = Field(default=0.5, ge=0.0, le=1.0, description="how well the evidence answers it")
+
+
+class InsightOutput(BaseModel):
+    insights: list[Insight] = Field(default_factory=list, max_length=8)
+
+
+class CriticGapOut(BaseModel):
+    question: str = Field(min_length=5, max_length=1000)
+    source_types: list[SourceType] = Field(default_factory=lambda: ["web"], max_length=6)
+    search_queries: list[str] = Field(default_factory=list, max_length=3)
+    reason: str = Field(default="", max_length=1000)
+    parent_sub_question_id: str | None = Field(default=None, max_length=32)
+
+
+class CritiqueOut(BaseModel):
+    """Red-Team Critic verdict as the model emits it."""
+
+    verdict: Literal["accept", "revise", "need_more_evidence"]
+    issues: list[str] = Field(default_factory=list, max_length=20)
+    follow_up: list[CriticGapOut] = Field(default_factory=list, max_length=4)
+    strengths: list[str] = Field(default_factory=list, max_length=10)
+
+
+class ReportOutput(BaseModel):
+    """The model-written parts of the report; the rest is assembled deterministically from state."""
+
+    title: str = Field(min_length=1, max_length=200)
+    executive_summary: str = Field(min_length=1, max_length=6000,
+                                   description="3-6 paragraphs, cite [E-ids]")
+    key_findings: list[str] = Field(default_factory=list, max_length=12,
+                                    description="one sentence each, cited")
+    limitations: list[str] = Field(default_factory=list, max_length=12)
+    open_questions: list[str] = Field(default_factory=list, max_length=10)

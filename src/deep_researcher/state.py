@@ -35,14 +35,17 @@ class ResearchState(TypedDict, total=False):
     summaries: Annotated[dict[str, dict[str, Any]], merge_dicts]   # sub_question_id -> Summary dump
     contradictions: Annotated[list[dict[str, Any]], operator.add]
     gaps: Annotated[list[dict[str, Any]], operator.add]            # history of every gap raised
-    pending_gaps: list[dict[str, Any]]                             # gaps raised in the latest analysis round
-    next_action: str                                               # "retrieve" | "insight", set by route_gaps
+    pending_gaps: list[dict[str, Any]]                             # gaps raised in the latest round
+    gap_source: str                                                # "analysis" | "critic": who raised them
+    next_action: str                                               # "retrieve" | "insight" | "report"
     hop: int
     # synthesis
     insights: list[dict[str, Any]]
     critique: dict[str, Any] | None
-    revisions: int
+    critiques: Annotated[list[dict[str, Any]], operator.add]      # every verdict (methodology appendix)
+    revisions: int                                                 # critic rounds completed
     report: str | None
+    report_json: dict[str, Any] | None
     # bookkeeping
     notes: Annotated[list[str], operator.add]                      # human-readable progress lines
 

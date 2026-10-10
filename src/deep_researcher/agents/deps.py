@@ -24,6 +24,22 @@ def _default_tools_for(source_types: list[str]) -> list[Any]:
     return tools_for(source_types)  # type: ignore[arg-type]
 
 
+def _default_embedding_id() -> str:
+    from deep_researcher.embeddings import embedding_id
+
+    return embedding_id()
+
+
+def _default_model_names() -> str:
+    from deep_researcher.llm import ROLES, model_for
+
+    pairs = {role: model_for(role) for role in ROLES}
+    by_model: dict[str, list[str]] = {}
+    for role, model in pairs.items():
+        by_model.setdefault(model, []).append(role)
+    return "; ".join(f"{m}: {', '.join(r)}" for m, r in by_model.items())
+
+
 @dataclass
 class Deps:
     llm: Callable[[str], Any] = field(default=_default_llm)
@@ -38,3 +54,6 @@ class Deps:
     analysis_k: int = 12                   # chunks shown to the analysis model per sub-question
     analysis_chunk_chars: int = 1600
     max_gap_branches: int = 4              # follow-up sub-questions pursued per hop (after de-duplication)
+    max_revisions: int = 2                 # critic rounds that may send insights back
+    embedding_id: Callable[[], str] = field(default=_default_embedding_id)
+    model_names: Callable[[], str] = field(default=_default_model_names)

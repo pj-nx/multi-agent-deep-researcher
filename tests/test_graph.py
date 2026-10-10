@@ -18,7 +18,13 @@ from deep_researcher.schemas import (
     AnalysisOutput,
     Claim,
     ContradictionOut,
+    CriticGapOut,
+    CritiqueOut,
     GapOut,
+    Insight,
+    InsightOutput,
+    ReasoningStep,
+    ReportOutput,
     ResearchPlan,
     SourceAssessment,
     SourceAssessments,
@@ -42,10 +48,13 @@ class FakeStructured:
 class FakeLLM:
     """Dispatches on the structured-output schema; records every prompt it saw."""
 
-    def __init__(self, plan, *, gap_rounds=1, contradiction=True):
+    def __init__(self, plan, *, gap_rounds=1, contradiction=True, verdicts=("accept",)):
         self.plan, self.gap_rounds, self.contradiction = plan, gap_rounds, contradiction
+        self.verdicts = list(verdicts)          # consumed one per critic round; last one repeats
         self.prompts = []
         self.analysis_calls = 0
+        self.insight_calls = 0
+        self.critic_calls = 0
 
     def with_structured_output(self, schema, **kwargs):
         assert kwargs.get("method") == "json_schema"
@@ -89,6 +98,38 @@ class FakeLLM:
             _ = hop_marker
             return AnalysisOutput(summary=f"Summary for {sq_id} citing [{ids[0]}].", claims=claims,
                                   contradictions=contradictions, gaps=gaps, confidence=0.7)
+        if schema is InsightOutput:
+            self.insight_calls += 1
+            ids = re.findall(r"\[(E-[0-9a-f]{10})\]", prompt)
+            if not ids:
+                return InsightOutput(insights=[])
+            revised = "Critique of the previous insights" in prompt
+            return InsightOutput(insights=[
+                Insight(hypothesis=("Revised: " if revised else "") + "Effects depend on sector",
+                        reasoning=[ReasoningStep(step="trials in knowledge work show gains", evidence_ids=[ids[0]]),
+                                   ReasoningStep(step="bogus citation", evidence_ids=["E-deadbeef00"]),
+                                   ReasoningStep(step="therefore sector moderates", evidence_ids=[])],
+                        confidence=0.6, falsifier="uniform gains across sectors"),
+                Insight(hypothesis="Ungrounded speculation", reasoning=[ReasoningStep(step="x", evidence_ids=["E-deadbeef00"])],
+                        confidence=0.9),
+            ])
+        if schema is CritiqueOut:
+            self.critic_calls += 1
+            verdict = self.verdicts[min(self.critic_calls - 1, len(self.verdicts) - 1)]
+            follow_up = [CriticGapOut(question="What do manufacturing-sector trials show?", source_types=["papers"],
+                                      search_queries=["manufacturing four-day week"], parent_sub_question_id="sq1")] \
+                if verdict == "need_more_evidence" else []
+            return CritiqueOut(verdict=verdict, issues=[f"issue from round {self.critic_calls}"] if verdict != "accept" else [],
+                               follow_up=follow_up, strengths=["cites evidence"])
+        if schema is ReportOutput:
+            ids = re.findall(r"\[(E-[0-9a-f]{10})\]", prompt)
+            if not ids:
+                return ReportOutput(title="No evidence", executive_summary="Nothing was retrieved.",
+                                    limitations=["no evidence"])
+            return ReportOutput(title="Remote work and productivity: what the evidence says",
+                                executive_summary=f"Overall the evidence is mixed [{ids[0]}]. A fake citation [E-deadbeef00] here.",
+                                key_findings=[f"Knowledge work shows gains [{ids[0]}]", "Unsupported finding [E-deadbeef00]"],
+                                limitations=["few sources"], open_questions=["long-run effects?"])
         raise AssertionError(f"unexpected schema {schema}")
 
 
@@ -134,7 +175,8 @@ def deps(tmp_path):
         return [tools[s] for s in source_types if s in tools]
 
     fake_llm = FakeLLM(_plan())
-    d = Deps(llm=lambda role: fake_llm, store=lambda: store, tools_for=tools_for)
+    d = Deps(llm=lambda role: fake_llm, store=lambda: store, tools_for=tools_for,
+             embedding_id=lambda: "fake:32", model_names=lambda: "fake-model: all roles")
     d.fake_tools = tools
     d.fake_store = store
     d.fake_llm = fake_llm
@@ -205,9 +247,23 @@ async def test_plan_interrupt_then_parallel_retrieval_and_report(deps):
     assert routes[1]["next"] == "insight"
 
     report = events[-1][1]["report"]
-    assert "## sq1" in report and "## sq2" in report and "## gap1_1" in report and "sq3" not in report
-    assert "## Contradictions" in report and "productivity rises" in report
-    assert "## Gaps raised" in report and "hallucinated" not in report      # ungrounded claim dropped
+    assert report.startswith("# Remote work and productivity")
+    assert "### sq1" in report and "### sq2" in report and "### gap1_1" in report and "sq3:" not in report
+    assert "## Where the evidence disagrees" in report and "productivity rises" in report
+    assert "hallucinated" not in report                       # ungrounded claim dropped by analysis
+    assert "E-deadbeef00" not in report                       # fake citations stripped from insights and report text
+    assert "### Insight 1: Effects depend on sector" in report and "Ungrounded speculation" not in report
+    assert "## Limitations" in report and "few sources" in report and "## Methodology" in report
+    assert "Citation check: 1 citations verified" in report and "2 removed" in report
+    assert "## Sources" in report and "credibility" in report
+    assert "## Open questions" in report and "long-run effects?" in report
+    insight_ev = next(d for k, d in events if k == "insight")
+    assert insight_ev["insights"] == ["Effects depend on sector"]
+    critic_ev = next(d for k, d in events if k == "critic")
+    assert critic_ev["verdict"] == "accept" and critic_ev["round"] == 1
+    rj = events[-1][1]["report_json"]
+    assert rj["stats"]["citations_removed"] == 2 and rj["stats"]["kept"] == len(rj["sources"])
+    assert rj["insights"][0]["reasoning"][1]["evidence_ids"] == []      # stripped, step kept as a logical link
 
     state = await graph.aget_state({"configurable": {"thread_id": "t1"}})
     assert state.values["approved"] is True and state.values["hop"] == 1
@@ -231,8 +287,9 @@ async def test_resume_with_true_accepts_plan_as_is(deps):
     assert kinds.count("retrieve") == 4                       # 3 planned + 1 gap hop
     validates = [d for k, d in events if k == "validate"]
     assert validates[0]["assessed"] == 7 and validates[0]["kept"] == 6      # the OFFTOPIC wikipedia hit was dropped
-    report = events[-1][1]["report"]
-    assert "sources dropped by the validator" in report and "Tyler Joseph" in report
+    rj = events[-1][1]["report_json"]
+    assert any(e["title"] == "Tyler Joseph" for e in rj["dropped_sources"])
+    assert "Tyler Joseph" not in events[-1][1]["report"]      # dropped sources stay out of the bibliography
 
 
 @pytest.mark.anyio
@@ -246,7 +303,7 @@ async def test_hop_limit_zero_disables_multi_hop(deps):
     route = next(d for k, d in events if k == "route_gaps")
     assert route["next"] == "insight" and "hop limit" in " ".join(route["notes"])
     report = events[-1][1]["report"]
-    assert "## Gaps raised" in report                         # the gap is still reported, just not pursued
+    assert "not pursued" in report                            # the gap is still reported, just not pursued
 
 
 @pytest.mark.anyio
@@ -302,6 +359,129 @@ async def test_slow_tool_is_bounded_by_timeout(deps):
     events = [e async for e in G.resume_with_plan(thread_id="t5", plan=True, graph=graph)]
     sq1 = next(d for k, d in events if k == "retrieve" and d["sub_question_id"] == "sq1")
     assert sq1["tools"] == {"slow": 0} and sq1["elapsed_s"] < 3
+
+
+@pytest.mark.anyio
+async def test_critic_revise_regenerates_insights_once(deps):
+    deps.fake_llm.verdicts = ["revise", "accept"]
+    graph = G.build_graph(InMemorySaver(), deps)
+    _ = [e async for e in G.stream_until_interrupt(question="Does remote work raise productivity?", thread_id="c1",
+                                                   max_hops=0, graph=graph)]
+    events = [e async for e in G.resume_with_plan(thread_id="c1", plan=True, graph=graph)]
+    kinds = [k for k, _ in events]
+    assert kinds.count("insight") == 2 and kinds.count("critic") == 2 and kinds[-1] == "report"
+    insights = [d for k, d in events if k == "insight"]
+    assert insights[1]["insights"] == ["Revised: Effects depend on sector"]
+    critics = [d for k, d in events if k == "critic"]
+    assert [c["verdict"] for c in critics] == ["revise", "accept"] and critics[0]["issues"] == ["issue from round 1"]
+    assert "round 1: revise" in events[-1][1]["report"] and "round 2: accept" in events[-1][1]["report"]
+
+
+@pytest.mark.anyio
+async def test_critic_need_more_evidence_triggers_a_retrieval_hop(deps):
+    deps.fake_llm.verdicts = ["need_more_evidence", "accept"]
+    deps.fake_llm.gap_rounds = 0                               # analysis raises no gaps: the critic drives the hop
+    graph = G.build_graph(InMemorySaver(), deps)
+    _ = [e async for e in G.stream_until_interrupt(question="Does remote work raise productivity?", thread_id="c2",
+                                                   max_hops=1, graph=graph)]
+    events = [e async for e in G.resume_with_plan(thread_id="c2", plan=True, graph=graph)]
+    kinds = [k for k, _ in events]
+    assert kinds.count("retrieve") == 4                        # 3 planned + 1 critic-requested
+    gap = next(d for k, d in events if k == "retrieve" and d["sub_question_id"] == "gap1_1")
+    assert gap["queries"] == ["manufacturing four-day week"]
+    assert kinds.count("critic") == 2 and kinds.index("critic") < kinds.index("route_gaps", kinds.index("critic"))
+    assert kinds[-1] == "report"
+    critics = [d for k, d in events if k == "critic"]
+    assert critics[0]["follow_up"] == ["What do manufacturing-sector trials show?"]
+    assert "requested by critic" in events[-1][1]["report"] or "gap1_1" in events[-1][1]["report"]
+
+
+@pytest.mark.anyio
+async def test_critic_need_more_evidence_without_hops_left_proceeds_to_report(deps):
+    deps.fake_llm.verdicts = ["need_more_evidence", "accept"]
+    deps.fake_llm.gap_rounds = 0
+    graph = G.build_graph(InMemorySaver(), deps)
+    _ = [e async for e in G.stream_until_interrupt(question="Does remote work raise productivity?", thread_id="c3",
+                                                   max_hops=0, graph=graph)]
+    events = [e async for e in G.resume_with_plan(thread_id="c3", plan=True, graph=graph)]
+    kinds = [k for k, _ in events]
+    assert kinds.count("retrieve") == 3 and kinds.count("critic") == 1 and kinds.count("insight") == 1
+    assert kinds[-1] == "report"
+    route = [d for k, d in events if k == "route_gaps"][-1]
+    assert route["next"] == "report"                           # critic's request cannot run: straight to report
+    assert "hop limit" in " ".join(route["notes"])
+
+
+@pytest.mark.anyio
+async def test_revision_cap_forces_acceptance(deps):
+    deps.fake_llm.verdicts = ["revise"]                        # always revise
+    deps.max_revisions = 2
+    graph = G.build_graph(InMemorySaver(), deps)
+    _ = [e async for e in G.stream_until_interrupt(question="Does remote work raise productivity?", thread_id="c4",
+                                                   max_hops=0, graph=graph)]
+    events = [e async for e in G.resume_with_plan(thread_id="c4", plan=True, graph=graph)]
+    kinds = [k for k, _ in events]
+    assert kinds.count("critic") == 3 and kinds.count("insight") == 3 and kinds[-1] == "report"
+    last = [d for k, d in events if k == "critic"][-1]
+    assert last["verdict"] == "accept" and "revision cap" in " ".join(last["notes"])
+    assert "(cap reached, proceeded)" in events[-1][1]["report"]
+
+
+class FlakyLLM:
+    """Raises for the given schemas; otherwise defers to the wrapped fake."""
+
+    def __init__(self, inner, failing):
+        self.inner, self.failing = inner, failing
+
+    def with_structured_output(self, schema, **kwargs):
+        if schema.__name__ in self.failing:
+            class Boom:
+                async def ainvoke(self, messages):
+                    raise RuntimeError(f"{schema.__name__} exploded")
+            return Boom()
+        return self.inner.with_structured_output(schema, **kwargs)
+
+
+@pytest.mark.anyio
+async def test_synthesis_failures_degrade_instead_of_killing_the_run(deps):
+    flaky = FlakyLLM(deps.fake_llm, {"InsightOutput", "CritiqueOut", "ReportOutput", "AnalysisOutput"})
+    deps.llm = lambda role: flaky
+    graph = G.build_graph(InMemorySaver(), deps)
+    _ = [e async for e in G.stream_until_interrupt(question="Does remote work raise productivity?", thread_id="f1",
+                                                   max_hops=0, graph=graph)]
+    events = [e async for e in G.resume_with_plan(thread_id="f1", plan=True, graph=graph)]
+    kinds = [k for k, _ in events]
+    assert kinds[-1] == "report" and "error" not in kinds
+    analyze = next(d for k, d in events if k == "analyze")
+    assert analyze["claims"] == 0 and set(analyze["sub_questions"]) == {"sq1", "sq2", "sq3"}
+    assert next(d for k, d in events if k == "insight")["insights"] == []
+    critic = next(d for k, d in events if k == "critic")
+    assert critic["verdict"] == "accept" and "critic unavailable" in critic["issues"][0]
+    report = events[-1][1]["report"]
+    assert report.startswith("# Research digest:") and "Analysis failed" in report
+    assert "not adversarially reviewed" in report and "## Sources" in report
+
+
+def test_ground_insights_strips_and_drops():
+    from deep_researcher.agents.insight import ground_insights
+
+    out = InsightOutput(insights=[
+        Insight(hypothesis="h1", reasoning=[ReasoningStep(step="a", evidence_ids=["E-1111111111", "E-bogus00000"]),
+                                            ReasoningStep(step="b", evidence_ids=[])], confidence=0.5),
+        Insight(hypothesis="h2", reasoning=[ReasoningStep(step="c", evidence_ids=["E-bogus00000"])], confidence=0.5),
+    ])
+    kept, stripped, dropped = ground_insights(out, {"E-1111111111"})
+    assert [i.hypothesis for i in kept] == ["h1"] and stripped == 2 and dropped == 1
+    assert kept[0].reasoning[0].evidence_ids == ["E-1111111111"]
+
+
+def test_strip_unknown_citations():
+    from deep_researcher.agents.common import cited_ids, strip_unknown_citations
+
+    text, removed = strip_unknown_citations("Gains [E-1111111111] and losses [E-2222222222] [E-badbadbad0].",
+                                            {"E-1111111111", "E-2222222222"})
+    assert removed == 1 and "badbad" not in text and text.endswith("[E-2222222222] .")
+    assert cited_ids(text) == ["E-1111111111", "E-2222222222"]
 
 
 def test_incremental_analysis_skips_parents_whose_gap_evidence_was_all_dropped():

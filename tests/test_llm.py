@@ -87,6 +87,18 @@ def test_structured_uses_json_schema_method(llm):
     assert captured == {"schema": dict, "method": "json_schema"}
 
 
+def test_reasoning_effort_env(llm, monkeypatch):
+    assert "reasoning" not in llm.build_kwargs("critic").get("extra_body", {})
+    monkeypatch.setenv("OPENROUTER_REASONING_EFFORT", "low")
+    assert llm.build_kwargs("critic")["extra_body"]["reasoning"] == {"effort": "low"}
+    monkeypatch.setenv("OPENROUTER_REASONING_EFFORT", "none")
+    assert llm.build_kwargs("critic")["extra_body"]["reasoning"] == {"enabled": False}
+    monkeypatch.setenv("OPENROUTER_REASONING_EFFORT", "turbo")
+    with pytest.raises(llm.LLMConfigError):
+        llm.build_kwargs("critic")
+    assert llm.ROLE_MAX_TOKENS["critic"] >= 8_000      # reasoning tokens count against the budget
+
+
 def test_get_llm_caches_without_overrides(llm, monkeypatch):
     monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-test")
     a, b = llm.get_llm("grader"), llm.get_llm("grader")

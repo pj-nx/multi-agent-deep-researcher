@@ -125,7 +125,14 @@ async def _analyse_one(sq: dict[str, Any], state: dict[str, Any], deps: Deps, ll
     prompt = f"Sub-question ({sq_id}): {sq['question']}\n\nEvidence chunks:\n\n{chunks_text}"
     async with sem:
         messages = [SystemMessage(SYSTEM), HumanMessage(prompt)]
-        out: AnalysisOutput = await structured(llm, AnalysisOutput).ainvoke(messages)
+        try:
+            out: AnalysisOutput = await structured(llm, AnalysisOutput).ainvoke(messages)
+        except Exception as exc:  # noqa: BLE001 - degrade: keep the evidence list, lose the analysis
+            log.warning("analysis failed for %s: %s", sq_id, str(exc)[:300])
+            summary = Summary(sub_question_id=sq_id, evidence_ids=sorted(shown),
+                              summary=f"Analysis failed ({type(exc).__name__}); {len(hits)} evidence chunks "
+                                      "were retrieved but not analysed.")
+            return {"summary": summary, "contradictions": [], "gaps": [], "dropped": 0, "chunks": len(hits)}
     summary, contradictions, gaps, dropped = ground(out, shown, sq_id)
     return {"summary": summary, "contradictions": contradictions, "gaps": gaps, "dropped": dropped,
             "chunks": len(hits), "confidence": out.confidence}
@@ -176,6 +183,7 @@ async def analyze_node(state: dict[str, Any], deps: Deps) -> dict[str, Any]:
         "contradictions": contradictions,
         "gaps": new_gaps,
         "pending_gaps": new_gaps,
+        "gap_source": "analysis",
         "notes": [f"analysis: {len(subs)} sub-questions{' (incremental)' if touched is not None else ''}, "
                   f"{n_claims} claims, {len(contradictions)} contradictions, {len(new_gaps)} gaps; "
                   f"{dropped} ungrounded citations dropped"],
