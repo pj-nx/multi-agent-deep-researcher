@@ -17,6 +17,7 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any
 
+from deep_researcher.pipeline_view import PipelineProgress
 from deep_researcher.reports import write_report
 from deep_researcher.schemas import ResearchPlan, SourceType
 from deep_researcher.state import ResearchState  # noqa: F401 - documents the state shape for readers
@@ -144,8 +145,8 @@ def format_activity(data: dict[str, Any], stamp: str) -> str:
 # ----------------------------------------------------------------------------- streams
 
 async def plan_stream(question: str, max_hops: int, budget: int | None, *, graph: Any = None,
-                      ) -> AsyncIterator[tuple[str, list[list[str]], str]]:
-    """Yields (log_text, plan_rows, thread_id) until the planner pauses for approval."""
+                      ) -> AsyncIterator[tuple[str, list[list[str]], str, str]]:
+    """Yields (log_text, plan_rows, thread_id, pipeline_html) until the planner pauses for approval."""
     from deep_researcher import graph as G
     from deep_researcher import tracing
 
@@ -153,25 +154,29 @@ async def plan_stream(question: str, max_hops: int, budget: int | None, *, graph
     cfg = tracing.run_config(thread_id, question, tags=["ui"])
     lines = [f"[{time.strftime('%H:%M:%S')}] thread {thread_id[:8]}: planning..."]
     rows: list[list[str]] = []
-    yield "\n".join(lines), rows, thread_id
+    progress = PipelineProgress()
+    progress.update("started", {})
+    yield "\n".join(lines), rows, thread_id, progress.render()
     try:
         async for event, data in G.stream_until_interrupt(question=question, thread_id=thread_id,
                                                           max_hops=max_hops, budget_seconds=budget or None,
                                                           config=cfg, graph=graph):
             lines.append(format_event(event, data))
+            progress.update(event, data)
             if event == "plan" and data.get("status") == "awaiting_approval":
                 rows = plan_to_rows(data["plan"])
-            yield "\n".join(lines), rows, thread_id
+            yield "\n".join(lines), rows, thread_id, progress.render()
     except Exception as exc:
         log.exception("plan stream failed")
         lines.append(f"[{time.strftime('%H:%M:%S')}] ERROR: {type(exc).__name__}: {str(exc)[:300]}")
-        yield "\n".join(lines), rows, thread_id
+        progress.update("error", {"message": f"{type(exc).__name__}: {str(exc)[:80]}"})
+        yield "\n".join(lines), rows, thread_id, progress.render()
 
 
 async def run_stream(thread_id: str, rows: list[list[Any]], question: str, budget: int | None,
                      log_text: str, *, graph: Any = None, out_dir: Path | None = None,
-                     ) -> AsyncIterator[tuple[str, str, str | None, str | None, str | None]]:
-    """Yields (log_text, report_markdown, md_path, json_path, pdf_path) through to the finished report."""
+                     ) -> AsyncIterator[tuple[str, str, str | None, str | None, str | None, str]]:
+    """Yields (log_text, report_markdown, md_path, json_path, pdf_path, pipeline_html) to the report."""
     from deep_researcher import graph as G
     from deep_researcher import tracing
 
@@ -180,32 +185,36 @@ async def run_stream(thread_id: str, rows: list[list[Any]], question: str, budge
         plan = rows_to_plan(rows, question)
     except Exception as exc:  # noqa: BLE001 - validation errors must be shown, not raised
         lines.append(f"[{time.strftime('%H:%M:%S')}] plan invalid: {str(exc)[:300]}")
-        yield "\n".join(lines), "", None, None, None
+        yield "\n".join(lines), "", None, None, None, PipelineProgress.after_plan(0).render()
         return
     n = len(plan["sub_questions"])
+    progress = PipelineProgress.after_plan(n)
+    progress.update("approve", {})
     lines.append(f"[{time.strftime('%H:%M:%S')}] approved {n} sub-questions; running...")
-    yield "\n".join(lines), "", None, None, None
+    yield "\n".join(lines), "", None, None, None, progress.render()
     cfg = tracing.run_config(thread_id, question, tags=["ui", "research"])
     report_md, report_json = "", None
     try:
         async for event, data in G.resume_with_plan(thread_id=thread_id, plan=plan,
                                                     budget_seconds=budget or None, config=cfg, graph=graph):
             lines.append(format_event(event, data))
+            progress.update(event, data)
             if event == "report":
                 report_md = data.get("report") or ""
                 report_json = data.get("report_json")
-            yield "\n".join(lines), report_md, None, None, None
+            yield "\n".join(lines), report_md, None, None, None, progress.render()
     except Exception as exc:
         log.exception("run stream failed")
         lines.append(f"[{time.strftime('%H:%M:%S')}] ERROR: {type(exc).__name__}: {str(exc)[:300]}")
-        yield "\n".join(lines), report_md, None, None, None
+        progress.update("error", {"message": f"{type(exc).__name__}: {str(exc)[:80]}"})
+        yield "\n".join(lines), report_md, None, None, None, progress.render()
         return
     if report_md:
         md_path, json_path, pdf_path = write_report(question, report_md, report_json, out_dir)
         lines.append(f"[{time.strftime('%H:%M:%S')}] saved {md_path}"
                      + (" (+ .json, .pdf)" if pdf_path else " (+ .json; PDF rendering failed)"))
         yield ("\n".join(lines), report_md, str(md_path), str(json_path) if json_path else None,
-               str(pdf_path) if pdf_path else None)
+               str(pdf_path) if pdf_path else None, progress.render())
     tracing.flush()
 
 
@@ -340,18 +349,17 @@ def build_app(graph: Any = None):
     import gradio as gr
 
     with gr.Blocks(title="Multi-Agent Deep Researcher") as demo:
-        gr.Markdown("# Multi-Agent Deep Researcher\n"
-                    "Planner -> parallel retrievers -> validator -> critical analysis (multi-hop) -> "
-                    "insights -> red-team critic -> report. Every claim cites stored evidence.")
+        gr.Markdown("# Multi-Agent Deep Researcher\n_Every claim in the report cites stored evidence._")
+        pipeline = gr.HTML(PipelineProgress().render())
         with gr.Tabs():
             with gr.Tab("Research"):
-                _build_research_tab(gr, demo, graph)
+                _build_research_tab(gr, demo, graph, pipeline)
             with gr.Tab("Settings"):
                 _build_settings_tab(gr)
     return demo
 
 
-def _build_research_tab(gr: Any, demo: Any, graph: Any) -> None:
+def _build_research_tab(gr: Any, demo: Any, graph: Any, pipeline: Any) -> None:
     if True:
         thread_state = gr.State("")
         question_state = gr.State("")
@@ -388,37 +396,39 @@ def _build_research_tab(gr: Any, demo: Any, graph: Any) -> None:
         async def on_plan(q, hops, bud):
             q = (q or "").strip()
             if len(q) < 5:
-                yield "Enter a question first.", [], "", "", "**Ready**", FREE, FREE
+                yield "Enter a question first.", [], "", "", "**Ready**", FREE, FREE, gr.update()
                 return
             try:
-                async for log_text, rows, tid in plan_stream(q, int(hops), int(bud or 0), graph=graph):
+                async for log_text, rows, tid, pipe in plan_stream(q, int(hops), int(bud or 0), graph=graph):
                     status = _busy("Planning...") if not rows else "**Plan ready: review and approve**"
-                    yield log_text, rows, tid, q, status, BUSY, BUSY
+                    yield log_text, rows, tid, q, status, BUSY, BUSY, pipe
             finally:
-                yield gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), FREE, FREE
+                yield (gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), FREE, FREE,
+                       gr.update())
 
         async def on_run(tid, rows, q, bud, previous_log):
             hidden = gr.update(visible=False)
             if not tid:
                 yield ((previous_log or "") + "\nRun the planner first.", "", hidden, hidden, hidden,
-                       "**Ready**", FREE, FREE)
+                       "**Ready**", FREE, FREE, gr.update())
                 return
             stream = run_stream(tid, rows, q, int(bud or 0), previous_log or "", graph=graph)
             try:
-                async for log_text, md, md_path, json_path, pdf_path in stream:
+                async for log_text, md, md_path, json_path, pdf_path, pipe in stream:
                     status = _busy("Researching... (see activity)") if not md else "**Report ready**"
                     yield (log_text, md,
                            gr.update(value=pdf_path, visible=bool(pdf_path)),
                            gr.update(value=md_path, visible=bool(md_path)),
-                           gr.update(value=json_path, visible=bool(json_path)), status, BUSY, BUSY)
+                           gr.update(value=json_path, visible=bool(json_path)), status, BUSY, BUSY, pipe)
             finally:
                 yield (gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(),
-                       FREE, FREE)
+                       FREE, FREE, gr.update())
 
         plan_btn.click(on_plan, [question, max_hops, budget],
-                       [activity, plan_table, thread_state, question_state, busy, plan_btn, run_btn])
+                       [activity, plan_table, thread_state, question_state, busy, plan_btn, run_btn,
+                        pipeline])
         run_btn.click(on_run, [thread_state, plan_table, question_state, budget, activity],
-                      [activity, report_md, dl_pdf, dl_md, dl_json, busy, plan_btn, run_btn])
+                      [activity, report_md, dl_pdf, dl_md, dl_json, busy, plan_btn, run_btn, pipeline])
 
 
 def main() -> None:

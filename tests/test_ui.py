@@ -81,14 +81,18 @@ async def test_plan_then_run_streams(tmp_path, monkeypatch):
     monkeypatch.setenv("LANGSMITH_TRACING", "false")
 
     plan_updates = [u async for u in ui.plan_stream("Does remote work raise productivity?", 1, 0, graph=graph)]
-    log_text, rows, thread_id = plan_updates[-1]
+    log_text, rows, thread_id, pipe = plan_updates[-1]
+    assert "dr-box done" in pipe and "3 sub-questions" in pipe and "awaiting approval" in pipe
+    assert "dr-box active" in plan_updates[0][3]                       # planner box pulses while planning
     assert thread_id and "plan ready: 3 sub-questions" in log_text
     assert [r[0] for r in rows] == ["sq1", "sq2", "sq3"]
 
     rows = rows[:2]                                          # user drops the third sub-question
     run_updates = [u async for u in ui.run_stream(thread_id, rows, "Does remote work raise productivity?", 0,
                                                   log_text, graph=graph, out_dir=tmp_path / "out")]
-    log_text, report, md_path, json_path, pdf_path = run_updates[-1]
+    log_text, report, md_path, json_path, pdf_path, pipe = run_updates[-1]
+    assert pipe.count("dr-box done") == 7 and "dr-box active" not in pipe   # every stage finished
+    assert "hop 1" in pipe                                               # the gap hop was shown
     assert "approved 2 sub-questions" in log_text and "report ready" in log_text and "saved" in log_text
     assert pdf_path and Path(pdf_path).read_bytes()[:5] == b"%PDF-"
     assert "calling fake" not in log_text and ": done in" in log_text and "searching arxiv" in log_text
@@ -98,12 +102,63 @@ async def test_plan_then_run_streams(tmp_path, monkeypatch):
     # streaming: the log grew with each event and the report arrived before the file paths
     assert len(run_updates) > 5
     assert run_updates[-2][1] == report and run_updates[-2][2] is None and run_updates[-2][4] is None
+    # mid-run, the Retrievers box was active while retrieving
+    assert any("dr-box active" in u[5] and "Retrievers" in u[5] for u in run_updates[1:-1])
 
 
 @pytest.mark.anyio
 async def test_run_stream_reports_invalid_plan(tmp_path):
     updates = [u async for u in ui.run_stream("t", [], "q" * 10, 0, "", graph=None)]
     assert len(updates) == 1 and "plan invalid" in updates[0][0]
+
+
+def test_pipeline_progress_state_machine():
+    from deep_researcher.pipeline_view import PipelineProgress
+
+    p = PipelineProgress()
+    p.update("started", {})
+    assert p.summary()["plan"] == "active"
+    p.update("activity", {"kind": "llm_start", "role": "planner", "label": "plan", "model": "openai/gpt-5.1"})
+    assert "calling gpt-5.1" in p.stages["plan"].note
+    p.update("plan", {"status": "awaiting_approval", "plan": {"sub_questions": [{}, {}, {}]}})
+    assert p.summary()["plan"] == "done" and p.summary()["retrieve"] == "waiting"
+
+    p = PipelineProgress.after_plan(3)
+    p.update("approve", {})
+    p.update("activity", {"kind": "tool_start", "tool": "arxiv", "sub_question_id": "sq1", "queries": 2})
+    assert p.summary()["retrieve"] == "active" and "searching arxiv" in p.stages["retrieve"].note
+    for i in range(3):
+        p.update("retrieve", {"sub_question_id": f"sq{i + 1}", "hop": 0, "sources": 2})
+    assert p.stages["retrieve"].note == "3/3 sub-questions"
+    p.update("validate", {"assessed": 9, "kept": 5})
+    assert p.summary()["retrieve"] == "done" and p.stages["validate"].note == "kept 5/9"
+    assert p.summary()["analyze"] == "active"
+    p.update("analyze", {"claims": 4, "contradictions": 1, "gaps": ["g"]})
+    p.update("route_gaps", {"next": "retrieve", "hop": 1, "new_sub_questions": ["gap1_1"]})
+    s = p.summary()
+    assert s["retrieve"] == "active" and s["validate"] == "pending" and s["analyze"] == "pending"
+    assert p.stages["retrieve"].note == "hop 1: 0/1" and p.stages["retrieve"].hop == 1
+    p.update("retrieve", {"sub_question_id": "gap1_1", "hop": 1, "sources": 1})
+    p.update("validate", {"assessed": 1, "kept": 1})
+    p.update("analyze", {"claims": 1, "contradictions": 0, "gaps": []})
+    p.update("route_gaps", {"next": "insight", "hop": 1})
+    assert p.summary()["insight"] == "active"
+    p.update("insight", {"insights": ["a", "b"]})
+    assert p.summary()["insight"] == "done" and p.summary()["critic"] == "active"
+    p.update("critic", {"round": 1, "verdict": "revise", "issues": ["x"]})
+    assert p.summary()["insight"] == "active" and p.summary()["critic"] == "pending"
+    p.update("insight", {"insights": ["a"]})
+    p.update("critic", {"round": 2, "verdict": "accept", "issues": []})
+    assert p.summary()["report"] == "active"
+    p.update("report", {"stats": {"kept": 6, "claims": 5}})
+    assert set(p.summary().values()) == {"done"} and "6 sources, 5 claims" in p.stages["report"].note
+    html = p.render()
+    assert html.count("dr-box done") == 7 and "<style>" in html
+
+    p2 = PipelineProgress.after_plan(2)
+    p2.update("approve", {})
+    p2.update("error", {"message": "boom"})
+    assert p2.summary()["retrieve"] == "error" and "boom" in p2.render()
 
 
 def test_build_app_constructs():
