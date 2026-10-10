@@ -4,13 +4,13 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
-import re
 import sys
-import time
 import uuid
 from pathlib import Path
 
 from dotenv import load_dotenv
+
+from deep_researcher.reports import write_report
 
 
 async def _main(args: argparse.Namespace) -> int:
@@ -50,15 +50,8 @@ async def _main(args: argparse.Namespace) -> int:
     tracing.flush()
     await G.aclose()
     if report:
-        out = Path(args.out)
-        out.mkdir(parents=True, exist_ok=True)
-        slug = re.sub(r"[^a-z0-9]+", "-", args.question.lower())[:60].strip("-")
-        stem = f"{time.strftime('%Y%m%d-%H%M%S')}-{slug}"
-        path = out / f"{stem}.md"
-        path.write_text(report)
-        if report_json:
-            (out / f"{stem}.json").write_text(json.dumps(report_json, indent=2, default=str))
-        print(f"\nreport written to {path} (+ .json)")
+        path, json_path = write_report(args.question, report, report_json, Path(args.out))
+        print(f"\nreport written to {path}" + (" (+ .json)" if json_path else ""))
     return 0
 
 

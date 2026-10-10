@@ -1,0 +1,98 @@
+"""Gradio UI: pure helpers and the two streams, against the fake graph (no browser, no server)."""
+import sys
+from pathlib import Path
+
+import pytest
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+pytest.importorskip("chromadb")
+from langgraph.checkpoint.memory import InMemorySaver
+
+from deep_researcher import graph as G
+from deep_researcher import ui
+from fakes import make_deps
+
+pytestmark = pytest.mark.real_graph
+
+
+def test_plan_rows_roundtrip_and_validation():
+    plan = {"question": "Does remote work raise productivity?", "sub_questions": [
+        {"id": "sq1", "question": "What do RCTs find?", "source_types": ["papers", "news"],
+         "search_queries": ["remote work RCT", "telework trial"], "depends_on": []},
+        {"id": "sq2", "question": "Background?", "source_types": ["wikipedia"], "search_queries": [], "depends_on": ["sq1"]},
+    ]}
+    rows = ui.plan_to_rows(plan)
+    assert rows[0] == ["sq1", "What do RCTs find?", "papers, news", "remote work RCT | telework trial", ""]
+    assert rows[1][4] == "sq1"
+    back = ui.rows_to_plan(rows, plan["question"])
+    assert back["sub_questions"][0]["search_queries"] == ["remote work RCT", "telework trial"]
+    assert back["sub_questions"][1]["depends_on"] == ["sq1"]
+    # user edits: drop row 1 (blank question), add a row with an unknown source type and a dangling dependency
+    edited = [["sq1", "", "papers", "", ""], ["sq2", "Background?", "wikipedia, tiktok", "x | y", "sq1"],
+              ["", "New question here", "", "", ""]]
+    back = ui.rows_to_plan(edited, plan["question"])
+    assert [s["id"] for s in back["sub_questions"]] == ["sq1", "sq2"]           # renumbered
+    assert back["sub_questions"][0]["source_types"] == ["wikipedia"]            # unknown type dropped
+    assert back["sub_questions"][0]["depends_on"] == []                         # dangling dependency dropped
+    assert back["sub_questions"][1]["source_types"] == ["web"]                  # default
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        ui.rows_to_plan([], plan["question"])                                   # a plan needs >= 1 sub-question
+
+
+def test_format_event_lines():
+    assert "plan ready: 2 sub-questions" in ui.format_event("plan", {"status": "awaiting_approval",
+                                                                     "plan": {"sub_questions": [{}, {}]}})
+    line = ui.format_event("retrieve", {"sub_question_id": "sq1", "hop": 0, "sources": 3, "chunks_stored": 4,
+                                        "tools": {"arxiv": 5}, "elapsed_s": 1.2})
+    assert "retrieve sq1 (hop 0): 3 sources, 4 chunks [arxiv 5] in 1.2s" in line
+    assert "skipped (budget exhausted)" in ui.format_event("retrieve", {"sub_question_id": "sq1", "skipped": "budget exhausted"})
+    assert "kept 2 of 5" in ui.format_event("validate", {"assessed": 5, "kept": 2})
+    assert "3 claims, 1 contradictions, 2 gaps across 2 sub-questions" in ui.format_event(
+        "analyze", {"claims": 3, "contradictions": 1, "gaps": ["a", "b"], "sub_questions": ["sq1", "sq2"]})
+    assert "pursuing gap1_1" in ui.format_event("route_gaps", {"next": "retrieve", "hop": 1, "new_sub_questions": ["gap1_1"]})
+    ins = ui.format_event("insight", {"insights": ["H1", "H2"]})
+    assert ins.startswith("[") and "insights: 2" in ins and "- H2" in ins
+    assert "critic round 1: revise (2 issues)" in ui.format_event("critic", {"round": 1, "verdict": "revise", "issues": ["a", "b"]})
+    assert "requesting: Q?" in ui.format_event("critic", {"round": 1, "verdict": "need_more_evidence", "follow_up": ["Q?"]})
+    assert "report ready" in ui.format_event("report", {"stats": {"kept": 3}})
+    assert "ERROR: boom" in ui.format_event("error", {"message": "boom"})
+
+
+@pytest.mark.anyio
+async def test_plan_then_run_streams(tmp_path, monkeypatch):
+    deps = make_deps(tmp_path)
+    graph = G.build_graph(InMemorySaver(), deps)
+    monkeypatch.setenv("LANGSMITH_TRACING", "false")
+
+    plan_updates = [u async for u in ui.plan_stream("Does remote work raise productivity?", 1, 0, graph=graph)]
+    log_text, rows, thread_id = plan_updates[-1]
+    assert thread_id and "plan ready: 3 sub-questions" in log_text
+    assert [r[0] for r in rows] == ["sq1", "sq2", "sq3"]
+
+    rows = rows[:2]                                          # user drops the third sub-question
+    run_updates = [u async for u in ui.run_stream(thread_id, rows, "Does remote work raise productivity?", 0,
+                                                  log_text, graph=graph, out_dir=tmp_path / "out")]
+    log_text, report, md_path, json_path = run_updates[-1]
+    assert "approved 2 sub-questions" in log_text and "report ready" in log_text and "saved" in log_text
+    assert report.startswith("# Remote work and productivity") and "### gap1_1" in report
+    assert Path(md_path).read_text() == report and Path(json_path).exists()
+    assert "sq3" not in report
+    # streaming: the log grew with each event and the report arrived before the file paths
+    assert len(run_updates) > 5
+    assert run_updates[-2][1] == report and run_updates[-2][2] is None
+
+
+@pytest.mark.anyio
+async def test_run_stream_reports_invalid_plan(tmp_path):
+    updates = [u async for u in ui.run_stream("t", [], "q" * 10, 0, "", graph=None)]
+    assert len(updates) == 1 and "plan invalid" in updates[0][0]
+
+
+def test_build_app_constructs():
+    pytest.importorskip("gradio")
+    demo = ui.build_app(graph=None)
+    assert demo is not None

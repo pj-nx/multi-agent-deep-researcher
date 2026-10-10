@@ -46,8 +46,12 @@ The CLI prints each agent event, writes the report to `reports/`, and without `-
 shows the planner's sub-questions and asks before retrieving. The same graph serves the API:
 
 ```bash
-uv run uvicorn api.index:app --reload     # http://localhost:8000/api/health, UI at public/index.html
+uv run python -m deep_researcher.ui        # Gradio UI at http://127.0.0.1:7860 (uv sync --extra ui)
+uv run uvicorn api.index:app --reload      # HTTP API at http://localhost:8000/api/health, UI at public/index.html
 ```
+
+The Gradio UI streams the agents' activity live, lets you edit the plan table before approving, renders the
+report and offers `.md` / `.json` downloads.
 
 ## Sources
 

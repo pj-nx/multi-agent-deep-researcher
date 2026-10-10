@@ -236,10 +236,22 @@ Each phase ends with something runnable. Estimated effort assumes evenings/weeke
   4k `max_tokens` budget on hidden reasoning before emitting JSON. Fixes: per-role budgets raised (critic 12k,
   insight/analysis 16k, report 24k), optional `OPENROUTER_REASONING_EFFORT`, and the fallbacks above so a single
   failed call can no longer sink a ten-minute run.
+- **Live result (2026-10-10, keyless sources, Sonnet heavy tier, 1 hop, 263 s):** 38 sources retrieved, 9 kept;
+  16 grounded claims, 1 contradiction; 13 gaps raised, 4 pursued (all 6 follow-up sources dropped by the
+  validator, so the hop re-analysed nothing); 5 insights; critic verdict `need_more_evidence` with 5 specific
+  issues (e.g. a sector-moderation inference resting on one vague source) → hop limit → report. Report: 5,155
+  words, specific title ("A Thin and Contested Evidence Base"), executive summary that says the base is narrow,
+  limitations naming the un-retrieved UK/Iceland/Microsoft pilots, 8 citations verified / 0 removed.
 
-### Phase 5 — Gradio UI + streaming (1 day)
-- Stream node events (`graph.stream(..., stream_mode="updates")`) into a live
-  "agent activity" panel; show plan for approval; render report; download button.
+### Phase 5 — Gradio UI + streaming (1 day) — DONE 2026-10-10
+- `src/deep_researcher/ui.py` (`uv run python -m deep_researcher.ui`): question + hops + budget → **Plan**
+  streams planner events into an "Agent activity" log and fills an editable plan table (id, question,
+  source_types, search_queries, depends_on; clear a question to drop it) → **Approve & run** streams every
+  agent event (retrieve per sub-question, validator, analysis, gap router, insights, critic, report) into the
+  log, renders the report as Markdown and offers `.md` / `.json` downloads (written via the shared
+  `reports.write_report`, also used by the CLI).
+- Runs the graph in-process; the plan/table helpers and both streams are Gradio-free so they are tested against
+  the fake graph (`tests/test_ui.py`), and failures surface in the log instead of hanging the page.
 
 ### Phase 6 — Vercel deployment (½ day)
 - Wire `api/index.py` to `build_graph()` with the Postgres checkpointer and hosted vector store (§10).
