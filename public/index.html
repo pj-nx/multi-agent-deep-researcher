@@ -5,16 +5,18 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Deep Researcher</title>
 <style>
-  :root { --bg:#f7f7f8; --card:#fff; --ink:#1a1d23; --muted:#6b7280; --accent:#2f45c6; --rule:#e5e7eb; }
-  @media (prefers-color-scheme: dark) { :root { --bg:#0f1218; --card:#171b23; --ink:#e7ebf2; --muted:#9aa3b5; --accent:#93a3ff; --rule:#2a3140; } }
+  :root { --bg:#f7f7f8; --card:#fff; --ink:#1a1d23; --muted:#6b7280; --accent:#2f45c6; --rule:#e5e7eb; --bad:#b42318; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#0f1218; --card:#171b23; --ink:#e7ebf2; --muted:#9aa3b5; --accent:#93a3ff; --rule:#2a3140; --bad:#ff7f70; } }
   body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.5 system-ui, sans-serif; }
   main { max-width:860px; margin:0 auto; padding:32px 16px; }
   h1 { font-size:1.6rem; margin:0 0 4px; } p.sub { color:var(--muted); margin:0 0 24px; }
-  form { display:flex; gap:8px; } input { flex:1; padding:12px; border:1px solid var(--rule); border-radius:8px; background:var(--card); color:var(--ink); }
+  form { display:flex; flex-wrap:wrap; gap:8px; }
+  input { flex:1; min-width:200px; padding:12px; border:1px solid var(--rule); border-radius:8px; background:var(--card); color:var(--ink); }
+  #token { flex:0 1 220px; display:none; }
   button { padding:12px 18px; border:0; border-radius:8px; background:var(--accent); color:#fff; font-weight:600; cursor:pointer; }
   button:disabled { opacity:.5; cursor:default; }
-  #log { margin-top:24px; background:var(--card); border:1px solid var(--rule); border-radius:8px; padding:16px; min-height:160px; font:13px/1.5 ui-monospace, monospace; white-space:pre-wrap; }
-  .ev { color:var(--accent); }
+  #log { margin-top:24px; background:var(--card); border:1px solid var(--rule); border-radius:8px; padding:16px; min-height:160px; font:13px/1.5 ui-monospace, monospace; white-space:pre-wrap; overflow-wrap:anywhere; }
+  .ev { color:var(--accent); } .err { color:var(--bad); }
 </style>
 </head>
 <body>
@@ -22,39 +24,89 @@
   <h1>Multi-Agent Deep Researcher</h1>
   <p class="sub">Planner → parallel retrievers → critical analysis → insights → red-team → report. Streams agent events live.</p>
   <form id="f">
-    <input id="q" placeholder="Ask a hard, multi-source question…" required minlength="5">
+    <input id="q" placeholder="Ask a hard, multi-source question…" required minlength="5" maxlength="2000">
+    <input id="token" type="password" placeholder="API token" autocomplete="off">
     <button id="go">Research</button>
   </form>
   <div id="log">Ready. Health: <span id="health">checking…</span></div>
 </main>
 <script>
   const log = document.getElementById('log');
+  const tokenInput = document.getElementById('token');
+
+  // Render untrusted text (user input, retrieved snippets) as text nodes only — never innerHTML.
+  function line(ev, text, cls) {
+    const el = document.createElement('div');
+    const tag = document.createElement('span');
+    tag.className = cls || 'ev';
+    tag.textContent = `[${ev}] `;
+    el.appendChild(tag);
+    el.appendChild(document.createTextNode(text));
+    log.appendChild(el);
+  }
+
+  // Parse one SSE message block per the spec: join every `data:` line with "\n".
+  function parseBlock(block) {
+    let event = 'message';
+    const data = [];
+    for (const raw of block.split('\n')) {
+      if (raw.startsWith('event:')) event = raw.slice(6).trim();
+      else if (raw.startsWith('data:')) data.push(raw.slice(5).replace(/^ /, ''));
+    }
+    return { event, data: data.join('\n') };
+  }
+
+  function authHeaders() {
+    const t = tokenInput.value.trim();
+    return t ? { authorization: `Bearer ${t}` } : {};
+  }
+
+  try { tokenInput.value = sessionStorage.getItem('dr_token') || ''; } catch (_) {}
+
   fetch('/api/health').then(r => r.json()).then(h => {
-    document.getElementById('health').textContent = `ok · graph_wired=${h.graph_wired} · max_hops=${h.max_hops}`;
-  }).catch(() => document.getElementById('health').textContent = 'unreachable');
+    document.getElementById('health').textContent =
+      `ok · graph_wired=${h.graph_wired} · max_hops=${h.max_hops} · auth=${h.auth_required ? 'required' : 'off'}`;
+    if (h.auth_required) tokenInput.style.display = 'block';
+  }).catch(() => { document.getElementById('health').textContent = 'unreachable'; });
 
   document.getElementById('f').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const btn = document.getElementById('go'); btn.disabled = true;
+    const btn = document.getElementById('go');
+    btn.disabled = true;
     log.textContent = '';
-    const res = await fetch('/api/research', {
-      method: 'POST', headers: {'content-type': 'application/json'},
-      body: JSON.stringify({ question: document.getElementById('q').value })
-    });
-    const reader = res.body.getReader(); const dec = new TextDecoder(); let buf = '';
-    while (true) {
-      const { value, done } = await reader.read(); if (done) break;
-      buf += dec.decode(value, { stream: true });
-      let i; while ((i = buf.indexOf('\n\n')) >= 0) {
-        const chunk = buf.slice(0, i); buf = buf.slice(i + 2);
-        const ev = /^event: (.*)$/m.exec(chunk)?.[1] ?? 'message';
-        const data = /^data: (.*)$/m.exec(chunk)?.[1] ?? '';
-        const el = document.createElement('div');
-        el.innerHTML = `<span class="ev">[${ev}]</span> ${data}`;
-        log.appendChild(el);
+    try { sessionStorage.setItem('dr_token', tokenInput.value.trim()); } catch (_) {}
+    try {
+      const res = await fetch('/api/research', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ question: document.getElementById('q').value })
+      });
+      if (!res.ok) {
+        let detail = `${res.status} ${res.statusText}`;
+        try { detail += ` — ${(await res.json()).detail ?? ''}`; } catch (_) {}
+        line('error', detail, 'err');
+        return;
       }
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let buf = '';
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        let i;
+        while ((i = buf.indexOf('\n\n')) >= 0) {
+          const { event, data } = parseBlock(buf.slice(0, i));
+          buf = buf.slice(i + 2);
+          line(event, data, event === 'error' ? 'err' : 'ev');
+        }
+      }
+      if (buf.trim()) { const { event, data } = parseBlock(buf); line(event, data); }
+    } catch (err) {
+      line('error', err && err.message ? err.message : String(err), 'err');
+    } finally {
+      btn.disabled = false;
     }
-    btn.disabled = false;
   });
 </script>
 </body>

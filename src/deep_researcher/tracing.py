@@ -26,8 +26,8 @@ import asyncio
 import contextlib
 import logging
 import os
-from collections.abc import Iterator
-from typing import Any, Callable, TypeVar
+from collections.abc import Callable, Iterator
+from typing import Any, TypeVar
 
 log = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ F = TypeVar("F", bound=Callable[..., Any])
 
 def _langsmith():
     try:
-        import langsmith  # noqa: F401
+        import langsmith
 
         return langsmith
     except ImportError:  # pragma: no cover - exercised only when the dep is absent
@@ -129,7 +129,7 @@ def run_url(run: Any) -> str | None:
         return None
     try:
         return run.get_url()
-    except Exception as exc:  # network / permissions / older SDK
+    except Exception as exc:  # noqa: BLE001 - observability must never fail a request
         log.debug("could not resolve trace URL: %s", exc)
         return None
 
@@ -154,14 +154,18 @@ def run_config(thread_id: str, question: str | None = None, *, run_name: str = "
 
 
 def flush(timeout: float | None = 10.0) -> None:
-    """Block until queued traces are uploaded. Call before a serverless function returns."""
+    """Block until queued traces are uploaded, or ``timeout`` seconds pass.
+
+    Call before a serverless function returns. Never raises: losing a trace is acceptable,
+    failing the user's request because of telemetry is not.
+    """
     if not enabled():
         return
     try:
         c = client()
         if c is not None:
-            c.flush()
-    except Exception as exc:
+            c.flush(timeout=timeout)
+    except Exception as exc:  # noqa: BLE001 - see docstring
         log.warning("LangSmith flush failed: %s", exc)
     try:
         from langchain_core.tracers.langchain import wait_for_all_tracers
@@ -169,12 +173,16 @@ def flush(timeout: float | None = 10.0) -> None:
         wait_for_all_tracers()
     except ImportError:
         pass
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - see docstring
         log.warning("wait_for_all_tracers failed: %s", exc)
 
 
 async def aflush(timeout: float | None = 10.0) -> None:
-    """Async-friendly flush (runs the blocking flush in a worker thread)."""
+    """Async flush bounded by ``timeout``; gives up (and logs) rather than hanging the response."""
     if not enabled():
         return
-    await asyncio.to_thread(flush, timeout)
+    try:
+        outer = None if timeout is None else timeout + 1
+        await asyncio.wait_for(asyncio.to_thread(flush, timeout), timeout=outer)
+    except TimeoutError:
+        log.warning("LangSmith flush timed out after %ss; traces may be incomplete", timeout)

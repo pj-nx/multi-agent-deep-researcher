@@ -115,13 +115,29 @@ Tracing is a strict no-op when the variables are unset. The helpers live in
 [`src/deep_researcher/tracing.py`](src/deep_researcher/tracing.py): `span()` for a parent run,
 `traced()` for tools and agents, `run_config()` to name and tag a graph run, `flush()`.
 
+## Protecting the API
+
+The research endpoint spends real money per call, so three env vars guard it (all optional):
+
+| Variable | Default | Effect |
+|---|---|---|
+| `API_AUTH_TOKEN` | unset (open) | When set, `POST /api/research*` require `Authorization: Bearer <token>` or `X-API-Key`. The hosted UI shows a token field when health reports `auth_required`. |
+| `RATE_LIMIT_PER_MINUTE` | `6` | Sliding window per client IP (honours `X-Forwarded-For`); `0` disables. |
+| `MAX_CONCURRENT_RUNS` | `3` | Simultaneous research streams per instance; extra requests get `503` with `Retry-After`. |
+
+Set `API_AUTH_TOKEN` on Vercel before sharing the URL. The limiter is in-process, which bounds
+burst cost per instance; swap in Upstash/Redis if you need a global limit. `/api/health` stays
+public and never exposes secrets.
+
 ## API
 
 | Method | Path | Purpose |
 |---|---|---|
 | GET | `/api/health` | liveness + whether the graph is wired |
 | POST | `/api/research` | `{question, max_hops?}` → SSE stream until plan approval |
-| POST | `/api/research/{thread_id}/resume` | `{plan}` → SSE stream to final report |
+| POST | `/api/research/{thread_id}/resume` | `{plan: ResearchPlan}` → SSE stream to final report |
+
+SSE events: `started` (with `trace_url`), `plan`, agent events, `error`, `done`.
 
 ## License
 

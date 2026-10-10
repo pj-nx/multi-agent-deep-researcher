@@ -162,7 +162,7 @@ def make_llm(role: str, **overrides: Any):
     return ChatOpenRouter(api_key=api_key(), base_url=base_url(), **kwargs)
 
 
-@functools.lru_cache(maxsize=None)
+@functools.cache
 def _cached(role: str):
     return make_llm(role)
 
@@ -188,13 +188,7 @@ def info() -> dict[str, Any]:
     }
 
 
-def list_models(prefix: str = "", *, timeout: float = 15.0) -> list[dict[str, Any]]:
-    """Live model catalogue from OpenRouter (public endpoint, no key needed). Network call."""
-    import httpx
-
-    resp = httpx.get(f"{base_url()}/models", timeout=timeout)
-    resp.raise_for_status()
-    rows = resp.json()["data"]
+def _shape_models(rows: list[dict[str, Any]], prefix: str) -> list[dict[str, Any]]:
     return sorted(
         (
             {"id": m["id"], "context_length": m.get("context_length"),
@@ -203,3 +197,25 @@ def list_models(prefix: str = "", *, timeout: float = 15.0) -> list[dict[str, An
         ),
         key=lambda r: r["id"],
     )
+
+
+def list_models(prefix: str = "", *, timeout: float = 15.0) -> list[dict[str, Any]]:
+    """Live model catalogue from OpenRouter (public endpoint, no key needed).
+
+    Blocking network call for CLI / notebook use. Inside async code use :func:`alist_models`.
+    """
+    import httpx
+
+    resp = httpx.get(f"{base_url()}/models", timeout=timeout)
+    resp.raise_for_status()
+    return _shape_models(resp.json()["data"], prefix)
+
+
+async def alist_models(prefix: str = "", *, timeout: float = 15.0) -> list[dict[str, Any]]:
+    """Async variant of :func:`list_models` for use in routes and graph nodes."""
+    import httpx
+
+    async with httpx.AsyncClient(timeout=timeout) as c:
+        resp = await c.get(f"{base_url()}/models")
+    resp.raise_for_status()
+    return _shape_models(resp.json()["data"], prefix)
