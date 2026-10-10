@@ -373,8 +373,9 @@ def _build_research_tab(gr: Any, demo: Any, graph: Any, pipeline: Any) -> None:
         with gr.Row():
             plan_btn = gr.Button("1. Plan", variant="primary", scale=4)
             busy = gr.Markdown("**Ready**", elem_id="busy")
-        activity = gr.Textbox(label="Agent activity", lines=14, max_lines=30, interactive=False,
-                              autoscroll=True)
+        with gr.Accordion("Agent activity (expand for the per-agent log)", open=False):
+            activity = gr.Textbox(show_label=False, lines=14, max_lines=30, interactive=False,
+                                  autoscroll=True)
         gr.Markdown("### 2. Review the plan (edit cells, clear a question to drop it), then approve")
         plan_table = gr.Dataframe(headers=PLAN_HEADERS, datatype=["str"] * 5, type="array", interactive=True,
                                   row_count=(0, "dynamic"), column_count=(5, "fixed"), wrap=True,
