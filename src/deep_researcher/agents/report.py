@@ -20,6 +20,7 @@ from deep_researcher.agents.common import (
 )
 from deep_researcher.agents.deps import Deps
 from deep_researcher.schemas import ReportOutput
+from deep_researcher.tools.language import allowed_languages
 
 log = logging.getLogger(__name__)
 
@@ -66,6 +67,8 @@ def _methodology_md(state: dict[str, Any], deps: Deps, stats: dict[str, Any]) ->
         ),
         f"- Retrieval tools: {', '.join(tools_used) or 'none'}; {stats['retrieved']} sources retrieved, "
         f"{stats['kept']} kept by the Source Validator, {stats['dropped']} dropped.",
+        f"- Languages: only {', '.join(stats['languages'])} accepted; "
+        f"{stats['filtered_language']} article(s) in other languages were discarded before validation.",
         f"- Analysis produced {stats['claims']} grounded claims and "
         f"{stats['contradictions']} contradictions; "
         f"{stats['gaps']} gaps were raised, {stats['gaps_pursued']} pursued.",
@@ -163,6 +166,9 @@ async def report_node(state: dict[str, Any], deps: Deps) -> dict[str, Any]:
         "citations_removed": removed,
         "embedding_id": deps.embedding_id(),
         "hops": state.get("hop", 0),
+        "languages": allowed_languages(),
+        "filtered_language": sum(int(r.get("filtered_language") or 0)
+                                 for r in state.get("retrieval_log", [])),
     }
 
     questions = {sq["id"]: sq["question"] for sq in state["plan"]["sub_questions"]}

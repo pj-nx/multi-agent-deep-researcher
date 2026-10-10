@@ -50,6 +50,8 @@ FIELDS: tuple[Field, ...] = (
     Field("EMBEDDINGS_DIMENSIONS", "Embedding dimensions", "text", "embeddings", "256, or 'native'"),
     Field("CHROMA_COLLECTION", "Chroma collection", "text", "embeddings",
           "one collection per embedding model"),
+    Field("RETRIEVAL_LANGUAGES", "Allowed languages", "text", "run",
+          "comma-separated ISO 639-1 codes, e.g. en or en,de,fr; articles in other languages are dropped"),
     Field("MAX_HOPS", "Default max hops", "text", "run"),
     Field("RUN_BUDGET_SECONDS", "Run budget (seconds)", "text", "run"),
 )
@@ -181,9 +183,10 @@ def save(form: dict[str, Any], path: Path | None = None) -> tuple[dict[str, str 
 def summary() -> dict[str, Any]:
     """Effective configuration (secrets masked) for display."""
     from deep_researcher import embeddings, llm, tracing
-    from deep_researcher.tools import registry
+    from deep_researcher.tools import language, registry
 
     return {
+        "languages": language.allowed_languages(),
         "keys": {f.key: mask(current(f.key)) for f in FIELDS if f.kind == "secret"},
         "llm": llm.info(),
         "embeddings": embeddings.info(),

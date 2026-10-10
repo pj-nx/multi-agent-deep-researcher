@@ -73,8 +73,10 @@ whether its key is present (`/api/health` → `sources`). Keyless tools are alwa
 | `api` | none built in | per service | `tools.register("api", YourTool)` for FRED, Polygon, etc. |
 
 The planner emits 2-3 short keyword `search_queries` per sub-question; the retriever runs each of
-them against every enabled tool (bounded by a per-tool timeout), de-duplicates by URL, embeds and
-stores. `RETRIEVAL_FETCH_FULL_TEXT=true` additionally fetches PDFs and pages for short results
+them against every enabled tool (bounded by a per-tool timeout), de-duplicates by URL, drops
+articles that are not in `RETRIEVAL_LANGUAGES` (default `en`; sources that take a language
+parameter are asked for those languages up front, everything else is detected from the text with
+`langdetect`, and the report's methodology states how many were discarded), embeds and stores. `RETRIEVAL_FETCH_FULL_TEXT=true` additionally fetches PDFs and pages for short results
 (GDELT titles, arXiv PDFs) via `tools/fetch.py` (size- and page-capped, best effort).
 
 **For useful results on non-CS topics, add `TAVILY_API_KEY` and `SEMANTIC_SCHOLAR_API_KEY`.** With

@@ -720,6 +720,7 @@ dependencies = [
     { name = "httpx" },
     { name = "langchain-core" },
     { name = "langchain-openai" },
+    { name = "langdetect" },
     { name = "langgraph" },
     { name = "langgraph-checkpoint-sqlite" },
     { name = "langsmith" },
@@ -792,6 +793,7 @@ requires-dist = [
     { name = "langchain-ollama", marker = "extra == 'embeddings-ollama'", specifier = ">=0.3" },
     { name = "langchain-openai", specifier = ">=1.7.0" },
     { name = "langchain-openai", marker = "extra == 'embeddings-openai'", specifier = ">=1.0" },
+    { name = "langdetect", specifier = ">=1.0.9" },
     { name = "langgraph", specifier = ">=1.2.14" },
     { name = "langgraph", marker = "extra == 'agents'", specifier = ">=1.0" },
     { name = "langgraph-checkpoint-postgres", marker = "extra == 'agents'", specifier = ">=2.0" },
@@ -1676,6 +1678,15 @@ sdist = { url = "https://files.pythonhosted.org/packages/85/22/d401fffe8d3f1339f
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c7/51/2880d2e88cce13c1180178f7e8dc796c2f45b2dc09cc09ed407d116c08cc/langchain_text_splitters-1.1.3-py3-none-any.whl", hash = "sha256:50edeb318b3be6a6308dddd7d616ab82823a9ccbea59a9c14c58a7b91df60295", size = 38217, upload-time = "2026-10-02T15:46:32.271Z" },
 ]
+
+[[package]]
+name = "langdetect"
+version = "1.0.9"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "six" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/0e/72/a3add0e4eec4eb9e2569554f7c70f4a3c27712f40e3284d483e88094cc0e/langdetect-1.0.9.tar.gz", hash = "sha256:cbc1fef89f8d062739774bd51eda3da3274006b3661d199c2655f6b3f6d605a0", size = 981474, upload-time = "2021-05-07T07:54:13.562Z" }
 
 [[package]]
 name = "langgraph"

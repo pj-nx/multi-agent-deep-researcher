@@ -127,6 +127,7 @@ class EvidenceStore:
                     id=chunk_id(ev.url, i), evidence_id=ev.id, chunk_index=i, text=piece,
                     sub_question_id=ev.sub_question_id, source_type=ev.source_type, title=ev.title,
                     url=ev.url, published_at=ev.published_at, credibility=ev.credibility,
+                    language=ev.language,
                 ))
         return self.add_chunks(chunks)
 

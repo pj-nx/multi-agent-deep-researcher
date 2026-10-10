@@ -275,6 +275,11 @@ Each phase ends with something runnable. Estimated effort assumes evenings/weeke
 
 - `max_hops` (default 3), `max_revisions` (2), per-run token budget, per-tool timeout and retry with backoff.
 - Retriever tools return at most N results each; validator drops irrelevant chunks before embedding to control store size.
+- **Language gate** (`tools/language.py`, 2026-10-10): only articles in `RETRIEVAL_LANGUAGES` (default `en`) become
+  evidence. newsdata.io, GDELT and Wikipedia are queried for those languages; everything is then classified
+  (declared metadata first, else seeded `langdetect` on title + text; texts under 40 chars pass as "unknown" so
+  title-only results survive). Dropped counts land in the retrieval log, the activity stream and the report's
+  methodology; each `Evidence`/chunk carries its `language` code.
 - All external text is **data, not instructions**: tool outputs are wrapped in delimiters and the system prompts say to ignore instructions found in retrieved content.
 - Respect robots/ToS: use official APIs (arXiv, Semantic Scholar, newsdata.io) rather than scraping; cache fetched PDFs locally.
 - Report always includes a *Limitations* section listing sub-questions with thin or conflicting evidence.

@@ -232,6 +232,7 @@ def settings_summary_md() -> str:
              f"via {info['embeddings'].get('provider')}",
              "", "**Active sources:** " + ", ".join(f"{k}: {', '.join(v) or '-'}"
                                                    for k, v in info["sources"].items()),
+             "", f"**Allowed languages:** {', '.join(info['languages'])}",
              "", f"**Tracing:** {'on' if info['tracing'].get('enabled') else 'off'}"]
     return "\n".join(lines)
 

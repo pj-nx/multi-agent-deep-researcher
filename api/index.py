@@ -47,6 +47,7 @@ from starlette.types import Receive, Scope, Send
 from deep_researcher import embeddings, llm, tracing
 from deep_researcher.schemas import ResearchPlan
 from deep_researcher.store import chunking
+from deep_researcher.tools import language as tool_language
 from deep_researcher.tools import registry as tool_registry
 
 log = logging.getLogger("deep_researcher.api")
@@ -259,6 +260,7 @@ async def health() -> dict:
         "chunking": {"size": chunking.default_chunk_size(), "overlap": chunking.default_chunk_overlap(),
                      "unit": chunking.default_chunk_unit()},
         "sources": tool_registry.info(),
+        "languages": tool_language.info(),
     }
 
 

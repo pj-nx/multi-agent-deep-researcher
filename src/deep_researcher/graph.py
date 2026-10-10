@@ -268,7 +268,7 @@ def _event_for(node: str, update: dict[str, Any] | None) -> tuple[str, dict[str,
     if node == "retrieve":
         rows = update.get("retrieval_log") or [{}]
         keep = ("sub_question_id", "hop", "tools", "sources", "chunks_stored", "elapsed_s", "skipped",
-                "warning", "queries", "filtered_irrelevant")
+                "warning", "queries", "filtered_irrelevant", "filtered_language", "languages_dropped")
         data.update({k: v for k, v in rows[0].items() if k in keep})
     elif node == "validate":
         a = update.get("assessments") or {}

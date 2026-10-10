@@ -11,6 +11,7 @@ import os
 import re
 from typing import Any
 
+from deep_researcher.tools import language as lang
 from deep_researcher.tools.base import RetrievalTool, SearchResult, clip, iso_date
 
 
@@ -23,8 +24,8 @@ class NewsDataTool(RetrievalTool):
     max_size = int(os.getenv("NEWSDATA_MAX_SIZE") or 10)      # 10 on the free plan, 50 on paid
 
     async def _search(self, query: str, limit: int) -> list[SearchResult]:
-        params: dict[str, Any] = {"q": newsdata_query(query),
-                                  "language": os.getenv("NEWSDATA_LANGUAGE", "en"),
+        languages = os.getenv("NEWSDATA_LANGUAGE") or ",".join(lang.allowed_languages()[:5])
+        params: dict[str, Any] = {"q": newsdata_query(query), "language": languages,
                                   "size": max(1, min(limit, self.max_size)), "removeduplicate": 1}
         if country := os.getenv("NEWSDATA_COUNTRY"):
             params["country"] = country
@@ -48,9 +49,9 @@ class GdeltTool(RetrievalTool):
         query = gdelt_query(query)
         if not query:
             return []
-        resp = await self._get(self.endpoint, params={"query": query, "mode": "artlist", "format": "json",
-                                                      "maxrecords": max(limit, 5), "sort": "hybridrel",
-                                                      "sourcelang": "english"})
+        params = {"query": query, "mode": "artlist", "format": "json", "maxrecords": max(limit, 5),
+                  "sort": "hybridrel", "sourcelang": lang.language_name(lang.primary_language())}
+        resp = await self._get(self.endpoint, params=params)
         if "json" not in (resp.headers.get("content-type") or "") and not resp.text.lstrip().startswith("{"):
             raise ValueError(f"GDELT returned non-JSON: {resp.text[:120]!r}")
         return parse_gdelt(resp.json())
@@ -90,7 +91,7 @@ def parse_newsdata(payload: dict[str, Any]) -> list[SearchResult]:
             extra={"source": a.get("source_name") or a.get("source_id"),
                    "source_priority": a.get("source_priority"), "country": a.get("country"),
                    "category": a.get("category"), "creator": a.get("creator"),
-                   "needs_fetch": not content},
+                   "language": a.get("language"), "needs_fetch": not content},
         ))
     return out
 
@@ -103,6 +104,7 @@ def parse_gdelt(payload: dict[str, Any]) -> list[SearchResult]:
             # GDELT gives no body: the title is the only text until the fetcher enriches it.
             title=title, url=a.get("url") or "", text=clip(title), source_type="news",
             published_at=iso_date(a.get("seendate")),
-            extra={"domain": a.get("domain"), "country": a.get("sourcecountry"), "needs_fetch": True},
+            extra={"domain": a.get("domain"), "country": a.get("sourcecountry"),
+                   "language": a.get("language"), "needs_fetch": True},
         ))
     return out

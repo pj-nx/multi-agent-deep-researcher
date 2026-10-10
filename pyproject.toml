@@ -17,6 +17,7 @@ dependencies = [
     "pypdf>=6.20.0",
     "python-dotenv>=1.2.4",
     "langchain-openai>=1.7.0",
+    "langdetect>=1.0.9",
 ]
 
 [project.optional-dependencies]

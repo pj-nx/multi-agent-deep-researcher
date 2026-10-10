@@ -18,6 +18,7 @@ from urllib.parse import urlsplit, urlunsplit
 from deep_researcher.agents.common import emit
 from deep_researcher.agents.deps import Deps
 from deep_researcher.schemas import Evidence, SubQuestion
+from deep_researcher.tools import language as lang
 from deep_researcher.tools.base import SearchResult
 
 log = logging.getLogger(__name__)
@@ -44,7 +45,23 @@ def to_evidence(result: SearchResult, sub_question_id: str) -> Evidence:
         id=evidence_id(result.url), sub_question_id=sub_question_id, source_type=result.source_type,
         title=result.title[:500], url=result.url[:2000], text=result.text,
         published_at=result.published_at, credibility=CREDIBILITY_PRIOR.get(result.source_type, 0.5),
+        language=result.extra.get("language_code"),
     )
+
+
+def language_gate(results: list[SearchResult]) -> tuple[list[SearchResult], dict[str, int]]:
+    """Keep results in the allowed languages; annotate each with its detected/declared code."""
+    allowed = lang.allowed_languages()
+    kept: list[SearchResult] = []
+    dropped: dict[str, int] = {}
+    for r in results:
+        ok, code = lang.classify(f"{r.title}. {r.text}", r.extra.get("language"), allowed)
+        r.extra["language_code"] = code
+        if ok:
+            kept.append(r)
+        else:
+            dropped[code or "?"] = dropped.get(code or "?", 0) + 1
+    return kept, dropped
 
 
 async def _maybe_enrich(results: list[SearchResult], deps: Deps) -> None:
@@ -156,6 +173,10 @@ async def retrieve_node(payload: dict[str, Any], deps: Deps) -> dict[str, Any]:
                 continue
             seen.add(key)
             results.append(r)
+    # Language gate first: only articles in RETRIEVAL_LANGUAGES (default English) become evidence.
+    results, dropped_lang = language_gate(results)
+    if dropped_lang:
+        emit("language_filter", sub_question_id=sq.id, dropped=dropped_lang)
     # Lexical relevance gate: search APIs rank by text match and return off-topic hits for short
     # keyword queries (Wikipedia especially). The Source Validator (Phase 3) will grade with a model;
     # until then require a minimal overlap with the sub-question's vocabulary.
@@ -180,7 +201,8 @@ async def retrieve_node(payload: dict[str, Any], deps: Deps) -> dict[str, Any]:
         "evidence": [e.model_dump() for e in evidence],
         "retrieval_log": [{"sub_question_id": sq.id, "hop": hop, "tools": per_tool, "sources": len(evidence),
                            "chunks_stored": stored, "elapsed_s": elapsed, "queries": queries,
-                           "filtered_irrelevant": filtered}],
+                           "filtered_irrelevant": filtered, "filtered_language": sum(dropped_lang.values()),
+                           "languages_dropped": dropped_lang}],
         "notes": [f"{sq.id}: {len(evidence)} sources / {stored} chunks via {', '.join(per_tool)} "
                   f"in {elapsed}s"],
     }

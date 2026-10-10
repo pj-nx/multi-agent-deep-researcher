@@ -145,6 +145,11 @@ class FakeTool:
         if self.source_type == "wikipedia":
             out.append(SearchResult(title="Tyler Joseph", url=f"https://{self.name}.test/offtopic/{abs(hash(query)) % 97}",
                                     text=f"OFFTOPIC musician biography {query}", source_type="wikipedia"))
+        if self.source_type == "news":
+            out.append(SearchResult(title="Semaine de quatre jours", url=f"https://{self.name}.test/fr/{abs(hash(query)) % 97}",
+                                    text="Une étude britannique sur la semaine de quatre jours fait état d'une "
+                                         "productivité accrue et de moins de stress chez les salariés.",
+                                    source_type="news"))
         return out
 
 

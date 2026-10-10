@@ -35,6 +35,7 @@ class Evidence(BaseModel):
     text: str = Field(min_length=1)
     published_at: str | None = Field(default=None, max_length=40)   # ISO-8601 date if known
     credibility: float | None = Field(default=None, ge=0.0, le=1.0)
+    language: str | None = Field(default=None, max_length=8)        # ISO 639-1, None = undetermined
 
 
 class EvidenceChunk(BaseModel):
@@ -50,6 +51,7 @@ class EvidenceChunk(BaseModel):
     url: str = Field(min_length=1, max_length=2000)
     published_at: str | None = None
     credibility: float | None = Field(default=None, ge=0.0, le=1.0)
+    language: str | None = None
 
 
 class ResearchPlan(BaseModel):

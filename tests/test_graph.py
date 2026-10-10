@@ -87,7 +87,8 @@ async def test_plan_interrupt_then_parallel_retrieval_and_report(deps):
     assert kinds[-1] == "report"
     retrieves = [d for k, d in events if k == "retrieve"]
     by_sq = {d["sub_question_id"]: d for d in retrieves}
-    assert by_sq["sq1"]["tools"] == {"arxiv": 4} and by_sq["sq2"]["tools"] == {"gdelt": 1}
+    assert by_sq["sq1"]["tools"] == {"arxiv": 4} and by_sq["sq2"]["tools"] == {"gdelt": 2}
+    assert by_sq["sq2"]["sources"] == 1 and by_sq["sq2"]["languages_dropped"] == {"fr": 1}   # French article gated out
     assert by_sq["sq1"]["queries"] == ["remote work productivity trial", "telework output RCT"]
     assert "gap1_1" in by_sq and by_sq["gap1_1"]["hop"] == 1 and by_sq["gap1_1"]["queries"] == ["long-term follow-up"]
     # planner's keyword queries are used verbatim; a sub-question without them falls back to its text
@@ -146,7 +147,7 @@ async def test_resume_with_true_accepts_plan_as_is(deps):
     kinds = [k for k, _ in events]
     assert kinds.count("retrieve") == 4                       # 3 planned + 1 gap hop
     validates = [d for k, d in events if k == "validate"]
-    assert validates[0]["assessed"] == 7 and validates[0]["kept"] == 6      # the OFFTOPIC wikipedia hit was dropped
+    assert validates[0]["assessed"] == 7 and validates[0]["kept"] == 6      # OFFTOPIC dropped; French never reached it
     rj = events[-1][1]["report_json"]
     assert any(e["title"] == "Tyler Joseph" for e in rj["dropped_sources"])
     assert "Tyler Joseph" not in events[-1][1]["report"]      # dropped sources stay out of the bibliography

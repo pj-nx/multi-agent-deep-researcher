@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 from typing import Any
 
+from deep_researcher.tools import language as lang
 from deep_researcher.tools.base import RetrievalTool, SearchResult, clip, iso_date
 
 
@@ -14,8 +15,8 @@ class WikipediaTool(RetrievalTool):
 
     @property
     def endpoint(self) -> str:
-        lang = os.getenv("WIKIPEDIA_LANG", "en")
-        return f"https://{lang}.wikipedia.org/w/api.php"
+        code = os.getenv("WIKIPEDIA_LANG") or lang.primary_language()
+        return f"https://{code}.wikipedia.org/w/api.php"
 
     async def _search(self, query: str, limit: int) -> list[SearchResult]:
         resp = await self._get(self.endpoint, params={
@@ -38,6 +39,6 @@ def parse_wikipedia(payload: dict[str, Any]) -> list[SearchResult]:
         out.append(SearchResult(
             title=p.get("title") or "", url=p.get("fullurl") or p.get("canonicalurl") or "",
             text=clip(extract), source_type="wikipedia", published_at=iso_date(p.get("touched")),
-            extra={"pageid": p.get("pageid"), "length": p.get("length")},
+            extra={"pageid": p.get("pageid"), "length": p.get("length"), "language": p.get("pagelanguage")},
         ))
     return out
