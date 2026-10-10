@@ -10,10 +10,12 @@ cited report.
 Showcases **agent collaboration**, **retrieval-augmented reasoning** (every claim cites a stored
 evidence ID that is verified before the report ships) and **long-context synthesis**.
 
-**Status:** the pipeline runs end to end. Planner (LLM, structured output) → human approval →
-parallel retrievers over real sources → persistent vector store → evidence digest report. The
-analysis, insight, critic and report agents are placeholders that keep the state contract; Phases
-3-4 replace them one node at a time. See [PLAN.md](PLAN.md) for the design and phase status.
+**Status:** Phases 0-3 done. Planner (structured output) → human approval → parallel retrievers over
+real sources → persistent vector store → **Source Validator** (model-graded relevance/credibility)
+→ **Critical Analysis** (retrieval-augmented: claims, contradictions, gaps, every citation checked
+against the chunks shown) → multi-hop loop on the most valuable gaps (capped per hop, incremental
+re-analysis) → digest report with a contradictions table. The
+insight, critic and report-builder agents are Phase 4 placeholders. See [PLAN.md](PLAN.md).
 
 ## Architecture
 
@@ -208,7 +210,8 @@ public and never exposes secrets.
 | POST | `/api/research/{thread_id}/resume` | `{plan: ResearchPlan}` → SSE stream to final report |
 
 SSE events: `started` (with `trace_url`), `plan` (awaiting approval), one `retrieve` per sub-question (parallel),
-`analyze`, `insight`, `critic`, `report` (Markdown in `report`), `error`, `done`.
+`validate` (assessed/kept), `analyze` (claims, contradictions, gaps), `route_gaps` (next hop or stop), repeated per
+hop, then `insight`, `critic`, `report` (Markdown in `report`), `error`, `done`.
 
 ## License
 

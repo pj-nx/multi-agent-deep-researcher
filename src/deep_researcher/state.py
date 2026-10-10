@@ -28,10 +28,15 @@ class ResearchState(TypedDict, total=False):
     # retrieval (fan-in)
     evidence: Annotated[list[dict[str, Any]], operator.add]        # Evidence.model_dump() per source
     retrieval_log: Annotated[list[dict[str, Any]], operator.add]   # one row per (sub-question, hop)
+    # validation
+    assessments: Annotated[dict[str, dict[str, Any]], merge_dicts]  # evidence_id -> SourceAssessment dump
     # analysis
+    extra_sub_questions: Annotated[list[dict[str, Any]], operator.add]  # gap-derived SubQuestion dumps
     summaries: Annotated[dict[str, dict[str, Any]], merge_dicts]   # sub_question_id -> Summary dump
     contradictions: Annotated[list[dict[str, Any]], operator.add]
-    gaps: Annotated[list[dict[str, Any]], operator.add]
+    gaps: Annotated[list[dict[str, Any]], operator.add]            # history of every gap raised
+    pending_gaps: list[dict[str, Any]]                             # gaps raised in the latest analysis round
+    next_action: str                                               # "retrieve" | "insight", set by route_gaps
     hop: int
     # synthesis
     insights: list[dict[str, Any]]

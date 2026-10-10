@@ -179,13 +179,38 @@ Each phase ends with something runnable. Estimated effort assumes evenings/weeke
 - Done: planner, `interrupt()` approval (edit or accept), `AsyncSqliteSaver`, `Send` fan-out, CLI with `--auto-approve`.
 - Remaining: verify parallelism in a LangSmith trace; optional ReAct retriever for query reformulation; dependency-aware ordering (`depends_on`) so dependent sub-questions see earlier evidence.
 
-### Phase 3 — Critical Analysis + multi-hop loop (1–2 days)
-- Source Validator grading.
-- Analysis: claim extraction → contradiction detection → gap detection.
-- Gap router, `hop` counter, `max_hops` termination. Test that a seeded contradictory
-  pair of sources yields a `Contradiction`.
+### Phase 3 — Critical Analysis + multi-hop loop (1–2 days) — DONE 2026-10-10
+- **Source Validator** (`agents/validator.py`, cheap model, batches of 10 per sub-question, 4 concurrent calls):
+  relevance, credibility, source kind, peer-review flag, issues, keep/drop. Verdicts land in state
+  (`assessments`) and are written back onto the store's chunk metadata (`EvidenceStore.update_assessments`)
+  so retrieval can weight by credibility. Degrades to "keep with prior credibility" when no model is available
+  or a batch fails.
+- **Critical Analysis** (`agents/analysis.py`, heavy model, one call per sub-question in parallel): true RAG —
+  top-2k chunks from Chroma filtered to the sub-question *and its gap children*, kept sources only, reranked by
+  similarity × (0.5 + 0.5 × credibility), top-k shown with `[E-id]` tags. Structured output: summary, claims
+  (with evidence ids + confidence), contradictions (both sides cited + why they differ), ≤3 gaps (with
+  source_types + keyword queries), confidence. **Grounding check:** any claim/contradiction citing an id that
+  was not shown is dropped and counted.
+- **Multi-hop loop:** `analyze → route_gaps → (Send retrieve …) → validate → analyze` while `pending_gaps`
+  exist, `hop < max_hops` and the budget holds. `route_gaps` de-duplicates near-identical gaps (Jaccard ≥ 0.5
+  on content words), prioritises gaps from the least-answered sub-questions (fewest claims) and pursues at most
+  `max_gap_branches` (default 4) per hop; the rest stay in `gaps` for the report. Gap sub-questions get ids
+  `gap{hop}_{n}` and a `parent_sub_question_id`; on later hops analysis is **incremental**: only sub-questions
+  that received new evidence (the gap children and their parents) are re-analysed, earlier summaries persist.
+- Report placeholder now renders summaries, claims with citations, a contradictions table, gaps raised,
+  validated sources with credibility and issues, and the dropped list.
+- Tests: seeded RAISES/LOWERS sources → a `Contradiction`; off-topic source dropped by the validator and listed;
+  one gap hop with `max_hops=1`, none with 0, capped at 2 when gaps keep coming; incremental re-analysis;
+  gap de-dup/prioritisation; ungrounded citations dropped; rerank weighting; validator fallback without a model.
+- **Live (2026-10-10, keyless sources, Sonnet as the heavy tier, 1 hop):** first run without the cap pursued 13
+  gaps and re-analysed 20 sub-questions (201 s); the validator kept 7 of 29 noisy arXiv/Wikipedia sources,
+  analysis produced 22 grounded claims, 1 contradiction with a method-based explanation, 0 ungrounded citations,
+  and summaries that state plainly when evidence is thin. With the cap and incremental re-analysis: 146 s, 4 of 9 gaps
+  pursued, 8 sub-questions re-analysed in hop 1 instead of 20. Validation yield varies run to run (3-7 kept of
+  ~20-30) because keyless arXiv/Wikipedia hits are mostly off-topic for this question; keyed sources (Semantic
+  Scholar, Tavily) are the lever, not the agents.
 
-### Phase 4 — Insight + Red-Team + Report (1–2 days)
+### Phase 4 — Insight + Red-Team + Report (1–2 days) — NEXT
 - Insight agent with reasoning chains citing evidence IDs.
 - Critic with `accept / revise / need_more_evidence` routing (cap revisions at 2).
 - Report Builder + grounding check; write `.md` and `.json` to `reports/`.

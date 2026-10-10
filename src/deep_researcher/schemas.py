@@ -92,6 +92,7 @@ class Gap(BaseModel):
     parent_sub_question_id: str = Field(min_length=1, max_length=32)
     question: str = Field(min_length=5, max_length=1000)
     source_types: list[SourceType] = Field(default_factory=lambda: ["web"], max_length=6)
+    search_queries: list[str] = Field(default_factory=list, max_length=3)
     reason: str = Field(default="", max_length=1000)
 
 
@@ -111,3 +112,46 @@ class Critique(BaseModel):
     verdict: Literal["accept", "revise", "need_more_evidence"]
     issues: list[str] = Field(default_factory=list, max_length=20)
     follow_up: list[Gap] = Field(default_factory=list, max_length=6)
+
+
+class SourceAssessment(BaseModel):
+    """Source Validator verdict for one piece of evidence."""
+
+    evidence_id: str = Field(min_length=1, max_length=64)
+    relevance: float = Field(ge=0.0, le=1.0, description="how directly it bears on the sub-question")
+    credibility: float = Field(ge=0.0, le=1.0, description="trustworthiness of the source itself")
+    source_kind: Literal["primary", "secondary", "tertiary", "opinion", "unknown"] = "unknown"
+    peer_reviewed: bool | None = None
+    issues: list[str] = Field(default_factory=list, max_length=6)
+    keep: bool = True
+
+
+class SourceAssessments(BaseModel):
+    items: list[SourceAssessment] = Field(default_factory=list, max_length=40)
+
+
+class ContradictionOut(BaseModel):
+    """Contradiction as the analysis model emits it (sub_question_id is filled in by the node)."""
+
+    claim_a: str = Field(min_length=1, max_length=1000)
+    claim_b: str = Field(min_length=1, max_length=1000)
+    evidence_ids_a: list[str] = Field(min_length=1, max_length=20)
+    evidence_ids_b: list[str] = Field(min_length=1, max_length=20)
+    explanation: str = Field(default="", max_length=2000)
+
+
+class GapOut(BaseModel):
+    question: str = Field(min_length=5, max_length=1000)
+    source_types: list[SourceType] = Field(default_factory=lambda: ["web"], max_length=6)
+    search_queries: list[str] = Field(default_factory=list, max_length=3)
+    reason: str = Field(default="", max_length=1000)
+
+
+class AnalysisOutput(BaseModel):
+    """Critical Analysis result for one sub-question."""
+
+    summary: str = Field(min_length=1, max_length=6000)
+    claims: list[Claim] = Field(default_factory=list, max_length=40)
+    contradictions: list[ContradictionOut] = Field(default_factory=list, max_length=10)
+    gaps: list[GapOut] = Field(default_factory=list, max_length=3)
+    confidence: float = Field(default=0.5, ge=0.0, le=1.0, description="how well the evidence answers it")

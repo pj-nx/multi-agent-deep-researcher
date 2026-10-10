@@ -34,3 +34,7 @@ class Deps:
     max_per_sub_question: int = 12
     tool_timeout_s: float = 45.0           # one slow/rate-limited API must not hold a branch hostage
     min_relevance: float = 0.2             # share of sub-question keywords a result must mention
+    llm_concurrency: int = 4               # parallel model calls inside validator / analysis
+    analysis_k: int = 12                   # chunks shown to the analysis model per sub-question
+    analysis_chunk_chars: int = 1600
+    max_gap_branches: int = 4              # follow-up sub-questions pursued per hop (after de-duplication)

@@ -48,6 +48,14 @@ class Hit:
         return max(0.0, 1.0 - self.distance)
 
 
+_CHUNK_FIELDS = frozenset(EvidenceChunk.model_fields) - {"id", "text"}
+
+
+def _chunk_fields(meta: dict[str, Any]) -> dict[str, Any]:
+    """Metadata may carry validator extras (relevance, keep); keep only EvidenceChunk fields."""
+    return {k: v for k, v in meta.items() if k in _CHUNK_FIELDS}
+
+
 def chunk_id(url: str, index: int) -> str:
     return hashlib.sha1(f"{url}#{index}".encode()).hexdigest()[:24]
 
@@ -137,12 +145,19 @@ class EvidenceStore:
 
     # ------------------------------------------------------------------ read
     def query(self, text: str, *, k: int = 10, sub_question_id: str | None = None,
+              sub_question_ids: Sequence[str] | None = None, evidence_ids: Sequence[str] | None = None,
               where: dict[str, Any] | None = None) -> list[Hit]:
         if self.count() == 0:
             return []
         clauses: list[dict[str, Any]] = []
         if sub_question_id:
             clauses.append({"sub_question_id": sub_question_id})
+        if sub_question_ids:
+            clauses.append({"sub_question_id": {"$in": list(sub_question_ids)}})
+        if evidence_ids is not None:
+            if not evidence_ids:
+                return []
+            clauses.append({"evidence_id": {"$in": list(evidence_ids)}})
         if where:
             clauses.append(where)
         filt = None if not clauses else (clauses[0] if len(clauses) == 1 else {"$and": clauses})
@@ -152,13 +167,34 @@ class EvidenceStore:
         hits: list[Hit] = []
         for cid, doc, meta, dist in zip(res["ids"][0], res["documents"][0], res["metadatas"][0],
                                         res["distances"][0], strict=True):
-            hits.append(Hit(chunk=EvidenceChunk(id=cid, text=doc, **meta), distance=float(dist)))
+            chunk = EvidenceChunk(id=cid, text=doc, **_chunk_fields(meta))
+            hits.append(Hit(chunk=chunk, distance=float(dist)))
         return hits
 
     def get(self, ids: Sequence[str]) -> list[EvidenceChunk]:
         res = self.collection.get(ids=list(ids), include=["documents", "metadatas"])
-        return [EvidenceChunk(id=cid, text=doc, **meta)
+        return [EvidenceChunk(id=cid, text=doc, **_chunk_fields(meta))
                 for cid, doc, meta in zip(res["ids"], res["documents"], res["metadatas"], strict=True)]
+
+    def update_assessments(self, assessments: dict[str, dict[str, Any]]) -> int:
+        """Write validator verdicts (credibility, relevance, keep) onto every chunk of each evidence id."""
+        if not assessments:
+            return 0
+        res = self.collection.get(where={"evidence_id": {"$in": list(assessments)}}, include=["metadatas"])
+        ids, metas = [], []
+        for cid, meta in zip(res["ids"], res["metadatas"], strict=True):
+            a = assessments.get(meta.get("evidence_id"))
+            if not a:
+                continue
+            new = dict(meta)
+            for key in ("credibility", "relevance", "keep"):
+                if key in a and a[key] is not None:
+                    new[key] = a[key]
+            ids.append(cid)
+            metas.append(_clean_meta(new))
+        if ids:
+            self.collection.update(ids=ids, metadatas=metas)
+        return len(ids)
 
     def has_url(self, url: str) -> bool:
         res = self.collection.get(where={"url": url}, limit=1, include=[])
