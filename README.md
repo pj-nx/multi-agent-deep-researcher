@@ -118,12 +118,16 @@ timeout would cut it. Provision Postgres (Aurora Serverless v2 / RDS / Neon) and
 Chroma Cloud separately and pass their endpoints as parameters. Put CloudFront + WAF in front for a
 domain and rate limiting, and serve `public/index.html` from S3/CloudFront pointing at the URL.
 
-### Vercel
+### Vercel (live: https://multi-agent-deep-researcher-zeta.vercel.app)
 
-`vercel.json` routes `/api/*` to `api/index.py` with the 300 s Hobby maximum. Set the same hosted env
-vars in the project settings (`CHECKPOINTER=postgres`, `DATABASE_URL`, `CHROMA_MODE=cloud` + Chroma
-Cloud credentials, `EMBEDDINGS_PROVIDER=openrouter`, `API_AUTH_TOKEN`, `RUN_BUDGET_SECONDS=240`) and
-`vercel --prod`. Keep `MAX_HOPS` low: a hop that outruns the function cap is cut off.
+Vercel detects the FastAPI preset from `api/index.py` and routes every path to the app, so
+`vercel.json` only sets `maxDuration: 300` (the Hobby maximum); do not add rewrites, they rewrite the
+path before FastAPI sees it. Deploy with `npx vercel login`, `npx vercel link`, set the env vars
+(`npx vercel env add ...`) and `npx vercel deploy --prod`. The live project runs with
+`EMBEDDINGS_PROVIDER=openrouter`, `MAX_HOPS=0`, `RUN_BUDGET_SECONDS=240`, Sonnet as the heavy tier
+and SQLite + embedded Chroma under `/tmp`: fine for a demo, but plan approval only resumes while the
+same function instance is warm. Switch to `CHECKPOINTER=postgres` + `CHROMA_MODE=cloud` for durable
+hosting. The API needs the `API_AUTH_TOKEN` bearer; the hosted page at `/` asks for it.
 
 ### What is and is not verified
 

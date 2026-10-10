@@ -269,7 +269,7 @@ Each phase ends with something runnable. Estimated effort assumes evenings/weeke
   key test button and an "effective configuration" summary. Local-only by design: never expose this page from
   a hosted deployment (it edits files and holds secrets); the API has no equivalent.
 
-### Phase 6 — Deployment wiring (½ day) — DONE 2026-10-11 (artifacts + local verification; no cloud deploy)
+### Phase 6 — Deployment wiring (½ day) — DONE 2026-10-11 (deployed to Vercel; AWS artifacts ready)
 - `CHECKPOINTER=postgres` (`langgraph-checkpoint-postgres`, long-lived `AsyncConnection`, closed by
   `graph.aclose()`); `CHROMA_MODE=persistent|http|cloud` (`store.make_chroma_client`, same `EvidenceStore`);
   `/api/health` reports both. The API has used the real graph since Phase 0.
@@ -280,6 +280,11 @@ Each phase ends with something runnable. Estimated effort assumes evenings/weeke
 - Verified locally against a throwaway Postgres container and a local Chroma server: a plan interrupt written by
   one graph instance is resumed by a second one on the same database and the final state (report) lands in
   Postgres; evidence round-trips through Chroma over HTTP; the image builds and serves `/api/health`.
+- **Vercel (2026-10-11):** live at https://multi-agent-deep-researcher-zeta.vercel.app (project
+  `multi-agent-deep-researcher`, Hobby). Finding: Vercel's FastAPI preset routes every path to the app, so the old
+  `/api/(.*)` → `/api/index` rewrite made FastAPI receive `/api/index` and 404 on everything; `vercel.json` now only
+  sets `maxDuration`. Hosted config: OpenRouter embeddings, Sonnet heavy tier, 0 hops, 240 s budget, SQLite +
+  embedded Chroma under `/tmp` (warm-instance only), auth token required.
   Finding: checkpointers commit the final write slightly *after* `astream` yields its last chunk, so an
   immediate resume on another instance could miss the interrupt and start over. `stream_until_interrupt` /
   `resume_with_plan` now wait (≤5 s) until the checkpoint is readable before returning, which is what the
