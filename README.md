@@ -51,7 +51,11 @@ uv run uvicorn api.index:app --reload      # HTTP API at http://localhost:8000/a
 ```
 
 The Gradio UI streams the agents' activity live, lets you edit the plan table before approving, renders the
-report and offers `.md` / `.json` downloads.
+report and offers `.md` / `.json` downloads. Its **Settings** tab edits the git-ignored `.env` in place and
+applies changes immediately: API keys (OpenRouter, Tavily, NewsAPI, Semantic Scholar, LangSmith; shown masked,
+blank = keep, `none` = clear), the model per tier (dropdowns, with a button that loads the live OpenRouter
+catalogue), fallback models and reasoning effort, the embeddings provider/model/dimensions and Chroma
+collection, and run limits. "Test OpenRouter key" makes one tiny call and reports the latency.
 
 ## Sources
 

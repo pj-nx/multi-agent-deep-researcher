@@ -252,6 +252,12 @@ Each phase ends with something runnable. Estimated effort assumes evenings/weeke
   `reports.write_report`, also used by the CLI).
 - Runs the graph in-process; the plan/table helpers and both streams are Gradio-free so they are tested against
   the fake graph (`tests/test_ui.py`), and failures surface in the log instead of hanging the page.
+- **Settings tab** (`settings.py` + `ui._build_settings_tab`): edits `.env` in place (order and comments kept,
+  mode 0600), applies to the running process (env + `llm`/`embeddings`/store/graph cache resets), masks secrets
+  (`sk-or-…cdef`), blank = keep / `none` = clear, per-tier model dropdowns with a live OpenRouter catalogue
+  loader, embeddings provider/model/dimensions with a reminder that a model change needs a new collection, a
+  key test button and an "effective configuration" summary. Local-only by design: never expose this page from
+  a hosted deployment (it edits files and holds secrets); the API has no equivalent.
 
 ### Phase 6 — Vercel deployment (½ day)
 - Wire `api/index.py` to `build_graph()` with the Postgres checkpointer and hosted vector store (§10).

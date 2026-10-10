@@ -171,6 +171,130 @@ async def run_stream(thread_id: str, rows: list[list[Any]], question: str, budge
     tracing.flush()
 
 
+# ----------------------------------------------------------------------------- settings
+
+DEFAULT_MODEL_CHOICES = (
+    "anthropic/claude-opus-5.5", "anthropic/claude-sonnet-5", "anthropic/claude-haiku-4.5",
+    "openai/gpt-5.1", "openai/gpt-5-mini", "google/gemini-3.1-pro-preview", "google/gemini-3-flash-preview",
+    "deepseek/deepseek-v4-pro", "qwen/qwen3.5-plus-20260420",
+)
+
+
+def settings_summary_md() -> str:
+    from deep_researcher import settings as S
+
+    info = S.summary()
+    models = info["llm"]["models"]
+    by_model: dict[str, list[str]] = {}
+    for role, model in models.items():
+        by_model.setdefault(model, []).append(role)
+    lines = [f"**Env file:** `{info['env_file']}`", "",
+             "**Keys:** " + ", ".join(f"{k.replace('_API_KEY', '').replace('_KEY', '')}: {v}"
+                                      for k, v in info["keys"].items()), "",
+             "**Models:** " + "; ".join(f"`{m}` ({', '.join(r)})" for m, r in by_model.items()), "",
+             f"**Embeddings:** `{info['embeddings'].get('embedding_id', '?')}` "
+             f"via {info['embeddings'].get('provider')}",
+             "", "**Active sources:** " + ", ".join(f"{k}: {', '.join(v) or '-'}"
+                                                   for k, v in info["sources"].items()),
+             "", f"**Tracing:** {'on' if info['tracing'].get('enabled') else 'off'}"]
+    return "\n".join(lines)
+
+
+def save_settings(form: dict[str, Any]) -> str:
+    """Apply the form, persist to .env, return a status line (never echoes secrets)."""
+    from deep_researcher import settings as S
+
+    try:
+        updates, path = S.save(form)
+    except Exception as exc:  # noqa: BLE001 - show the error in the page
+        return f"Save failed: {type(exc).__name__}: {str(exc)[:200]}"
+    if not updates:
+        return "Nothing changed."
+    changed = ", ".join(f"{k} {'cleared' if v is None else 'set'}" for k, v in updates.items())
+    note = ""
+    if any(k.startswith("EMBEDDINGS_") for k in updates):
+        note = (" Embedding settings changed: use a new CHROMA_COLLECTION "
+                "(an existing collection is bound to its model).")
+    return f"Saved to {path}: {changed}.{note}"
+
+
+async def test_openrouter() -> str:
+    from deep_researcher import llm
+
+    if not llm.enabled():
+        return "OPENROUTER_API_KEY is not set."
+    try:
+        from langchain_core.messages import HumanMessage
+
+        model = llm.make_llm("grader", max_tokens=10)
+        t = time.time()
+        r = await model.ainvoke([HumanMessage("Reply with the single word: pong")])
+        return f"OpenRouter OK: {model.model_name} answered {r.content!r} in {time.time() - t:.1f}s"
+    except Exception as exc:  # noqa: BLE001
+        return f"OpenRouter FAILED: {type(exc).__name__}: {str(exc)[:200]}"
+
+
+async def fetch_model_choices() -> list[str]:
+    from deep_researcher import llm
+
+    try:
+        rows = await llm.alist_models()
+    except Exception as exc:  # noqa: BLE001
+        log.warning("model list fetch failed: %s", exc)
+        return list(DEFAULT_MODEL_CHOICES)
+    ids = [r["id"] for r in rows if not r["id"].endswith(":batch")]
+    return sorted(set(ids) | set(DEFAULT_MODEL_CHOICES))
+
+
+def _build_settings_tab(gr: Any) -> None:
+    from deep_researcher import settings as S
+
+    gr.Markdown("### Settings\nValues are written to the project's `.env` (git-ignored) and applied "
+                "immediately. Leave a key blank to keep it; type `none` to clear it. "
+                "Secrets are shown masked.")
+    inputs: dict[str, Any] = {}
+    for group, title in (("keys", "API keys and tracing"), ("models", "Models (OpenRouter ids)"),
+                         ("embeddings", "Embeddings and vector store"), ("run", "Run limits")):
+        with gr.Accordion(title, open=(group != "run")):
+            for f in [f for f in S.FIELDS if f.group == group]:
+                if f.kind == "secret":
+                    inputs[f.key] = gr.Textbox(label=f.label, value="", placeholder=S.display_value(f),
+                                               type="password", info=f.help)
+                elif f.kind == "bool":
+                    on = S.current(f.key).lower() in {"1", "true", "yes"}
+                    inputs[f.key] = gr.Checkbox(label=f.label, value=on, info=f.help)
+                elif f.kind == "choice":
+                    choices = list(f.choices) if f.choices else list(DEFAULT_MODEL_CHOICES)
+                    cur = S.current(f.key)
+                    if cur and cur not in choices:
+                        choices.insert(0, cur)
+                    inputs[f.key] = gr.Dropdown(label=f.label, choices=choices, value=cur or None,
+                                                allow_custom_value=True, info=f.help)
+                else:
+                    inputs[f.key] = gr.Textbox(label=f.label, value=S.current(f.key), info=f.help)
+    with gr.Row():
+        save_btn = gr.Button("Save & apply", variant="primary")
+        test_btn = gr.Button("Test OpenRouter key")
+        models_btn = gr.Button("Load model list from OpenRouter")
+    status = gr.Markdown()
+    effective = gr.Markdown(value=settings_summary_md, label="Effective configuration")
+
+    keys = list(inputs)
+
+    def on_save(*values):
+        msg = save_settings(dict(zip(keys, values, strict=True)))
+        return msg, settings_summary_md()
+
+    async def on_models():
+        choices = await fetch_model_choices()
+        return [gr.update(choices=choices) for _ in range(3)] + [f"Loaded {len(choices)} models."]
+
+    save_btn.click(on_save, [inputs[k] for k in keys], [status, effective])
+    test_btn.click(test_openrouter, None, status)
+    models_btn.click(on_models, None, [inputs["OPENROUTER_MODEL_HEAVY"], inputs["OPENROUTER_MODEL_WORKER"],
+                                       inputs["OPENROUTER_MODEL_CHEAP"], status])
+
+
 # ----------------------------------------------------------------------------- Gradio app
 
 def build_app(graph: Any = None):
@@ -180,6 +304,16 @@ def build_app(graph: Any = None):
         gr.Markdown("# Multi-Agent Deep Researcher\n"
                     "Planner -> parallel retrievers -> validator -> critical analysis (multi-hop) -> "
                     "insights -> red-team critic -> report. Every claim cites stored evidence.")
+        with gr.Tabs():
+            with gr.Tab("Research"):
+                _build_research_tab(gr, demo, graph)
+            with gr.Tab("Settings"):
+                _build_settings_tab(gr)
+    return demo
+
+
+def _build_research_tab(gr: Any, demo: Any, graph: Any) -> None:
+    if True:
         thread_state = gr.State("")
         question_state = gr.State("")
         with gr.Row():
@@ -226,7 +360,6 @@ def build_app(graph: Any = None):
                        [activity, plan_table, thread_state, question_state])
         run_btn.click(on_run, [thread_state, plan_table, question_state, budget, activity],
                       [activity, report_md, dl_md, dl_json])
-    return demo
 
 
 def main() -> None:
