@@ -22,7 +22,7 @@ summarisation over a large evidence corpus).
 | Retrieval tools | arXiv API, Semantic Scholar API, Tavily (or Serper) web search, NewsAPI (or GDELT), Wikipedia, PDF fetcher (`pypdf`), optional domain APIs (e.g. FRED, Polygon) | Covers the four source types in the brief: papers, news, reports, APIs. |
 | Evidence store | **Chroma** (local, persistent) with `text-embedding-3-small` or `voyage-3` embeddings | Zero-ops for a POC; every chunk carries `evidence_id`, `url`, `source_type`, `published_at`, `credibility`. |
 | Persistence | `SqliteSaver` checkpointer | Resume after human approval, re-run a failed node, inspect state per thread. |
-| Observability | LangSmith tracing | Required to debug a 7-agent graph; also gives eval datasets. |
+| Observability | LangSmith tracing via `src/deep_researcher/tracing.py` | Required to debug a 7-agent graph; also gives eval datasets. See §11. |
 | UI (local) | **Gradio** app (streaming node events + plan approval + report download) | Consistent with the course projects. CLI runner too. |
 | UI (hosted) | **Vercel**: static `public/index.html` + FastAPI function in `api/index.py` streaming Server-Sent Events | Same graph, different front door. See §10. |
 | Packaging | `uv`, Python ≥ 3.12, `python-dotenv` | Same conventions as `agents/pyproject.toml`. |
@@ -285,3 +285,29 @@ vercel --prod          # or just push to main
 - `main` is protected: PRs only, preview deploy must succeed.
 - `.env*` ignored; `.env.example` documents every variable.
 - `reports/` and `*.db` ignored so generated output never lands in the public repo.
+
+---
+
+## 11. Observability: LangSmith tracing
+
+Implemented in `src/deep_researcher/tracing.py`; wired into `api/index.py`. Zero-cost no-op
+when `LANGSMITH_TRACING` / `LANGSMITH_API_KEY` are unset.
+
+| Layer | How it is traced | Where to look in LangSmith |
+|---|---|---|
+| API request | `tracing.span("api.research" / "api.resume")` opens a parent run with `thread_id`, `stage` metadata and `api` + `vercel`/`local` tags. The run URL is sent in the first SSE event. | Top-level runs; filter `metadata.thread_id = …` to see one investigation across the plan and resume calls |
+| Graph run | `graph.stream(state, config=tracing.run_config(thread_id, question, tags=[...]))` names the run `deep_researcher` and attaches the same `thread_id`. LangGraph nests nodes, subgraphs and `Send` branches automatically. | Expand the parent run; parallel retrievers appear as sibling child runs with overlapping timelines |
+| Agents / nodes | Plain graph nodes are traced by LangGraph. Helper functions outside the graph use `@tracing.traced("name")`. | Child runs named after the node |
+| Tools | `@tracing.traced(run_type="retriever")` for search / fetch tools so documents render as retriever output; `run_type="tool"` for the rest | Retriever panel with per-document view |
+| Models | LangChain chat models are traced automatically with tokens, cost and latency | LLM runs; use the project dashboard for cost per investigation |
+| Serverless | `tracing.configure()` sets `LANGCHAIN_CALLBACKS_BACKGROUND=false` when `VERCEL` is set; `tracing.aflush()` runs in the stream's `finally` so queued traces upload before the function returns | No missing/partial traces on Vercel |
+
+Conventions:
+
+- Tags: `deep-researcher` on every graph run, plus the stage (`plan`, `research`) and the
+  environment. Agents add their own tag (`retriever`, `analysis`, `insight`, `critic`, `report`).
+- Metadata: always `thread_id`; graph runs add `hop`, `sub_question_id`, `max_hops`.
+- Project: `deep-researcher` locally, `deep-researcher-prod` on Vercel (set `LANGSMITH_PROJECT`
+  per environment in the Vercel dashboard).
+- Evals (Phase 7) reuse these traces: production runs are sampled into a LangSmith dataset and the
+  groundedness / coverage judges run as LangSmith evaluators against them.

@@ -63,6 +63,32 @@ Or import the GitHub repo in the Vercel dashboard; pushes to `main` deploy autom
 - Human plan approval is split into two requests: `POST /api/research` returns the plan and a
   `thread_id`; `POST /api/research/{thread_id}/resume` continues from the checkpoint.
 
+## Tracing with LangSmith
+
+Set three variables (locally in `.env`, on Vercel in the project settings) and every request
+becomes a LangSmith trace:
+
+```bash
+LANGSMITH_TRACING=true
+LANGSMITH_API_KEY=lsv2_...
+LANGSMITH_PROJECT=deep-researcher
+```
+
+What you get:
+
+- One parent run per API call (`api.research`, `api.resume`) tagged `api` and `vercel`/`local`,
+  with `thread_id` in metadata so a whole investigation can be filtered in one view.
+- LangGraph node, tool and model calls nest under that parent automatically; retrievers use the
+  `retriever` run type so LangSmith renders documents properly.
+- The first SSE event carries `trace_url`, so the UI can link straight to the trace.
+- `/api/health` reports `tracing.enabled` and the project, never the key.
+- On Vercel the client is flushed before the function returns and LangChain callbacks run
+  synchronously, so traces are not lost when the instance is frozen.
+
+Tracing is a strict no-op when the variables are unset. The helpers live in
+[`src/deep_researcher/tracing.py`](src/deep_researcher/tracing.py): `span()` for a parent run,
+`traced()` for tools and agents, `run_config()` to name and tag a graph run, `flush()`.
+
 ## API
 
 | Method | Path | Purpose |
