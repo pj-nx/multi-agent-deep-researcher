@@ -61,7 +61,8 @@ uv run uvicorn api.index:app --reload      # HTTP API at http://localhost:8000; 
 The Gradio UI (flat, minimalist; Matrix-green accent on white, dark by default, with a toggle that remembers your
 choice) streams the agents' activity live through a row of pipeline stage boxes, lets you edit the plan table
 before approving, renders the report and offers `.pdf` / `.md` / `.json` downloads (the PDF is rendered in pure Python via
-`markdown` + `xhtml2pdf`, no system libraries; the CLI writes all three files too). Its **Settings** tab edits the git-ignored `.env` in place and
+`markdown` + `xhtml2pdf`, no system libraries; the CLI writes all three files too), and ends every run with a
+**Run summary** plus a **Runs this session** table (see [Run summary](#run-summary)). Its **Settings** tab edits the git-ignored `.env` in place and
 applies changes immediately: API keys (OpenRouter, Tavily, newsdata.io, Semantic Scholar, LangSmith; shown masked,
 blank = keep, `none` = clear), the model per tier (dropdowns, with a button that loads the live OpenRouter
 catalogue), fallback models and reasoning effort, the embeddings provider/model/dimensions and Chroma
@@ -152,7 +153,8 @@ by default with the same light/dark toggle.
   indicator and disabled buttons while a request runs, a collapsed agent activity log, the editable
   plan table (ID, Question, Source types, Search queries, Depends on; clear a question to drop it, `+`
   adds a row), "Approve and run", the rendered report and PDF / Markdown / JSON downloads (PDF via
-  `/api/report/pdf`, the others built in the browser).
+  `/api/report/pdf`, the others built in the browser), then the **Run summary** and the **Runs this
+  session** table, computed in the browser from the event stream (see [Run summary](#run-summary)).
 - **Settings tab** (`/#settings`): see below.
 - **API guide tab** (`/#api`): the user guide for calling the API from your own code (endpoints, auth,
   the two-step plan/resume flow, per-run settings, every stream event, curl and Python examples,
@@ -329,6 +331,30 @@ store = EvidenceStore(embeddings.get_embeddings(), embedding_id=embeddings.embed
 store.add_evidence([...])                       # Evidence -> 512-token chunks -> 256-d vectors, persisted
 hits = store.query("four-day week productivity", k=10, sub_question_id="sq1")
 ```
+
+## Run summary
+
+Both UIs end every run with the same summary, so you can see what a question cost before reading the
+report. It is built from the event stream the UIs already consume ([`run_stats.py`](src/deep_researcher/run_stats.py)
+in the Gradio app, the equivalent JavaScript in the hosted page), so it needs no tracing backend.
+
+| Row | What it shows |
+|---|---|
+| Time | total wall time, split into the plan and research legs |
+| Model calls | number of model calls, total tokens, and an estimated cost from OpenRouter's live per-token prices (`n/a` when the catalogue cannot be fetched; embeddings are not included) |
+| Sources | retrieved, kept by the validator, dropped, and results per retrieval tool |
+| Analysis | claims, contradictions, gaps raised and pursued, hops |
+| Synthesis | sub-questions, critic rounds, citations verified and removed |
+| Run health | `no issues`, or the degraded components (rate-limited source, model error, missing key) |
+| Models | each model with its call count and tokens |
+| Model time by role | summed call durations per agent role (parallel calls overlap, so the total can exceed wall time) |
+
+Under it, a collapsed **Runs this session** table keeps one row per run (time, question, duration,
+tokens, cost, kept sources, claims, contradictions, hops, issues, status), newest first, for as long as
+the page is open. A typical zero-hop run on Haiku reads: 18 calls, 85k tokens, about $0.22, 14 of 41
+sources kept, 14 claims, 1 contradiction; the eval baseline above shows what the default models cost.
+The same figures are what the evaluation runner records per case, so a UI run and an eval row are
+directly comparable.
 
 ## Tracing with LangSmith
 
