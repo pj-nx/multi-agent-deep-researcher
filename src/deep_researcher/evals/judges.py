@@ -31,7 +31,8 @@ from deep_researcher.evals.cases import EvalCase
 
 log = logging.getLogger(__name__)
 
-JUDGE_NAMES: tuple[str, ...] = ("citation_integrity", "groundedness", "coverage", "contradiction_recall")
+JUDGE_NAMES: tuple[str, ...] = ("citation_integrity", "groundedness", "coverage", "contradiction_recall",
+                                "document_use")
 
 
 @dataclass
@@ -377,6 +378,22 @@ async def contradiction_recall(
     )
 
 
+def document_use(report_json: dict[str, Any], case: EvalCase | None = None) -> JudgeResult:
+    """For cases with attached documents: 1.0 when at least one claim cites an uploaded section, 0.5 when
+    sections were kept but never cited, 0 when nothing from the documents survived. n/a otherwise."""
+    if case is None or not case.documents:
+        return JudgeResult("document_use", None, details={"note": "no documents attached"})
+    is_upload = lambda s: str(s.get("url", "")).startswith("upload://")  # noqa: E731
+    uploaded = {s["id"] for s in report_json.get("sources", []) if is_upload(s)}
+    cited = {i for c in claims(report_json) for i in c.get("evidence_ids", []) if i in uploaded}
+    retrieved = sum(1 for s in [*report_json.get("sources", []), *report_json.get("dropped_sources", [])]
+                    if is_upload(s))
+    score = 1.0 if cited else (0.5 if uploaded else 0.0)
+    return JudgeResult("document_use", score, details={"retrieved_sections": retrieved,
+                                                       "kept_sections": len(uploaded),
+                                                       "cited_sections": len(cited)})
+
+
 async def judge_report(
     report_json: dict[str, Any], case: EvalCase | None = None, *, llm: Any | None = None
 ) -> dict[str, JudgeResult]:
@@ -388,6 +405,7 @@ async def judge_report(
     if case is not None:
         results["coverage"] = await coverage(report_json, case.expected_facets, llm=llm)
         results["contradiction_recall"] = await contradiction_recall(report_json, case, llm=llm)
+        results["document_use"] = document_use(report_json, case)
     return results
 
 

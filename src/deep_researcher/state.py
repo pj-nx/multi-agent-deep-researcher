@@ -48,6 +48,7 @@ class ResearchState(TypedDict, total=False):
     max_hops: int
     deadline: float                 # unix time after which retrieval loops stop (0 = none)
     # planning
+    documents: dict[str, Any] | None  # DocumentSet.model_dump() when files were attached
     plan: dict[str, Any] | None     # ResearchPlan.model_dump()
     approved: bool
     # retrieval (fan-in)

@@ -88,9 +88,17 @@ async def _main(args: argparse.Namespace) -> int:
         removed = await prune(saver, days=args.days, include_unfinished=args.include_unfinished,
                               dry_run=args.dry_run)
     finally:
-        await saver.conn.close()
+        conn = getattr(saver, "conn", None)      # the in-memory saver has no connection
+        if conn is not None:
+            await conn.close()
     verb = "would delete" if args.dry_run else "deleted"
     print(f"{verb} {len(removed)} run(s) older than {args.days:g} day(s)")
+    if args.documents:
+        from deep_researcher.store.uploads import get_upload_store
+
+        store = get_upload_store()
+        sets = store.expired_sets(args.days) if args.dry_run else store.expire(args.days)
+        print(f"{verb} {len(sets)} uploaded document set(s) older than {args.days:g} day(s)")
     if removed and not args.dry_run and G.checkpointer_kind() == "sqlite":
         _vacuum_sqlite(os.getenv("CHECKPOINT_DB") or ".checkpoints.sqlite")
     return 0
@@ -103,6 +111,8 @@ def main() -> int:
     p.add_argument("--include-unfinished", action="store_true",
                    help="also delete runs with no report (abandoned plan approvals, failures)")
     p.add_argument("--dry-run", action="store_true", help="report what would be deleted, change nothing")
+    p.add_argument("--documents", action="store_true",
+                   help="also delete uploaded document sets older than --days (the 'uploads' collection)")
     return asyncio.run(_main(p.parse_args()))
 
 

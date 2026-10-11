@@ -11,7 +11,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-SourceType = Literal["papers", "news", "web", "reports", "api", "wikipedia"]
+SourceType = Literal["papers", "news", "web", "reports", "api", "wikipedia", "documents"]
 
 
 class SubQuestion(BaseModel):
@@ -52,6 +52,28 @@ class EvidenceChunk(BaseModel):
     published_at: str | None = None
     credibility: float | None = Field(default=None, ge=0.0, le=1.0)
     language: str | None = None
+
+
+class DocumentInfo(BaseModel):
+    """One uploaded document in a document set (the manifest entry; never the bytes)."""
+
+    doc_id: str = Field(min_length=1, max_length=32)
+    filename: str = Field(min_length=1, max_length=200)
+    kind: Literal["pdf", "txt", "md", "html", "docx"]
+    pages: int = Field(ge=0)
+    sections: int = Field(ge=0)
+    chars: int = Field(ge=0)
+    no_text: bool = False                       # e.g. a scanned PDF: listed, never searched
+    warnings: list[str] = Field(default_factory=list, max_length=5)
+    language: str | None = Field(default=None, max_length=8)
+    excerpt: str = Field(default="", max_length=300)
+
+
+class DocumentSet(BaseModel):
+    """What a run carries about its uploads: the set id and the manifest."""
+
+    set_id: str = Field(min_length=8, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")
+    documents: list[DocumentInfo] = Field(default_factory=list, max_length=50)
 
 
 class ScopeVerdict(BaseModel):

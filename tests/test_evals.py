@@ -79,8 +79,9 @@ class FakeGrader:
 
 def test_seeded_questions_load_and_are_well_formed():
     cases = C.load_cases()
-    assert len(cases) == 10
-    assert len({c.id for c in cases}) == 10
+    assert len(cases) == 11
+    assert len({c.id for c in cases}) == 11
+    assert [c.id for c in cases if c.documents] == ["acme-pilot-memo"]
     assert all(len(c.expected_facets) >= 3 for c in cases)
     assert sum(c.expect_contradiction for c in cases) >= 6
     assert all(c.contradiction_hint for c in cases if c.expect_contradiction)
@@ -90,6 +91,7 @@ def test_load_cases_filters_and_rejects_duplicates(tmp_path):
     cases = C.load_cases(ids=["four-day-week", "grid-batteries"])
     assert [c.id for c in cases] == ["four-day-week", "grid-batteries"]
     assert len(C.load_cases(limit=3)) == 3
+    assert C.load_cases(ids=["acme-pilot-memo"])[0].document_paths(C.default_path().parent)[0].exists()
     with pytest.raises(ValueError, match="unknown case ids"):
         C.load_cases(ids=["nope"])
     p = tmp_path / "q.jsonl"
@@ -102,7 +104,7 @@ def test_load_cases_filters_and_rejects_duplicates(tmp_path):
 def test_cli_list_prints_cases():
     out = subprocess.run([sys.executable, "-m", "deep_researcher.evals", "list"], cwd=ROOT, capture_output=True,
                          text=True, check=True, env={"PYTHONPATH": "src", "PATH": "/usr/bin:/bin"}).stdout
-    assert "four-day-week:" in out and "[contradiction]" in out and out.count("facets:") == 10
+    assert "four-day-week:" in out and "[contradiction]" in out and out.count("facets:") == 11
 
 
 # ----------------------------------------------------------------------------- judges

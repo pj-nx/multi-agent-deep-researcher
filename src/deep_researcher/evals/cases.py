@@ -23,6 +23,11 @@ class EvalCase(BaseModel):
     )
     tags: list[str] = Field(default_factory=list, max_length=8)
     max_hops: int | None = Field(default=None, ge=0, le=5, description="per-case override of the hop limit")
+    documents: list[str] = Field(default_factory=list, max_length=10,
+                                 description="files to attach (paths relative to the questions file)")
+
+    def document_paths(self, base: Path) -> list[Path]:
+        return [(base / d).resolve() for d in self.documents]
 
 
 def default_path() -> Path:
@@ -43,9 +48,13 @@ def load_cases(
         if not s or s.startswith("#"):
             continue
         try:
-            cases.append(EvalCase.model_validate(json.loads(s)))
+            case = EvalCase.model_validate(json.loads(s))
         except Exception as exc:
             raise ValueError(f"{p}:{n}: {exc}") from exc
+        missing = [d for d in case.document_paths(p.parent) if not d.exists()]
+        if missing:
+            raise ValueError(f"{p}:{n}: attached document(s) not found: {[str(m) for m in missing]}")
+        cases.append(case)
     seen = [c.id for c in cases]
     dupes = sorted({i for i in seen if seen.count(i) > 1})
     if dupes:

@@ -76,6 +76,7 @@ async def _run(args: argparse.Namespace) -> int:
             judge=not args.no_judge,
             settings=settings,
             on_done=on_done,
+            questions_path=Path(args.questions),
         )
     finally:
         tracing.flush()

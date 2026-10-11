@@ -37,6 +37,8 @@ POLICIES: dict[SourceType, SourcePolicy] = {
     "wikipedia": SourcePolicy([WikipediaTool], "all"),
     "reports": SourcePolicy([TavilyReportsTool], "all"),
     "api": SourcePolicy([], "all"),
+    # Uploaded documents: the tool is bound to a document set per run (documents.bind_documents).
+    "documents": SourcePolicy([], "all"),
 }
 
 

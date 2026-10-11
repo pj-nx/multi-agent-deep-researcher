@@ -19,6 +19,7 @@ from deep_researcher.agents.common import (
     summaries_text,
 )
 from deep_researcher.agents.deps import Deps
+from deep_researcher.documents import display_source
 from deep_researcher.health import degrade, health_md, summarise
 from deep_researcher.schemas import ReportOutput
 from deep_researcher.skills import skill_prompt
@@ -101,7 +102,7 @@ def _bibliography_md(state: dict[str, Any]) -> list[str]:
         flags = f" | {', '.join(a['issues'])}" if a.get("issues") else ""
         lines.append(
             f"- [{e['id']}] **{e.get('title') or e['url']}**{date} | {e['source_type']}{kind} "
-            f"| credibility {cred:.2f}{flags} | {e['url']}"
+            f"| credibility {cred:.2f}{flags} | {display_source(e.get('title') or '', e['url'])}"
         )
     return [*lines, ""]
 
@@ -171,6 +172,8 @@ async def report_node(state: dict[str, Any], deps: Deps) -> dict[str, Any]:
         "gaps_pursued": len(state.get("extra_sub_questions", [])),
         "citations_verified": verified,
         "citations_removed": removed,
+        "documents_retrieved": sum(1 for e in evidence if str(e.get("url", "")).startswith("upload://")),
+        "documents_kept": sum(1 for e in kept if str(e.get("url", "")).startswith("upload://")),
         "embedding_id": deps.embedding_id(),
         "hops": state.get("hop", 0),
         "languages": allowed_languages(),

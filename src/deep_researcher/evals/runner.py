@@ -104,6 +104,7 @@ class CaseRun:
     est_cost_usd: float | None = None
     stats: dict[str, Any] = field(default_factory=dict)
     sub_questions: int = 0
+    documents: list[str] = field(default_factory=list)    # attached file names
     report_md: str | None = None
     report_json: dict[str, Any] | None = None
     judges: dict[str, JudgeResult] = field(default_factory=dict)
@@ -136,11 +137,19 @@ async def run_pipeline(
     graph: Any = None,
     thread_id: str | None = None,
     run: CaseRun | None = None,
+    documents: dict[str, Any] | None = None,
 ) -> tuple[str | None, dict[str, Any] | None]:
-    """Plan → auto-approve → research; returns (report_md, report_json) and fills timings/usage on ``run``."""
+    """Plan → auto-approve → research; returns (report_md, report_json) and fills timings/usage on ``run``.
+
+    ``documents`` (a manifest dict from ``documents.ingest``) attaches an uploaded set; when no graph is
+    given, one bound to that set is compiled.
+    """
     from deep_researcher import graph as G
     from deep_researcher import tracing
+    from deep_researcher.documents import graph_for_documents
 
+    if documents and graph is None:
+        graph = await graph_for_documents(documents)
     run = run or CaseRun(case_id="adhoc", question=question)
     run.thread_id = thread_id = thread_id or str(uuid.uuid4())
     cfg = tracing.run_config(thread_id, question, tags=["eval"], metadata={"eval_case": run.case_id})
@@ -153,6 +162,7 @@ async def run_pipeline(
         budget_seconds=budget_seconds,
         config=cfg,
         graph=graph,
+        documents=documents,
     ):
         if event == "activity" and data.get("kind") == "llm_end":
             run.usage.add(data)
@@ -190,12 +200,24 @@ async def run_case(
     judge_llm: Any | None = None,
     prices: dict[str, tuple[float, float]] | None = None,
     judge: bool = True,
+    questions_path: Path | None = None,
 ) -> CaseRun:
     run = CaseRun(case_id=case.id, question=case.question)
     hops = case.max_hops if case.max_hops is not None else max_hops
+    documents = None
     try:
+        if case.documents:
+            from deep_researcher.documents import ingest
+            from deep_researcher.evals.cases import default_path
+
+            base = (questions_path or default_path()).parent
+            files = [(p.name, p.read_bytes()) for p in case.document_paths(base)]
+            set_id, manifest = await asyncio.to_thread(ingest, files)
+            documents = {"set_id": set_id, "documents": [d.model_dump() for d in manifest]}
+            run.documents = [d.filename for d in manifest]
         run.report_md, run.report_json = await run_pipeline(
-            case.question, max_hops=hops, budget_seconds=budget_seconds, graph=graph, run=run
+            case.question, max_hops=hops, budget_seconds=budget_seconds, graph=graph, run=run,
+            documents=documents,
         )
         run.ok = True
     except Exception as exc:  # noqa: BLE001 - one failing case must not abort the suite
@@ -289,6 +311,7 @@ def summary_markdown(
         "Grounded",
         "Coverage",
         "Contra. recall",
+        "Docs",
         "Mean",
     ]
     lines = [f"# {title}", ""]
@@ -399,6 +422,7 @@ async def run_suite(
     judge: bool = True,
     settings: dict[str, Any] | None = None,
     on_done: Any = None,
+    questions_path: Path | None = None,
 ) -> list[CaseRun]:
     """Run every case (``concurrency`` at a time), writing results as each finishes."""
     sem = asyncio.Semaphore(max(1, concurrency))
@@ -414,6 +438,7 @@ async def run_suite(
                 judge_llm=judge_llm,
                 prices=prices,
                 judge=judge,
+                questions_path=questions_path,
             )
         runs.append(r)
         write_results(
