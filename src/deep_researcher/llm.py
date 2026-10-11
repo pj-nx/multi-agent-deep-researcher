@@ -80,7 +80,8 @@ ROLE_TEMPERATURE: dict[str, float] = {
 # degrading. Observed: the critic spent 3.3k reasoning tokens before writing any JSON.
 ROLE_MAX_TOKENS: dict[str, int] = {
     "planner": 8_000, "retriever": 4_000, "validator": 4_000, "analysis": 16_000,
-    "insight": 16_000, "critic": 12_000, "report": 24_000, "grader": 2_000,
+    "insight": 16_000, "critic": 12_000, "report": 24_000,
+    "grader": 16_000,   # the judge tier reasons before answering; 2k ran out mid-verdict
 }
 
 _TRUTHY = {"1", "true", "yes", "on"}

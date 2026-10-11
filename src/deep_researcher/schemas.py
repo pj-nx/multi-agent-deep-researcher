@@ -132,7 +132,7 @@ class SourceAssessment(BaseModel):
     credibility: float = Field(ge=0.0, le=1.0, description="trustworthiness of the source itself")
     source_kind: Literal["primary", "secondary", "tertiary", "opinion", "unknown"] = "unknown"
     peer_reviewed: bool | None = None
-    issues: list[str] = Field(default_factory=list, max_length=6)
+    issues: list[str] = Field(default_factory=list, max_length=12)
     keep: bool = True
 
 
@@ -192,7 +192,7 @@ class ReportOutput(BaseModel):
     """The model-written parts of the report; the rest is assembled deterministically from state."""
 
     title: str = Field(min_length=1, max_length=200)
-    executive_summary: str = Field(min_length=1, max_length=6000,
+    executive_summary: str = Field(min_length=1, max_length=12000,
                                    description="3-6 paragraphs, cite [E-ids]")
     key_findings: list[str] = Field(default_factory=list, max_length=12,
                                     description="one sentence each, cited")
