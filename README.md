@@ -26,7 +26,7 @@ with seeded questions and groundedness / coverage / contradiction judges.
 flowchart LR
     q([question]) --> planner[Planner]
     planner --> approve{{human approves / edits plan}}
-    approve -->|Send fan-out| retriever[Retrievers ×N<br/>arXiv · Semantic Scholar · Tavily<br/>newsdata.io / GDELT · Wikipedia · PDF]
+    approve -->|Send fan-out| retriever[Retrievers ×N<br/>arXiv · Semantic Scholar · Tavily<br/>newsdata.io / GDELT · Wikipedia · PDF<br/>uploaded documents]
     retriever --> store[(Chroma evidence store<br/>512-token chunks, 256-d)]
     store --> validator[Source Validator]
     validator --> analysis[Critical Analysis<br/>claims · contradictions · gaps]
@@ -291,6 +291,43 @@ first start after upgrading, or run `python scripts/add_checkpoint_created_at.py
 For a hosted Postgres, run the same command from any scheduler with `CHECKPOINTER=postgres` and
 `DATABASE_URL` set (a GitHub Actions `schedule:` workflow works).
 
+## Uploaded documents as a source
+
+Attach your own files and they become one more source type, `documents`, that the planner can target
+and the retrievers search alongside papers, news and the web. Formats: PDF (pypdf; scanned PDFs with no
+text are listed but not searchable), TXT, Markdown, HTML, and DOCX with `uv sync --extra documents`.
+
+- **CLI**: `uv run python -m deep_researcher "question" --doc report.pdf --doc notes.md --auto-approve`
+- **Gradio**: the "Attach documents" accordion in Step 1; the manifest appears under it.
+- **Hosted page**: the same accordion uploads with your token and lists the manifest; "Remove documents" deletes the set.
+- **API**: `POST /api/documents` (multipart `files[]`, optional `document_set_id` to append) returns the
+  set id and manifest; send it as `document_set_id` with both `/api/research` and `/resume`;
+  `GET`/`DELETE /api/documents/{id}`. `/api/health` → `uploads` lists the limits.
+
+How it works ([`documents.py`](src/deep_researcher/documents.py), [`store/uploads.py`](src/deep_researcher/store/uploads.py),
+[`tools/documents.py`](src/deep_researcher/tools/documents.py)): on upload a file is sniffed from its bytes,
+parsed, split into page-aligned sections of about 1,500 tokens and embedded into a separate Chroma `uploads`
+collection (same backend and embedding fingerprint as the evidence store). A run gets a `DocumentsTool`
+bound to its set; for each sub-question it similarity-searches the sections and returns them like any
+other tool's results, so the language gate, relevance gate, chunking, branch-level validation and citation
+checks apply unchanged. The planner sees the manifest with a short excerpt per file. Sections cite as
+`[E-…]` and the bibliography shows `Uploaded: file.pdf, p. 12-13`. The report's `stats` carry
+`documents_retrieved` / `documents_kept`.
+
+Limits (env, see `.env.example`): `UPLOAD_MAX_FILE_MB` (20), `UPLOAD_MAX_PAGES` (200),
+`UPLOAD_MAX_DOCS_PER_SET` (10), `UPLOAD_RETENTION_DAYS` (7; `python -m deep_researcher.prune --documents`
+deletes older sets). Vercel caps request bodies at 4.5 MB, so the hosted page allows about 4 MB per file;
+larger files need a hosted Chroma plus a direct-to-storage upload, which is not built. Like a run's
+thread, a set lives in the instance's Chroma unless the deployment uses Chroma http/cloud, so upload and
+run promptly on the hosted site.
+
+Safety: document text is data, never instructions (rendered inside the same delimiters as fetched pages);
+pypdf only, no JavaScript or external fetches; size, page and set caps enforced before parsing; sets
+reachable only by their random id through the authenticated API.
+
+Evals: the seeded case `acme-pilot-memo` attaches a small fictional pilot memo (`evals/docs/`) whose facets can
+only be answered from the file; the `document_use` judge scores whether uploaded sections were cited.
+
 ## Embeddings and the vector DB
 
 Evidence is chunked into **512-token** pieces (64-token overlap, sentence/paragraph boundaries,
@@ -380,9 +417,11 @@ public and never exposes secrets.
 | GET | `/api/health` | liveness, graph/tracing/llm/embeddings/chunking config, enabled sources |
 | GET | `/api/guide` | the API user guide as Markdown, filled in for this deployment |
 | GET | `/api/models` | OpenRouter's live model catalogue (id, context length, prices), cached 10 min; `?prefix=anthropic/` filters |
-| POST | `/api/research` | `{question, max_hops?, settings?}` → SSE stream until plan approval |
-| POST | `/api/research/{thread_id}/resume` | `{plan: ResearchPlan, settings?}` → SSE stream to final report |
+| POST | `/api/research` | `{question, max_hops?, settings?, document_set_id?}` → SSE stream until plan approval |
+| POST | `/api/research/{thread_id}/resume` | `{plan: ResearchPlan, settings?, document_set_id?}` → SSE stream to final report |
 | POST | `/api/report/pdf` | `{markdown, title?}` → `application/pdf`; stateless, so the hosted page can turn the streamed report into a download |
+| POST | `/api/documents` | multipart `files[]` (+ optional `document_set_id`) → `{document_set_id, documents}`; attach files as the `documents` source |
+| GET / DELETE | `/api/documents/{id}` | the set's manifest / remove the set |
 
 `settings` is optional per-run overrides: `{models: {heavy|worker|cheap|<role>: "vendor/model"}, reasoning_effort, fallback_models, budget_seconds}`; the server validates ids, caps the budget at `RUN_BUDGET_SECONDS`, builds that run's models from it and echoes the resolved values in a `settings` event.
 

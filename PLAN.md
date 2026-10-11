@@ -315,8 +315,11 @@ Status 2026-10-11: step (a) done — `documents.py` (parse PDF/TXT/MD/HTML/DOCX,
 sections, `ingest`, `bind_documents`), `store/uploads.py` (Chroma `uploads` collection: manifest, search per
 set, delete, expiry), `tools/documents.py` (`DocumentsTool`), the `documents` source type, planner awareness,
 bibliography rendering, CLI `--doc`, and the analysis query now scoped by each sub-question's own evidence ids
-(closes the single-`sub_question_id` gap below). Remaining: (b) API endpoints, Gradio and hosted page; (c) evals
-case, prune `--documents`, README and API guide.
+(closes the single-`sub_question_id` gap below). Step (b) done: `POST/GET/DELETE /api/documents`,
+`document_set_id` on research/resume, Gradio file input, hosted page upload, API guide. Step (c) done: the
+`acme-pilot-memo` eval case with a bundled fictional memo (`evals/docs/`), the `document_use` judge,
+`prune --documents`, `documents_retrieved/kept` stats, README and `.env.example`. Not built: direct-to-storage
+uploads for files above Vercel's 4.5 MB request cap.
 
 **Goal.** A user attaches their own files (PDF first; TXT/MD, HTML and DOCX after) and the pipeline
 treats them as one more source type: the planner can target them, retrievers pull the relevant

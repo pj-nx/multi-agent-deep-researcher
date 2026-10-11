@@ -196,7 +196,8 @@ async def test_full_run_cites_uploaded_sections_and_lists_them_as_uploaded(store
     plan = events[-1][1]["plan"]
     events = [e async for e in G.resume_with_plan(thread_id="d1", plan=plan, graph=graph)]
     report = next(d for k, d in events if k == "report")
-    assert report["stats"]["kept"] >= 1
+    assert report["stats"]["kept"] >= 1 and report["stats"]["documents_kept"] == report["stats"]["kept"]
+    assert report["stats"]["documents_retrieved"] >= report["stats"]["documents_kept"]
     assert all(s["source_type"] == "documents" for s in report["report_json"]["sources"])
     assert "Uploaded: trial.pdf, p." in report["report"] and "upload://" not in report["report"].split("## Sources")[1]
     cited = {i for s in report["report_json"]["summaries"].values() for c in s["claims"] for i in c["evidence_ids"]}
@@ -212,3 +213,81 @@ def test_document_info_schema_bounds():
 def test_pdf_fixture_is_a_real_pdf():
     data = make_pdf(["hello"])
     assert data.startswith(b"%PDF-1.4") and zlib.crc32(data)       # sanity: bytes, not a placeholder
+
+
+# ----------------------------------------------------------------------------- evals + prune
+
+def test_document_use_judge():
+    from deep_researcher.evals import cases as C
+    from deep_researcher.evals.judges import document_use
+
+    case = C.EvalCase(id="d", question="Is it so?", expected_facets=["x"], documents=["docs/x.pdf"])
+    plain = C.EvalCase(id="p", question="Is it so?", expected_facets=["x"])
+    rep = {"sources": [{"id": "E-1", "url": "upload://s/d#p1"}, {"id": "E-2", "url": "https://x"}],
+           "dropped_sources": [{"id": "E-3", "url": "upload://s/d#p2"}],
+           "summaries": {"sq1": {"claims": [{"text": "t", "evidence_ids": ["E-1"]}]}}}
+    r = document_use(rep, case)
+    assert r.score == 1.0 and r.details == {"retrieved_sections": 2, "kept_sections": 1, "cited_sections": 1}
+    rep["summaries"]["sq1"]["claims"][0]["evidence_ids"] = ["E-2"]
+    assert document_use(rep, case).score == 0.5
+    rep["sources"] = [{"id": "E-2", "url": "https://x"}]
+    assert document_use(rep, case).score == 0.0
+    assert document_use(rep, plain).score is None and document_use(rep, None).score is None
+
+
+@pytest.mark.anyio
+async def test_eval_runner_attaches_case_documents(store, tmp_path, monkeypatch):
+    """A case with ``documents`` is ingested, the graph is bound to the set, and the judge sees citations."""
+    from langgraph.checkpoint.memory import InMemorySaver
+
+    from deep_researcher import documents as docmod
+    from deep_researcher import graph as G
+    from deep_researcher.evals import cases as C
+    from deep_researcher.evals.runner import run_case
+    from deep_researcher.schemas import ResearchPlan, SubQuestion
+    from deep_researcher.store import uploads as U
+
+    monkeypatch.setattr(U, "get_upload_store", lambda: store)
+    base = make_deps(tmp_path)
+    base.fake_llm.gap_rounds = 0
+    base.fake_llm.plan = ResearchPlan(question="Does remote work raise productivity?", sub_questions=[
+        SubQuestion(id="a", question="What does the attached memo say about remote work productivity?",
+                    source_types=["documents"], search_queries=["remote work productivity"])])
+    bound = {}
+
+    async def fake_graph_for_documents(documents, *, deps=None, store=None):
+        bound["set_id"] = documents["set_id"]
+        return G.build_graph(InMemorySaver(), D.bind_documents(base, documents["set_id"], store=upload_store))
+
+    upload_store = store
+    monkeypatch.setattr(docmod, "graph_for_documents", fake_graph_for_documents)
+    qdir = tmp_path / "evals"
+    (qdir / "docs").mkdir(parents=True)
+    (qdir / "docs" / "memo.pdf").write_bytes(make_pdf(["Remote work RAISES productivity in knowledge work.",
+                                                        "Remote work LOWERS output in call centres."]))
+    case = C.EvalCase(id="memo", question="Does remote work raise productivity?", expected_facets=["remote work"],
+                      documents=["docs/memo.pdf"])
+    run = await run_case(case, max_hops=0, budget_seconds=None, questions_path=qdir / "questions.jsonl")
+    assert run.ok, run.error
+    assert run.documents == ["memo.pdf"] and bound["set_id"] and store.manifest(bound["set_id"])
+    assert run.judges["document_use"].score == 1.0 and run.stats["documents_kept"] >= 1
+
+
+def test_prune_documents_flag(store, monkeypatch, capsys):
+    import sys
+
+    from deep_researcher import prune
+    from deep_researcher.store import uploads as U
+
+    monkeypatch.setattr(U, "get_upload_store", lambda: store)
+    monkeypatch.setenv("CHECKPOINTER", "memory")
+    set_id, _ = D.ingest([("old.txt", b"old text here")], store=store)
+    monkeypatch.setattr(sys, "argv", ["prune", "--days", "0", "--documents", "--dry-run"])
+    # make the set look old
+    store.collection.update(ids=[U.section_record_id(set_id, store.manifest(set_id)[0].doc_id, 0)],
+                            metadatas=[{"created_at": 1.0}])
+    assert prune.main() == 0
+    out = capsys.readouterr().out
+    assert "would delete 1 uploaded document set(s)" in out and store.count(set_id) == 1
+    monkeypatch.setattr(sys, "argv", ["prune", "--days", "0", "--documents"])
+    assert prune.main() == 0 and store.count(set_id) == 0

@@ -172,6 +172,8 @@ async def report_node(state: dict[str, Any], deps: Deps) -> dict[str, Any]:
         "gaps_pursued": len(state.get("extra_sub_questions", [])),
         "citations_verified": verified,
         "citations_removed": removed,
+        "documents_retrieved": sum(1 for e in evidence if str(e.get("url", "")).startswith("upload://")),
+        "documents_kept": sum(1 for e in kept if str(e.get("url", "")).startswith("upload://")),
         "embedding_id": deps.embedding_id(),
         "hops": state.get("hop", 0),
         "languages": allowed_languages(),
