@@ -148,24 +148,41 @@ by default with the same light/dark toggle.
 
 - **Pipeline boxes** show each agent's live status, notes (model being called, sources found, tokens)
   and hop badges; a JavaScript port of `pipeline_view.py`.
-- **Research tab**: question, max hops, the server's run budget, "Plan the research" with a busy
+- **Research tab**: question, max hops, run budget (capped by the server), "Plan the research" with a busy
   indicator and disabled buttons while a request runs, a collapsed agent activity log, the editable
   plan table (ID, Question, Source types, Search queries, Depends on; clear a question to drop it, `+`
   adds a row), "Approve and run", the rendered report and PDF / Markdown / JSON downloads (PDF via
   `/api/report/pdf`, the others built in the browser).
-- **Settings tab**: the API bearer token (kept in `sessionStorage` for the tab only; the tab opens
-  itself when the server requires a token and none is set); **per-run model and parameter
-  overrides**: the model for each tier (heavy / worker / cheap, with "Load model list from
-  OpenRouter" filling a picker with ids and prices via `GET /api/models`), reasoning effort,
-  fallback models and the run budget (on the Research tab); and the server's effective
-  configuration from `/api/health`. Overrides are remembered in `localStorage` and sent as a
-  `settings` object with both the plan and the resume request, so they apply to that run only. A
-  hosted function has no writable `.env`, so this is how the hosted page offers what the Gradio
-  Settings tab does; API keys are never part of it and stay on the server. The server caps the
-  budget at its own `RUN_BUDGET_SECONDS` and validates model ids; the chosen models appear in the
-  activity log (`settings` event) and in the report's methodology section.
+- **Settings tab** (`/#settings`): see below.
 - Vercel serves `public/` statically; everywhere else the API's `GET /` returns the same file. User
   input and streamed text are rendered as text nodes; the report Markdown is sanitised with DOMPurify.
+
+#### Settings tab
+
+![Hosted UI settings](docs/hosted-settings.png)
+
+A hosted function has no writable `.env`, so the hosted page cannot edit the server's configuration
+the way the local Gradio Settings tab does. It offers the same choices as **per-run overrides**
+instead:
+
+| Setting | Where | Applies |
+|---|---|---|
+| API token | Settings → API access | Sent as `Authorization: Bearer` with every request; kept in `sessionStorage` for the tab only. The tab opens itself when the server requires a token and none is set. |
+| Heavy / worker / cheap tier model | Settings → Models and run parameters | Planner, analysis, insight, critic / retriever, report / validator, grader. "Load model list from OpenRouter" fills the pickers with ids and prices per million tokens (`GET /api/models`); the placeholder shows the server default. |
+| Reasoning effort | same block | `none`, `minimal`, `low`, `medium`, `high`, or the server default. |
+| Fallback models | same block | Comma-separated ids OpenRouter tries if the chosen model fails. |
+| Run budget | Research → Budget | Seconds per leg before retrieval loops stop; `0` means the server default. The server caps it at its own `RUN_BUDGET_SECONDS`. |
+| Max follow-up hops | Research → slider | Already per request (`max_hops`). |
+
+Choices are remembered in `localStorage` ("Reset to server defaults" clears them) and sent as a
+`settings` object with both the plan and the resume request, so they apply to that run only and
+never change what other users get. The server validates model ids and tier/role names, builds that
+run's models from the overrides (`src/deep_researcher/run_settings.py`), echoes the resolved values
+in a `settings` stream event (visible in the activity log) and records them in the report's
+methodology section. API keys are deliberately not overridable and stay on the server; the
+**Effective server configuration** panel below the controls shows what the server itself is
+running: models per role, reasoning effort, fallback models, embeddings, vector DB, checkpointer,
+active sources, languages and tracing, all from `/api/health`.
 
 ### What is and is not verified
 

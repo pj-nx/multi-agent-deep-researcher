@@ -259,12 +259,14 @@
   });
 
   // ---------------------------------------------------------------- tabs
-  for (const b of document.querySelectorAll('.tabs button')) {
-    b.addEventListener('click', () => {
-      document.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('selected', x === b));
-      document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('selected', p.id === 'tab-' + b.dataset.tab));
-    });
+  function showTab(name) {
+    document.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('selected', x.dataset.tab === name));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('selected', p.id === 'tab-' + name));
   }
+  for (const b of document.querySelectorAll('.tabs button')) {
+    b.addEventListener('click', () => { showTab(b.dataset.tab); history.replaceState(null, '', '#' + b.dataset.tab); });
+  }
+  if (location.hash === '#settings') showTab('settings');     // deep link, e.g. from the README
 
   // ---------------------------------------------------------------- pipeline boxes (port of pipeline_view.PipelineProgress)
   const pipe = { stages: {}, expected: 0, doneInHop: 0, hop: 0 };
