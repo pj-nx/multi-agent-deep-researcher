@@ -11,6 +11,7 @@ import asyncio
 import logging
 import os
 import time
+import weakref
 from dataclasses import dataclass, field
 from typing import Any, ClassVar
 
@@ -26,6 +27,13 @@ USER_AGENT = os.getenv(
     "deep-researcher/0.1 (+https://github.com/pj-nx/multi-agent-deep-researcher)",
 )
 DEFAULT_TIMEOUT = float(os.getenv("RETRIEVAL_TIMEOUT_SECONDS") or 30)
+
+CACHE_TTL_SECONDS = float(os.getenv("RETRIEVAL_CACHE_TTL_SECONDS") or 600)   # 0 disables
+
+# Search results per HTTP client: {(tool, query, limit): (stored_at, results)}, plus one lock per key so
+# parallel sub-questions asking the same thing wait for the first answer instead of re-querying.
+_search_cache: weakref.WeakKeyDictionary[httpx.AsyncClient, dict[str, dict[Any, Any]]] = (
+    weakref.WeakKeyDictionary())
 
 _shared_client: httpx.AsyncClient | None = None
 
@@ -111,7 +119,26 @@ class RetrievalTool:
             return resp
 
     async def search(self, query: str, limit: int = 5) -> list[SearchResult]:
-        """Never raises. Returns usable results only."""
+        """Never raises. Returns usable results only; identical searches within the TTL are answered once."""
+        if CACHE_TTL_SECONDS <= 0:
+            return await self._search_uncached(query, limit)
+        store = _search_cache.setdefault(self.client, {"results": {}, "locks": {}})
+        key = (self.name, query, limit)
+        async with store["locks"].setdefault(key, asyncio.Lock()):
+            hit = store["results"].get(key)
+            if hit and time.monotonic() - hit[0] < CACHE_TTL_SECONDS:
+                log.info("%s: cached results for %r", self.name, query[:60])
+                return list(hit[1])
+            results, ok = await self._search_checked(query, limit)
+            if ok:                       # failures are never cached: the next caller retries
+                store["results"][key] = (time.monotonic(), results)
+            return list(results)
+
+    async def _search_uncached(self, query: str, limit: int) -> list[SearchResult]:
+        return (await self._search_checked(query, limit))[0]
+
+    async def _search_checked(self, query: str, limit: int) -> tuple[list[SearchResult], bool]:
+        """(results, succeeded). Failures are reported through health.record_tool_error."""
         try:
             results = await self._search(query, limit)
         except httpx.HTTPStatusError as exc:
@@ -119,12 +146,12 @@ class RetrievalTool:
             log.warning("%s: HTTP %s for %r", self.name, code, query[:80])
             record_tool_error(self.name, "rate_limited" if code == 429 else f"http_{code}",
                               f"HTTP {code} for {query[:60]!r}")
-            return []
+            return [], False
         except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
             log.warning("%s: failed for %r: %s", self.name, query[:80], str(exc)[:160])
             record_tool_error(self.name, "request_failed", f"{type(exc).__name__}: {str(exc)[:120]}")
-            return []
-        return [r for r in results if r.usable()][:limit]
+            return [], False
+        return [r for r in results if r.usable()][:limit], True
 
     async def _search(self, query: str, limit: int) -> list[SearchResult]:  # pragma: no cover - abstract
         raise NotImplementedError
