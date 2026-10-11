@@ -10,7 +10,9 @@ cited report.
 Showcases **agent collaboration**, **retrieval-augmented reasoning** (every claim cites a stored
 evidence ID that is verified before the report ships) and **long-context synthesis**.
 
-**Status:** all seven phases of [PLAN.md](PLAN.md) are done. Planner (structured output) → human approval →
+**Status:** all seven phases of [PLAN.md](PLAN.md) are done. Phase 8, uploaded documents (PDF and more) as a
+research source, is built on branch `phase-8-documents` ([PR #2](https://github.com/pj-nx/multi-agent-deep-researcher/pull/2),
+draft) and on hold; see PLAN.md §Phase 8 for what it contains and how to resume. Planner (structured output) → human approval →
 parallel retrievers over real sources → persistent vector store → **Source Validator** (model-graded
 relevance/credibility) → **Critical Analysis** (retrieval-augmented: claims, contradictions, gaps,
 every citation checked against the chunks shown) → multi-hop loop on the most valuable gaps →

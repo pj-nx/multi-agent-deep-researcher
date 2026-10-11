@@ -309,7 +309,22 @@ Each phase ends with something runnable. Estimated effort assumes evenings/weeke
 
 ---
 
-### Phase 8 — Uploaded documents as a research source (planned, ~2.5 days)
+### Phase 8 — Uploaded documents as a research source — ON HOLD (2026-10-11)
+
+**Status.** Built on branch `phase-8-documents` (draft [PR #2](https://github.com/pj-nx/multi-agent-deep-researcher/pull/2),
+CI green, 198 tests) and put on hold before merging. All three steps below are implemented there:
+parsing and sectioning (`documents.py`), the Chroma `uploads` collection (`store/uploads.py`), the
+`DocumentsTool` and `documents` source type, planner awareness, bibliography rendering, CLI `--doc`,
+`POST/GET/DELETE /api/documents` with `document_set_id` on research/resume, the Gradio file input, the
+hosted page upload, the `acme-pilot-memo` eval case with a bundled memo PDF, the `document_use` judge,
+`prune --documents`, README and API guide. Verified end to end with a real 12-page PDF (11 sections, 9 cited).
+Not built: direct-to-storage uploads for files above Vercel's 4.5 MB request cap.
+
+**To resume.** Merge `main` into the branch (main gained the run summary after the branch was cut),
+re-run the suite, decide the two open questions (hosted per-file limit and whether user documents
+get a credibility prior), then mark PR #2 ready. The worktree lives at `../deep-researcher-phase8`.
+
+The original plan follows.
 
 **Goal.** A user attaches their own files (PDF first; TXT/MD, HTML and DOCX after) and the pipeline
 treats them as one more source type: the planner can target them, retrievers pull the relevant
