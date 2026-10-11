@@ -309,6 +309,95 @@ Each phase ends with something runnable. Estimated effort assumes evenings/weeke
 
 ---
 
+### Phase 8 — Uploaded documents as a research source (planned, ~2.5 days)
+
+**Goal.** A user attaches their own files (PDF first; TXT/MD, HTML and DOCX after) and the pipeline
+treats them as one more source type: the planner can target them, retrievers pull the relevant
+sections per sub-question, the validator grades them, the analysis cites them as `[E-id]`, and the
+report's bibliography shows "Uploaded: file.pdf, p. 12". Nothing else in the graph changes shape.
+
+**Design: ingest once, search locally.**
+
+1. **Document sets.** An upload creates a *document set* (`document_set_id`, uuid) holding one or
+   more documents. Files are parsed on upload (`tools/fetch.pdf_to_text` already does pypdf with page
+   and size caps; add TXT/MD/HTML, DOCX via an optional `python-docx` extra), split into *sections*
+   (page-aligned, ~1.5k tokens, with `page_start`/`page_end`) and embedded into a separate Chroma
+   collection `uploads` on the same backend as the evidence store (persistent / http / cloud), with
+   metadata `document_set_id`, `doc_id`, `filename`, `page_start`, `page_end`, `language`. The same
+   embedding fingerprint rule applies (collection pinned to `embedding_id`). Bytes are never kept in
+   graph state; the state carries only `document_set_id` and a manifest (filename, pages, doc_id).
+   Scanned PDFs with no extractable text are reported in the manifest as `no_text` (OCR is out of
+   scope).
+2. **`documents` source type** (add to `SourceType`) with a `DocumentsTool` in the registry. Its
+   `search(query)` is a similarity search over the set's sections (top `per_tool_limit`, deduplicated
+   by section) returning `SearchResult(title="file.pdf p.12-13", url="upload://<set>/<doc>#p12",
+   text=<section>, source_type="documents")`. From there the existing retriever path applies
+   unchanged: language gate, relevance gate, `Evidence` with `evidence_id(url)`, chunking into the
+   evidence collection under the sub-question, branch-level validation. Sections are small, so
+   re-embedding them per sub-question is cheap; chunk ids stay unique because the section is part of
+   the URL. The tool is bound to a set at run time the same way per-run models are: `Deps.tools_for`
+   is wrapped (see `run_settings.make_deps`) so a run with documents gets a tool instance for its set,
+   and a run without documents never sees the type.
+3. **Planner awareness.** When a set is attached the planner prompt gets the manifest plus the first
+   ~300 characters of each document, and the instruction to use `documents` for sub-questions the
+   files can answer and to combine it with web/papers for context. The hosted and Gradio plan tables
+   already allow editing source types, so users can add or remove `documents` per sub-question.
+4. **Validator and report.** Uploaded sections are graded like any source; the validator prompt gets
+   one line saying the document was supplied by the user (it should judge relevance, not provenance).
+   Bibliography entries for `upload://` URLs render as "Uploaded: file.pdf, p. 12-13" instead of a link;
+   `report_json.sources[].url` keeps the `upload://` form so clients can map back to the file.
+5. **Known gap to close on the way.** Chunk metadata holds a single `sub_question_id`; when two
+   sub-questions retrieve the same section (or the same web page today) the second upsert overwrites
+   the first and the analysis query (`sub_question_ids` AND `evidence_ids`) can no longer see it for
+   the first sub-question. Fix: drop the `sub_question_id` clause when `evidence_ids` is given (the
+   evidence ids already scope the query), or store `sub_question_ids` as a list.
+
+**Surfaces.**
+
+- **API.** `POST /api/documents` (multipart, auth + rate limit) → `{document_set_id, documents: [...]}`;
+  `GET /api/documents/{id}` (manifest); `DELETE /api/documents/{id}`. `ResearchRequest` and
+  `ResumeRequest` gain `document_set_id`; `/api/health` reports `uploads: {enabled, max_file_mb,
+  max_pages, formats}`. Limits via env: `UPLOAD_MAX_FILE_MB` (default 20 local), `UPLOAD_MAX_PAGES`
+  (200), `UPLOAD_MAX_DOCS_PER_SET` (10), `UPLOAD_RETENTION_DAYS` (7). **Vercel caps request bodies at
+  4.5 MB**, so on Vercel the limit is 4 MB per file unless `UPLOAD_BLOB_STORE` points at Vercel Blob
+  or S3 (client uploads directly with a presigned URL, the API ingests from there). AWS Lambda has a
+  6 MB synchronous limit with the same escape hatch.
+- **Gradio.** A `gr.File` (multiple, `.pdf .txt .md .html .docx`) in Step 1 ingests on upload,
+  shows the manifest (name, pages, sections, `no_text` warnings) and passes the set id into
+  `plan_stream` / `run_stream`.
+- **Hosted page.** A file input in Step 1 posting `FormData` to `/api/documents`, the manifest
+  listed under it, and `document_set_id` sent with both the plan and resume requests; the API guide
+  gets an "Uploaded documents" section.
+- **CLI.** `python -m deep_researcher "question" --doc report.pdf --doc notes.md`.
+- **Pruning.** `python -m deep_researcher.prune --documents` deletes sets older than the retention
+  period from the `uploads` collection (and local files under `uploads/` when present).
+
+**Safety.** Document text is data, never instructions (the existing prompt convention covers it;
+sections are rendered inside the same delimiters as web text). Parsing is pypdf only (no JavaScript,
+no external fetches), MIME is sniffed from bytes not the extension, control characters are stripped,
+and every cap above is enforced before parsing. Sets are addressable only by their random id and
+only through an authenticated API; retention deletes them. Uploaded documents never leave the
+server except as sections inside model prompts.
+
+**Evals.** Add one seeded case with a bundled public-domain PDF under `evals/docs/` whose facets can
+only be covered from the file, run with and without the document to show the delta, and a
+`documents_used` stat (sections cited / sections retrieved).
+
+**Tests.** Parsing per format (incl. a scanned PDF → `no_text`), section splitting and page mapping,
+`uploads` collection isolation per set and embedding-fingerprint check, `DocumentsTool.search` with a
+fake embedding, retriever end to end with a fake set (sections become evidence, validated, cited),
+bibliography rendering of `upload://` URLs, API upload limits and auth, Gradio and hosted-page
+plumbing, prune of expired sets.
+
+**Order of work.** (a) store collection + parser + `DocumentsTool` + Deps binding + CLI flag, 1 day;
+(b) API endpoints + Gradio + hosted page, 1 day; (c) planner awareness, report rendering, evals case,
+prune, README and API guide, ½ day.
+
+**Decisions to confirm first.** Per-file size on the hosted site (4 MB vs. adding Blob storage);
+whether user-supplied documents get a credibility prior above web sources; retention period.
+
+---
+
 ## 7. Guardrails and budgets
 
 - `max_hops` (default 3), `max_revisions` (2), per-run token budget, per-tool timeout and retry with backoff.
