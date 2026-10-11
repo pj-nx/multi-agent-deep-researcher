@@ -1,7 +1,7 @@
 """Input guardrails, checked before any planning or retrieval spend.
 
-1. Profanity: the Guardrails Hub ``ProfanityFree`` validator (``guardrails-ai-profanity-free``, an offline
-   scikit-learn classifier; no LLM call), run first.
+1. Profanity: a dependency-free bag-of-words word-list check (:mod:`deep_researcher.profanity`; no LLM
+   call), run first.
 2. Scope: a question may span at most ``GUARDRAIL_MAX_CATEGORIES`` (default 2) subject categories.
 3. Coherence: when it spans two categories they must be related; unrelated topics bundled into one
    query are rejected.
@@ -14,13 +14,13 @@ classifier itself is unavailable the question is let through and the outage is r
 from __future__ import annotations
 
 import asyncio
-import functools
 import os
 from collections.abc import Callable
 from typing import Any
 
 from deep_researcher.agents.common import call_structured
 from deep_researcher.health import degrade
+from deep_researcher.profanity import has_profanity
 from deep_researcher.schemas import ScopeVerdict
 from deep_researcher.skills import skill_prompt
 
@@ -61,18 +61,6 @@ def max_categories() -> int:
         return 2
 
 
-@functools.cache
-def _profanity_validator() -> Any:
-    """Built on first use: importing guardrails + scikit-learn takes seconds, so not at module import."""
-    from guardrails_ai.profanity_free import ProfanityFree
-
-    return ProfanityFree()
-
-
-def has_profanity(text: str) -> bool:
-    from guardrails.validator_base import FailResult
-
-    return isinstance(_profanity_validator().validate(text, {}), FailResult)
 
 
 async def check_question(question: str, llm_for: Callable[[str], Any]) -> list[dict[str, Any]]:

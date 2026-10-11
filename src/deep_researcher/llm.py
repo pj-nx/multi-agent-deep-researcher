@@ -79,8 +79,8 @@ ROLE_TEMPERATURE: dict[str, float] = {
 # structured-output call that runs out of budget fails outright (LengthFinishReasonError) rather than
 # degrading. Observed: the critic spent 3.3k reasoning tokens before writing any JSON.
 ROLE_MAX_TOKENS: dict[str, int] = {
-    "planner": 8_000, "retriever": 4_000, "validator": 4_000, "analysis": 16_000,
-    "insight": 16_000, "critic": 12_000, "report": 24_000, "grader": 2_000,
+    "planner": 300, "retriever": 300, "validator": 300, "analysis": 300,
+    "insight": 300, "critic": 300, "report": 300, "grader": 300,
 }
 
 _TRUTHY = {"1", "true", "yes", "on"}

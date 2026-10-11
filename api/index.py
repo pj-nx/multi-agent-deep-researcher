@@ -56,22 +56,9 @@ from deep_researcher.tools import registry as tool_registry
 log = logging.getLogger("deep_researcher.api")
 tracing.configure()
 
-def _warm_guardrails() -> None:
-    try:
-        from deep_researcher.guardrails import enabled, has_profanity
-
-        if enabled():
-            has_profanity("warm up")
-    except Exception as exc:  # noqa: BLE001 - the first real check reports (and degrades) if this is broken
-        log.info("guardrail warm-up skipped: %s", exc)
-
-
 @asynccontextmanager
 async def _lifespan(_: FastAPI):
-    # Load the profanity classifier in the background so the first question does not pay for it.
-    warm = asyncio.create_task(asyncio.to_thread(_warm_guardrails))
     yield
-    warm.cancel()
     if _graph_available():
         from deep_researcher.graph import aclose
 

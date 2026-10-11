@@ -14,11 +14,12 @@ def llm_for(role):
     return FakeLLM(_plan())
 
 
-def test_profanity_validator_flags_profane_and_passes_domain_vocabulary():
+def test_profanity_word_list_flags_profane_and_passes_domain_vocabulary():
     assert has_profanity("what the shit is going on with inflation")
     assert has_profanity("What the f*ck is going on")
     assert not has_profanity("Do AI coding assistants raise developer productivity?")
     assert not has_profanity("Sexual health outcomes of sex education programs")
+    assert has_profanity("this is sh1t")
     assert not has_profanity("Is cocaine use rising among adults?")
 
 
@@ -66,11 +67,11 @@ async def test_classifier_outage_fails_open_but_is_recorded():
 
 
 @pytest.mark.anyio
-async def test_profanity_library_failure_fails_open_but_is_recorded(monkeypatch):
+async def test_profanity_check_failure_fails_open_but_is_recorded(monkeypatch):
     from deep_researcher import guardrails
 
     def broken(text):
-        raise ImportError("guardrails not installed")
+        raise ImportError("word list unavailable")
 
     monkeypatch.setattr(guardrails, "has_profanity", broken)
     ds = await check_question("Do AI coding assistants raise developer productivity?", llm_for)

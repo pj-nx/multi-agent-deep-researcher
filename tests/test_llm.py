@@ -105,7 +105,7 @@ def test_reasoning_effort_env(llm, monkeypatch):
     monkeypatch.setenv("OPENROUTER_REASONING_EFFORT", "turbo")
     with pytest.raises(llm.LLMConfigError):
         llm.build_kwargs("critic")
-    assert llm.ROLE_MAX_TOKENS["critic"] >= 8_000      # reasoning tokens count against the budget
+    assert llm.ROLE_MAX_TOKENS["critic"] == 300        # capped to fit the available credit
 
 
 def test_get_llm_caches_without_overrides(llm, monkeypatch):

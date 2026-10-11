@@ -195,9 +195,9 @@ report's Run health says so.
 
 Every question is checked before the planner runs ([guardrails.py](src/deep_researcher/guardrails.py)):
 
-1. **Profanity** is rejected by the Guardrails Hub `ProfanityFree` validator
-   (`guardrails-ai-profanity-free`; an offline classifier, no model call). It loads lazily: the first check
-   after start-up takes a few seconds.
+1. **Profanity** is rejected by a dependency-free bag-of-words word list
+   ([profanity.py](src/deep_researcher/profanity.py); no model call, whole-word matching, simple
+   obfuscations like `f*ck` normalised).
 2. **At most 2 subject categories** per question (`GUARDRAIL_MAX_CATEGORIES`, default 2).
 3. **Two categories must be related.** A question that bundles unrelated topics is rejected.
 
