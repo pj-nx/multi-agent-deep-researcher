@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """Checkpoint pruning: old completed threads go, recent and unfinished ones stay."""
 import sys
 from datetime import UTC, datetime, timedelta

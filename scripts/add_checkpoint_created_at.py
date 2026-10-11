@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """One-off migration: add ``created_at`` to an existing LangGraph ``checkpoints`` table.
 
     python scripts/add_checkpoint_created_at.py                 # sqlite: $CHECKPOINT_DB or default

@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """Per-run settings: validation, model resolution, Deps construction, budget capping and the API wiring."""
 import sys
 from pathlib import Path

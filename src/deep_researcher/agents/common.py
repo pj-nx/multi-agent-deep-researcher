@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """Helpers shared by the agents: activity events, structured model calls, prompt rendering."""
 
 from __future__ import annotations

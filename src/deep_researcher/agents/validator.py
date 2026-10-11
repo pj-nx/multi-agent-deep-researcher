@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """Source Validator: cheap-model grading of every newly retrieved source.
 
 For each sub-question it batches the unassessed evidence and asks the validator model for

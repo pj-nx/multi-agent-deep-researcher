@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """The API user guide: one Markdown source for the hosted page, the Gradio tab and GET /api/guide."""
 import sys
 from pathlib import Path

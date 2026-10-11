@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """Bag-of-words profanity check (the first version of the guardrail): no dependencies, no model.
 
 The text is lower-cased, common obfuscations (``f*ck``, ``sh1t``) are normalised, and the resulting words

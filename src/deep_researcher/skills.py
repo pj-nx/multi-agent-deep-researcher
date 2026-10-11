@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """Skills: short instruction blocks from ``skills.md`` appended to an agent's system prompt.
 
 Each ``## name`` section of ``skills.md`` is one skill. :data:`AGENT_SKILLS` says which agents get which

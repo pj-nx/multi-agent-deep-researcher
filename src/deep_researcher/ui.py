@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """Gradio UI: ask a question, watch the agents work, edit and approve the plan, read and download the report.
 
 Runs the graph in-process (no HTTP API in between). Launch with:
@@ -25,6 +26,8 @@ from deep_researcher.schemas import ResearchPlan, SourceType
 from deep_researcher.state import ResearchState  # noqa: F401 - documents the state shape for readers
 
 log = logging.getLogger(__name__)
+
+COPYRIGHT = "© 2026 C10 Hackathon G1 · Multi-Agent Deep Researcher"
 
 # Display labels for the editable plan table; columns are positional (see plan_to_rows / rows_to_plan).
 PLAN_HEADERS = ["ID", "Question", "Source types", "Search queries", "Depends on"]
@@ -406,6 +409,7 @@ def build_app(graph: Any = None):
                 _build_settings_tab(gr)
             with gr.Tab("API guide"):
                 gr.Markdown(api_guide_md(), elem_id="dr-report")
+        gr.Markdown(COPYRIGHT, elem_id="dr-footer")
     return demo
 
 

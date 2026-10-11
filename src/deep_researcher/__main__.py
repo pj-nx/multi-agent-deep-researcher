@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """CLI: `uv run python -m deep_researcher "question" [--max-hops N] [--auto-approve] [--out reports/]`"""
 from __future__ import annotations
 

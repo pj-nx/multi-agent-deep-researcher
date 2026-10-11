@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """End-to-end graph run with fake LLM, fake tools and a real (fake-embedded) store."""
 import sys
 from pathlib import Path

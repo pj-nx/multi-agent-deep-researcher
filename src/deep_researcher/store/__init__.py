@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """Persistent evidence store (vector DB) and chunking."""
 
 from deep_researcher.store.chunking import chunk_text, count_tokens

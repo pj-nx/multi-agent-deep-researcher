@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """Seeded evaluation cases: ``evals/questions.jsonl`` at the repository root (or ``EVALS_QUESTIONS``)."""
 
 from __future__ import annotations

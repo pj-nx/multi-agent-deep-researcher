@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """Language gate: detection, declared metadata, allowed list, retriever filtering, API parameters."""
 import sys
 from pathlib import Path

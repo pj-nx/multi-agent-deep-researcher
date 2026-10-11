@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """Wikipedia via the MediaWiki action API (no key): search + intro extracts in one call."""
 from __future__ import annotations
 

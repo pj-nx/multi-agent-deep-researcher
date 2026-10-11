@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """Settings: .env round trip, masking, blank/none semantics, live apply with cache resets."""
 import os
 import sys

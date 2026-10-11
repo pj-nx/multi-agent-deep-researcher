@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """News: newsdata.io when NEWSDATA_API_KEY is set, else GDELT (keyless).
 
 newsdata.io ``/api/1/latest`` covers recent news (roughly the last 48 hours; older articles need the

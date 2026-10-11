@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """Full-text fetcher: PDFs via pypdf, HTML via a tag-stripping parser. Size- and page-capped."""
 from __future__ import annotations
 

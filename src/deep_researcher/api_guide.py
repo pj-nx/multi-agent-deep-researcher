@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """The API user guide, rendered as Markdown for the hosted page's API tab, the Gradio app's API tab and
 ``GET /api/guide``. One source so the three never drift; the deployment's own URL, auth requirement
 and limits are filled in.

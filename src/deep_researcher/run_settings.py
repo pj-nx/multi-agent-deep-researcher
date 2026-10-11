@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """Per-run settings a client may send with a research request.
 
 Hosted deployments (Vercel, Lambda) have no writable ``.env``, so the hosted UI cannot change the

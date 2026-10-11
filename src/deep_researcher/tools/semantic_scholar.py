@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """Semantic Scholar Graph API. Keyless at a low shared rate limit; SEMANTIC_SCHOLAR_API_KEY raises it."""
 from __future__ import annotations
 

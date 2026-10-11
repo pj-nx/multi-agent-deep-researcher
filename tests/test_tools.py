@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """Retrieval tools against canned HTTP responses (httpx.MockTransport): parsers, enablement, failure modes."""
 import json
 import sys

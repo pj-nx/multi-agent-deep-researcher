@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """Tavily web search (TAVILY_API_KEY). Also used for 'reports' with a query hint towards PDFs/reports."""
 from __future__ import annotations
 

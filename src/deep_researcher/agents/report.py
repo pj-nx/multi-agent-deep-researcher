@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """Report Builder: model-written executive summary, findings and limitations; everything else assembled
 deterministically from state, then every citation is checked against kept evidence."""
 

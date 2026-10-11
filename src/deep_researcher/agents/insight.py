@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """Insight Generation: hypotheses and trends as explicit reasoning chains over the analysed evidence."""
 
 from __future__ import annotations

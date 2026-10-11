@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """Evaluation harness (PLAN.md Phase 7): seeded questions, report judges, suite runner, LangSmith glue."""
 
 from deep_researcher.evals.cases import EvalCase, load_cases

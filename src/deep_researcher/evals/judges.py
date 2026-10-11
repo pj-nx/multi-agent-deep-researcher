@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """Judges that score a finished report (``report_json`` as the Report Builder emits it).
 
 Four judges, each returning a score in [0, 1] (or ``None`` when not applicable):

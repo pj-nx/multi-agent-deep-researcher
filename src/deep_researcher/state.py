@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """LangGraph state for the research graph.
 
 Everything is stored as plain JSON-serialisable dicts (Pydantic models are dumped on write and

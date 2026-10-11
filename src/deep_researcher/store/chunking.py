@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """Token-budgeted chunking with overlap, breaking on paragraph/sentence boundaries.
 
 Defaults come from env so the whole app agrees on one chunk shape:

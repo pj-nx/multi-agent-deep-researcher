@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """Runtime settings: read/write the project's ``.env`` and apply changes to the running process.
 
 Used by the UI's Settings tab. Secrets are never echoed back in full (see :func:`mask`); blank

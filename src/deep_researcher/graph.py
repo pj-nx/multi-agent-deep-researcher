@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """The research graph: planner → approval → parallel retrievers → analysis loop → synthesis → report.
 
 All seven agents are real: planner, retrievers, source validator, critical analysis (with the

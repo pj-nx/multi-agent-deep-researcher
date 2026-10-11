@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """Which tools serve which source type, and which of them are enabled by the environment.
 
 Policy per source type:

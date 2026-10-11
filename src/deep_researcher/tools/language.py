@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """Language gate: only articles in the allowed languages (default English) become evidence.
 
 ``RETRIEVAL_LANGUAGES`` is a comma-separated list of ISO 639-1 codes (``en``, ``de``, ``fr`` ...).

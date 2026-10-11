@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """Injectable dependencies for graph nodes, so tests can swap LLMs, tools and the store."""
 from __future__ import annotations
 

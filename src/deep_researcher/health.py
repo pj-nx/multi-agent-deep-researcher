@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """Run health: one place where "something degraded but the run carried on" is recorded.
 
 Agents that fall back (a rate-limited source, a model error, a missing key) call :func:`degrade`.

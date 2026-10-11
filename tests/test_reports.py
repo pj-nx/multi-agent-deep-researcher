@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """Report files: Markdown, JSON and PDF rendering."""
 import io
 import sys

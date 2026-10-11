@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """LangSmith tracing support.
 
 Everything here degrades to a no-op when tracing is off or the `langsmith` package is

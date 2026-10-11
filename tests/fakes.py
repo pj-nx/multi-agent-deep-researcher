@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """Fakes shared by the graph and UI tests: schema-dispatching LLM, canned tools, in-memory store deps."""
 import re
 

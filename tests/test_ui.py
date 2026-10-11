@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """Gradio UI: pure helpers and the two streams, against the fake graph (no browser, no server)."""
 import importlib.util
 import sys

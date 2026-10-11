@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """Retrieval tools: papers (arXiv, Semantic Scholar), web/reports (Tavily), news (newsdata.io/GDELT),
 Wikipedia."""
 

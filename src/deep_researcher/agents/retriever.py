@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """Contextual Retriever: one branch per sub-question, fans out across the enabled tools.
 
 Deterministic by design (no LLM in the loop): every tool for the sub-question's source types is

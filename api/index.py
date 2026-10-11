@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """FastAPI entrypoint for Vercel.
 
 Vercel routes /api/* here (see vercel.json). Locally: `uvicorn api.index:app --reload`

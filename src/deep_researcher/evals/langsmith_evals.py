@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """Optional LangSmith integration: the seeded cases as a dataset, the judges as evaluators.
 
 Everything here needs ``LANGSMITH_TRACING=true`` and ``LANGSMITH_API_KEY``; :func:`available`

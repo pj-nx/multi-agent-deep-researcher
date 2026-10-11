@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 import sys
 from pathlib import Path
 

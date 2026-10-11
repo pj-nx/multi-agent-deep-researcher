@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """Pydantic models shared by the API and the graph.
 
 Plan, evidence and the analysis/insight/critique records. Later phases fill them in; the shapes

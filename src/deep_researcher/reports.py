@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """Writing finished reports to disk (shared by the CLI and the Gradio UI), including PDF rendering."""
 from __future__ import annotations
 

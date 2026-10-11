@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """Embedding model factory: local by default, hosted when you ask for it.
 
 The evidence store needs one embedding model per collection. This module picks it from env so

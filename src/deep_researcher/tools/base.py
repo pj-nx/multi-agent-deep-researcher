@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """Shared plumbing for retrieval tools.
 
 Every tool is a small class with ``name``, ``source_type``, the env vars it needs, and an async

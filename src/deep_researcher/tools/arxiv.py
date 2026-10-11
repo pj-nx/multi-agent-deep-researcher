@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """arXiv Atom API (no key). https://info.arxiv.org/help/api/user-manual.html"""
 from __future__ import annotations
 

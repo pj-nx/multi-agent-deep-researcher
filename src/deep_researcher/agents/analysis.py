@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """Critical Analysis: retrieval-augmented reasoning per sub-question.
 
 For every sub-question (plan + gap-derived), pull the best chunks from the vector store (filtered to

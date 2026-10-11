@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """LLM factory: every agent gets its chat model from here, routed through OpenRouter.
 
 OpenRouter exposes hundreds of models behind one OpenAI-compatible endpoint, so the

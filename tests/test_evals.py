@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """Phase 7: seeded cases, judges (deterministic + fake grader) and the suite runner on the fake graph."""
 import json
 import re

@@ -484,4 +484,5 @@ congestion-charges case (85%), where claims add qualifiers the cited abstracts d
 
 ## License
 
-No license has been chosen yet; all rights reserved until one is added.
+Copyright (c) 2026 C10 Hackathon G1. No license has been chosen yet; all rights reserved until one is added.
+Every source file carries the notice, and both UIs show it in their footer (`tests/test_copyright.py` keeps it that way).

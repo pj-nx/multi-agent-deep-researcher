@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """Per-run statistics shown in the UIs: fed from the event stream, cost from prices, Markdown rendering."""
 import sys
 from pathlib import Path

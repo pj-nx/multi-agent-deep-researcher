@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """Run the seeded cases through the real pipeline, judge each report and write a results folder.
 
 Per case the runner streams the plan, auto-approves it, streams the research leg to the report,

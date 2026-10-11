@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """Per-run statistics for the UIs: tokens and calls per model, call time per role, wall time per leg,
 the report's own counters, run-health issues and an estimated cost.
 

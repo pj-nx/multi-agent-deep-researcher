@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """skills.md: definitions are valid, a broken file never crashes an agent, and every agent's system prompt
 carries exactly its skills at the moment it runs (checked over a full fake pipeline run)."""
 import sys

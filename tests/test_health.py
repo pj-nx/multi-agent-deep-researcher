@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """Run health: degrade() records, tool failures surfaced by the retriever, report "Run health" section."""
 import sys
 from pathlib import Path

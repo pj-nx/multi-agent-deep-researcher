@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """Input guardrails: profanity, max categories, unrelated categories; fail-open when the classifier is down."""
 import sys
 from pathlib import Path

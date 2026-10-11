@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """Research Planner: decomposes the question into 3-7 sub-questions with source hints (structured output)."""
 from __future__ import annotations
 

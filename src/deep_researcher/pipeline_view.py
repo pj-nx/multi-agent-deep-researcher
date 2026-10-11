@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """Pipeline progress: turns the stream of graph events into a row of stage boxes (HTML).
 
 Pure Python so it can be unit-tested; the Gradio UI renders :meth:`PipelineProgress.render` in a

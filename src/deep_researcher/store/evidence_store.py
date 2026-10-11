@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """Persistent vector store for retrieved evidence, backed by Chroma.
 
 Why Chroma: embedded, zero-ops, persists to a directory, and the same code talks to Chroma

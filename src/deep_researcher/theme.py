@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """Visual system for the Gradio app: flat, minimalist, black type on white, green accent, with a
 dark mode (near-black canvas, light type, the same green).
 
@@ -151,11 +152,15 @@ CSS = f"""
                          background: var(--dr-green) !important; }}
 #dr-downloads button:hover {{ background: {PALETTE['green_dark']} !important; }}
 footer {{ display: none !important; }}
+#dr-footer {{ margin-top: 28px; padding-top: 12px; border-top: 1px solid var(--dr-line);
+              color: var(--dr-ink-3); font-size: 12px; text-align: center; }}
+#dr-footer p {{ margin: 0; }}
 #dr-theme-toggle {{ min-width: 0; max-width: 150px; margin-left: auto; }}
 
 /* ---- dark mode: Gradio adds the `dark` class to <body>; the toggle flips it ---- */
 .dark #dr-header h1 {{ color: {DARK['ink']}; }}
-.dark #dr-sub, .dark .dr-step, .dark #dr-busy {{ color: {DARK['ink_3']}; }}
+.dark #dr-sub, .dark .dr-step, .dark #dr-busy, .dark #dr-footer {{ color: {DARK['ink_3']}; }}
+.dark #dr-footer {{ border-top-color: {DARK['line']}; }}
 .dark .tab-container {{ border-bottom-color: {DARK['line']} !important; }}
 .dark .tab-container button[role="tab"] {{ color: {DARK['ink_3']} !important; }}
 .dark .tab-container button[role="tab"].selected {{ color: {DARK['ink']} !important;

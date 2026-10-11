@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """Red-Team Critic: adversarial review of the insights against the evidence.
 
 Verdicts: ``accept`` → report; ``revise`` → insights are regenerated with the critique;

@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """Hosted-deployment wiring: Postgres checkpointer, Chroma http/cloud clients, health payload.
 
 Live checks run only when a local Postgres (DR_TEST_DATABASE_URL) or Chroma server

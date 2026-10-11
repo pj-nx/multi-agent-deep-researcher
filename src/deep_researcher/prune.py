@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """Delete old graph runs from the checkpointer (sqlite or postgres, whichever ``CHECKPOINTER`` selects).
 
     uv run python -m deep_researcher.prune [--days 4] [--include-unfinished] [--dry-run]

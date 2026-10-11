@@ -1,3 +1,4 @@
+# Copyright (c) 2026 C10 Hackathon G1
 """Input guardrails, checked before any planning or retrieval spend.
 
 1. Profanity: a dependency-free bag-of-words word-list check (:mod:`deep_researcher.profanity`; no LLM
