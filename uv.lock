@@ -910,6 +910,7 @@ dependencies = [
     { name = "pydantic" },
     { name = "pypdf" },
     { name = "python-dotenv" },
+    { name = "python-multipart" },
     { name = "tiktoken" },
     { name = "xhtml2pdf" },
 ]
@@ -999,6 +1000,7 @@ requires-dist = [
     { name = "python-docx", marker = "extra == 'documents'", specifier = ">=1.1" },
     { name = "python-dotenv", specifier = ">=1.2.4" },
     { name = "python-dotenv", marker = "extra == 'agents'", specifier = ">=1.0" },
+    { name = "python-multipart", specifier = ">=0.0.9" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.6" },
     { name = "semanticscholar", marker = "extra == 'agents'", specifier = ">=0.9" },
     { name = "sentence-transformers", marker = "extra == 'embeddings-local'", specifier = ">=3.0" },

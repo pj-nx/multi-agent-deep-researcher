@@ -31,7 +31,7 @@ def fake_graph_streams(request, monkeypatch):
     import deep_researcher.graph as G
 
     async def fake_stream_until_interrupt(*, question, thread_id, max_hops=1, budget_seconds=None,
-                                          config=None, graph=None):
+                                          config=None, graph=None, documents=None):
         yield "plan", {"status": "awaiting_approval", "thread_id": thread_id,
                        "plan": {"question": question, "sub_questions": [
                            {"id": "sq1", "question": "What do RCTs say?", "source_types": ["papers"]}]}}

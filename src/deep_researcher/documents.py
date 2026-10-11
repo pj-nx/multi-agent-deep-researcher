@@ -333,6 +333,29 @@ def stamp() -> float:
     return time.time()
 
 
+def manifest_markdown(documents: list[dict[str, Any]]) -> str:
+    """Short manifest for the UIs."""
+    if not documents:
+        return ""
+    lines = []
+    for d in documents:
+        flag = " · **no extractable text** (scanned? not searchable)" if d.get("no_text") else ""
+        warn = f" · {'; '.join(d['warnings'])}" if d.get("warnings") else ""
+        lines.append(f"- **{d['filename']}** · {d.get('kind')} · {d.get('pages')} page(s) · "
+                     f"{d.get('sections')} section(s){flag}{warn}")
+    return "\n".join(lines)
+
+
+async def graph_for_documents(documents: dict[str, Any] | None, *, deps: Deps | None = None,
+                              store: Any = None):
+    """A compiled graph whose retrievers can search ``documents['set_id']`` (None = the shared graph)."""
+    from deep_researcher import graph as G
+
+    if not documents or not documents.get("set_id"):
+        return await G.graph_for(deps) if deps else None
+    return await G.graph_for(bind_documents(deps or Deps(), documents["set_id"], store=store))
+
+
 def ingest(
     files: list[tuple[str, bytes]],
     *,

@@ -17,6 +17,7 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any
 
+from deep_researcher.documents import DocumentError, graph_for_documents, ingest, manifest_markdown
 from deep_researcher.guardrails import GuardrailViolation
 from deep_researcher.pipeline_view import PipelineProgress
 from deep_researcher.reports import write_report
@@ -154,11 +155,13 @@ def format_activity(data: dict[str, Any], stamp: str) -> str:
 # ----------------------------------------------------------------------------- streams
 
 async def plan_stream(question: str, max_hops: int, budget: int | None, *, graph: Any = None,
+                      documents: dict[str, Any] | None = None,
                       ) -> AsyncIterator[tuple[str, list[list[str]], str, str]]:
     """Yields (log_text, plan_rows, thread_id, pipeline_html) until the planner pauses for approval."""
     from deep_researcher import graph as G
     from deep_researcher import tracing
 
+    graph = graph or await graph_for_documents(documents)
     thread_id = str(uuid.uuid4())
     cfg = tracing.run_config(thread_id, question, tags=["ui"])
     lines = [f"[{time.strftime('%H:%M:%S')}] thread {thread_id[:8]}: planning..."]
@@ -169,7 +172,7 @@ async def plan_stream(question: str, max_hops: int, budget: int | None, *, graph
     try:
         async for event, data in G.stream_until_interrupt(question=question, thread_id=thread_id,
                                                           max_hops=max_hops, budget_seconds=budget or None,
-                                                          config=cfg, graph=graph):
+                                                          config=cfg, graph=graph, documents=documents):
             lines.append(format_event(event, data))
             progress.update(event, data)
             if event == "plan" and data.get("status") == "awaiting_approval":
@@ -188,11 +191,13 @@ async def plan_stream(question: str, max_hops: int, budget: int | None, *, graph
 
 async def run_stream(thread_id: str, rows: list[list[Any]], question: str, budget: int | None,
                      log_text: str, *, graph: Any = None, out_dir: Path | None = None,
+                     documents: dict[str, Any] | None = None,
                      ) -> AsyncIterator[tuple[str, str, str | None, str | None, str | None, str]]:
     """Yields (log_text, report_markdown, md_path, json_path, pdf_path, pipeline_html) to the report."""
     from deep_researcher import graph as G
     from deep_researcher import tracing
 
+    graph = graph or await graph_for_documents(documents)
     lines = [log_text] if log_text else []
     try:
         plan = rows_to_plan(rows, question)
@@ -229,6 +234,33 @@ async def run_stream(thread_id: str, rows: list[list[Any]], question: str, budge
         yield ("\n".join(lines), report_md, str(md_path), str(json_path) if json_path else None,
                str(pdf_path) if pdf_path else None, progress.render())
     tracing.flush()
+
+
+# ----------------------------------------------------------------------------- uploads
+
+def ingest_uploads(paths: list[str] | None, current: dict[str, Any] | None = None,
+                   ) -> tuple[dict[str, Any] | None, str]:
+    """Ingest the files the ``gr.File`` component holds; returns (documents dict for the run, manifest md).
+
+    The component gives the full current list on every change, so a new set is built each time and the
+    previous one deleted; clearing the component drops the set.
+    """
+    from deep_researcher.store.uploads import get_upload_store
+
+    if current and current.get("set_id"):
+        try:
+            get_upload_store().delete_set(current["set_id"])
+        except Exception as exc:  # noqa: BLE001 - best effort cleanup
+            log.warning("could not delete document set %s: %s", current["set_id"], exc)
+    if not paths:
+        return None, ""
+    files = [(Path(p).name, Path(p).read_bytes()) for p in paths]
+    try:
+        set_id, manifest = ingest(files)
+    except DocumentError as exc:
+        return None, f"**Upload rejected:** {exc}"
+    docs = {"set_id": set_id, "documents": [d.model_dump() for d in manifest]}
+    return docs, manifest_markdown(docs["documents"])
 
 
 # ----------------------------------------------------------------------------- settings
@@ -413,6 +445,7 @@ def _build_research_tab(gr: Any, demo: Any, graph: Any, pipeline: Any) -> None:
     if True:
         thread_state = gr.State("")
         question_state = gr.State("")
+        docs_state = gr.State(None)
         gr.Markdown("Step 1 · Ask", elem_classes=["dr-step"])
         with gr.Row():
             question = gr.Textbox(label="Research question", lines=2, scale=4,
@@ -421,6 +454,11 @@ def _build_research_tab(gr: Any, demo: Any, graph: Any, pipeline: Any) -> None:
             with gr.Column(scale=1):
                 max_hops = gr.Slider(0, 3, value=1, step=1, label="Max follow-up hops")
                 budget = gr.Number(value=0, label="Budget (seconds, 0 = none)", precision=0)
+        with gr.Accordion("Attach documents (optional): pdf, txt, md, html, docx", open=False):
+            files = gr.File(file_count="multiple", elem_id="dr-files",
+                            file_types=[".pdf", ".txt", ".md", ".html", ".htm", ".docx"],
+                            label="Your documents become the `documents` source (the planner is told)")
+            docs_md = gr.Markdown("", elem_id="dr-docs")
         with gr.Row():
             plan_btn = gr.Button("Plan the research", variant="primary", scale=4)
             busy = gr.Markdown("Ready", elem_id="dr-busy")
@@ -447,26 +485,32 @@ def _build_research_tab(gr: Any, demo: Any, graph: Any, pipeline: Any) -> None:
         def _busy(text: str) -> str:
             return f"⏳ {text}"
 
-        async def on_plan(q, hops, bud):
+        def on_docs(paths, current):
+            return ingest_uploads(paths, current)
+
+        files.change(on_docs, [files, docs_state], [docs_state, docs_md])
+
+        async def on_plan(q, hops, bud, docs):
             q = (q or "").strip()
             if len(q) < 5:
                 yield "Enter a question first.", [], "", "", "Ready", FREE, FREE, gr.update()
                 return
             try:
-                async for log_text, rows, tid, pipe in plan_stream(q, int(hops), int(bud or 0), graph=graph):
+                async for log_text, rows, tid, pipe in plan_stream(q, int(hops), int(bud or 0), graph=graph,
+                                                                   documents=docs):
                     status = _busy("Planning...") if not rows else "✓ Plan ready, review and approve"
                     yield log_text, rows, tid, q, status, BUSY, BUSY, pipe
             finally:
                 yield (gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), FREE, FREE,
                        gr.update())
 
-        async def on_run(tid, rows, q, bud, previous_log):
+        async def on_run(tid, rows, q, bud, previous_log, docs):
             hidden = gr.update(visible=False)
             if not tid:
                 yield ((previous_log or "") + "\nRun the planner first.", "", hidden, hidden, hidden,
                        "Ready", FREE, FREE, gr.update())
                 return
-            stream = run_stream(tid, rows, q, int(bud or 0), previous_log or "", graph=graph)
+            stream = run_stream(tid, rows, q, int(bud or 0), previous_log or "", graph=graph, documents=docs)
             try:
                 async for log_text, md, md_path, json_path, pdf_path, pipe in stream:
                     status = _busy("Researching...") if not md else "✓ Report ready"
@@ -478,10 +522,10 @@ def _build_research_tab(gr: Any, demo: Any, graph: Any, pipeline: Any) -> None:
                 yield (gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), gr.update(),
                        FREE, FREE, gr.update())
 
-        plan_btn.click(on_plan, [question, max_hops, budget],
+        plan_btn.click(on_plan, [question, max_hops, budget, docs_state],
                        [activity, plan_table, thread_state, question_state, busy, plan_btn, run_btn,
                         pipeline])
-        run_btn.click(on_run, [thread_state, plan_table, question_state, budget, activity],
+        run_btn.click(on_run, [thread_state, plan_table, question_state, budget, activity, docs_state],
                       [activity, report_md, dl_pdf, dl_md, dl_json, busy, plan_btn, run_btn, pipeline])
 
 

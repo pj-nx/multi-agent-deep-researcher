@@ -47,13 +47,15 @@ from dotenv import load_dotenv
 if (os.getenv("DR_LOAD_DOTENV") or "1").strip().lower() not in {"0", "false", "no", "off"}:
     load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 from starlette.concurrency import iterate_in_threadpool
 from starlette.types import Receive, Scope, Send
 
 from deep_researcher import api_guide, embeddings, llm, tracing
+from deep_researcher import documents as docs_mod
+from deep_researcher.agents.deps import Deps
 from deep_researcher.guardrails import GuardrailViolation
 from deep_researcher.reports import markdown_to_pdf
 from deep_researcher.run_settings import RunSettings, allowed_models, effective_budget, is_allowed, make_deps
@@ -100,15 +102,21 @@ TRUST_PROXY_HEADERS = (os.getenv("TRUST_PROXY_HEADERS") or _trust_default).lower
 API_TAGS = ["api", "vercel" if os.getenv("VERCEL") else "local"]
 
 
+SET_ID = r"^[A-Za-z0-9_-]{8,64}$"
+
+
 class ResearchRequest(BaseModel):
     question: str = Field(min_length=5, max_length=2000)
     max_hops: int | None = Field(default=None, ge=0, le=5)
     settings: RunSettings | None = Field(default=None, description="per-run models / effort / budget")
+    document_set_id: str | None = Field(default=None, pattern=SET_ID,
+                                        description="a set from POST /api/documents to use as a source")
 
 
 class ResumeRequest(BaseModel):
     plan: ResearchPlan
     settings: RunSettings | None = Field(default=None, description="send the same settings as the plan call")
+    document_set_id: str | None = Field(default=None, pattern=SET_ID, description="same set as the plan call")
 
 
 class PdfRequest(BaseModel):
@@ -292,6 +300,8 @@ async def health() -> dict:
         "auth_required": API_AUTH_TOKEN is not None,
         "rate_limit_per_minute": RATE_LIMIT_PER_MINUTE,
         "max_concurrent_runs": MAX_CONCURRENT_RUNS,
+        "uploads": {**docs_mod.limits(),
+                    "max_request_mb": 4 if os.getenv("VERCEL") else None},   # Vercel caps request bodies
         "run_settings": {"overridable": ["models", "reasoning_effort", "fallback_models", "budget_seconds"],
                          "budget_cap_seconds": RUN_BUDGET_SECONDS or None, "max_hops_limit": 5,
                          "allowed_models": allowed_models() or None},
@@ -385,20 +395,84 @@ async def research(req: ResearchRequest) -> StreamingResponse:
             return
         from deep_researcher.graph import graph_for, stream_until_interrupt  # type: ignore[import-not-found]
 
-        deps = make_deps(req.settings)
+        deps = _deps_for(req.settings, req.document_set_id)
         graph = await graph_for(deps) if deps else None      # None = the shared graph
         if req.settings and not req.settings.is_empty():
             yield "settings", req.settings.summary()
         async for ev in stream_until_interrupt(
             question=req.question, thread_id=thread_id, max_hops=max_hops, budget_seconds=budget,
             config=tracing.run_config(thread_id, req.question, tags=["plan"]), graph=graph,
+            documents=documents,
         ):
             yield ev
 
-    echo = {"question": req.question, "max_hops": max_hops, "budget_seconds": budget}
+    documents = _documents_for(req.document_set_id)
+    echo = {"question": req.question, "max_hops": max_hops, "budget_seconds": budget,
+            "document_set_id": req.document_set_id}
     inputs = {"question": req.question, "max_hops": max_hops, "echo": echo}
     return SlotStreamingResponse(_run_stream("api.research", thread_id, inputs, "plan", slot, events),
                                  media_type="text/event-stream", slot=slot)
+
+
+def _upload_store() -> Any:
+    from deep_researcher.store.uploads import get_upload_store
+
+    return get_upload_store()
+
+
+def _documents_for(set_id: str | None) -> dict[str, Any] | None:
+    """Manifest dict for the graph state, or 404 when the set is unknown (expired, wrong instance)."""
+    if not set_id:
+        return None
+    manifest = _upload_store().manifest(set_id)
+    if not manifest:
+        raise HTTPException(status_code=404, detail="Unknown document set (expired, or uploaded to another "
+                                                    "instance); upload the files again.")
+    return {"set_id": set_id, "documents": [d.model_dump() for d in manifest]}
+
+
+def _deps_for(settings: RunSettings | None, set_id: str | None) -> Deps | None:
+    """Per-run dependencies: model overrides and/or the documents tool bound to this run's set."""
+    deps = make_deps(settings)
+    if set_id:
+        deps = docs_mod.bind_documents(deps or Deps(), set_id)
+    return deps
+
+
+_FILES = File(...)
+_SET_ID_FORM = Form(default=None, pattern=SET_ID)
+
+
+@app.post("/api/documents", dependencies=[Depends(guard)])
+async def upload_documents(files: list[UploadFile] = _FILES,
+                           document_set_id: str | None = _SET_ID_FORM) -> dict:
+    """Attach files as a research source. Returns the set id to send as ``document_set_id`` with
+    ``/api/research`` and ``/resume``, plus the manifest. Add to an existing set by passing its id."""
+    cap = docs_mod.max_file_bytes()
+    payload: list[tuple[str, bytes]] = []
+    for f in files:
+        data = await f.read(cap + 1)
+        if len(data) > cap:
+            raise HTTPException(status_code=413, detail=f"{f.filename}: larger than {cap // 1_000_000} MB")
+        payload.append((f.filename or "upload", data))
+    if not payload:
+        raise HTTPException(status_code=422, detail="No files received.")
+    try:
+        set_id, manifest = await asyncio.to_thread(docs_mod.ingest, payload, set_id=document_set_id)
+    except docs_mod.DocumentError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {"document_set_id": set_id, "documents": [d.model_dump() for d in manifest]}
+
+
+@app.get("/api/documents/{set_id}", dependencies=[Depends(guard)])
+async def get_documents(set_id: str) -> dict:
+    docs = _documents_for(set_id) or {}
+    return {"document_set_id": set_id, "documents": docs.get("documents", [])}
+
+
+@app.delete("/api/documents/{set_id}", dependencies=[Depends(guard)])
+async def delete_documents(set_id: str) -> dict:
+    return {"document_set_id": set_id, "deleted": await asyncio.to_thread(_upload_store().delete_set, set_id)}
 
 
 _models_cache: dict[str, Any] = {"at": 0.0, "rows": []}
@@ -448,8 +522,10 @@ async def resume(thread_id: str, req: ResumeRequest) -> StreamingResponse:
     slot = run_slots.acquire()
     from deep_researcher.graph import graph_for, resume_with_plan  # type: ignore[import-not-found]
 
+    _documents_for(req.document_set_id)                      # 404 before the stream starts
+
     async def events():
-        deps = make_deps(req.settings)
+        deps = _deps_for(req.settings, req.document_set_id)
         graph = await graph_for(deps) if deps else None      # None = the shared graph
         if req.settings and not req.settings.is_empty():
             yield "settings", req.settings.summary()

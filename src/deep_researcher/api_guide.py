@@ -78,6 +78,9 @@ resume with the (optionally edited) plan.
 | POST | `/api/research` | `{{"question", "max_hops"?, "settings"?}}` | SSE stream until the plan needs approval |
 | POST | `/api/research/{{thread_id}}/resume` | `{{"plan", "settings"?}}` | SSE stream through to the report |
 | POST | `/api/report/pdf` | `{{"markdown", "title"?}}` | `application/pdf` (stateless: pass the report Markdown back) |
+| POST | `/api/documents` | multipart `files[]`, optional `document_set_id` | attach your own files as a source; returns `document_set_id` and the manifest |
+| GET | `/api/documents/{{id}}` | | the set's manifest |
+| DELETE | `/api/documents/{{id}}` | | remove the set |
 
 ## Limits on this server
 
@@ -136,6 +139,24 @@ allowlist, anything else is rejected with `422`. `reasoning_effort` is `none`, `
 the server default. API keys are never part of settings. The stream echoes what was resolved in a
 `settings` event and the report's methodology section records the models used.
 
+## Uploaded documents (optional)
+
+Attach your own files (pdf, txt, md, html, docx) and they become the `documents` source: parsed and
+split into page-aligned sections on upload, searched by similarity for each sub-question, validated,
+cited as `[E-…]` and listed in the bibliography as "Uploaded: file.pdf, p. 12". The planner is told
+about them; add or remove `documents` in the plan's source types before resuming.
+
+```bash
+curl -X POST "{base}/api/documents"{auth_hdr} -F "files=@report.pdf" -F "files=@notes.md"
+# -> {{"document_set_id": "…", "documents": [{{"filename": "report.pdf", "pages": 12, "sections": 11, ...}}]}}
+```
+
+Send the id as `document_set_id` with **both** the plan and the resume request. Limits come from
+`/api/health` → `uploads` (file size, pages, files per set, retention; `max_request_mb` is the hosting
+platform's request cap, 4 MB on Vercel). Sets expire after the retention period, and like a
+thread, a set lives in the instance's store unless the deployment uses a hosted Chroma; upload and
+run promptly. Document text is treated as data, never as instructions.
+
 ## Step 3: PDF (optional)
 
 ```bash
@@ -188,7 +209,9 @@ for ev, d in events("POST", f"{{BASE}}/api/research/{{thread}}/resume", {{"plan"
 | Status | Meaning |
 |---|---|
 | `401` | missing or wrong token |
-| `422` | invalid body: question too short, bad plan, unknown tier/role, disallowed model, bad `thread_id` |
+| `422` | invalid body: question too short, bad plan, unknown tier/role, disallowed model, bad `thread_id`, unsupported or empty upload |
+| `413` | an uploaded file is larger than the server's per-file limit |
+| `404` | unknown `document_set_id` (expired, or uploaded to another instance) |
 | `429` | rate limit; wait `Retry-After` seconds |
 | `503` | too many runs in progress; retry after `Retry-After` |
 | `error` event | the run failed after it started (model or tool failure); the message says why |

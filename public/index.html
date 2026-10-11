@@ -85,6 +85,10 @@
   .range-row output { min-width:40px; padding:3px 8px; border:1px solid var(--line-2); border-radius:6px;
                       color:var(--ink); text-align:center; }
   .hint { color:var(--ink-3); font-size:12px; margin-top:4px; }
+  input[type=file] { color:var(--ink-3); font-size:13px; }
+  input[type=file]::file-selector-button { font:inherit; font-weight:600; font-size:13px; padding:6px 12px; margin-right:10px;
+                                           border:1.5px solid var(--green); border-radius:8px; background:var(--green); color:var(--btn-ink); cursor:pointer; }
+  input[type=file]::file-selector-button:hover { background:var(--green-hover); border-color:var(--green-hover); }
 
   button.btn { font:inherit; font-weight:600; padding:11px 18px; border:1.5px solid var(--green); border-radius:8px;
                background:var(--green); color:var(--btn-ink); cursor:pointer; }
@@ -181,6 +185,15 @@
         <div class="hint" id="budget-hint">Retrieval loops stop after this many seconds per leg.</div>
       </div>
     </div>
+    <details class="block" id="docs-block">
+      <summary>Attach documents (optional): pdf, txt, md, html, docx</summary>
+      <div style="padding:0 14px 12px">
+        <input id="docs" type="file" multiple accept=".pdf,.txt,.md,.html,.htm,.docx">
+        <div class="hint" id="docs-hint">Your files become the <code>documents</code> source; the planner is told about them.</div>
+        <ul id="doc-list" class="hint" style="margin:8px 0 0; padding-left:18px"></ul>
+        <button id="docs-clear" class="btn" type="button" style="display:none; margin-top:8px; padding:6px 12px; font-size:13px">Remove documents</button>
+      </div>
+    </details>
     <div class="actions">
       <button id="plan-btn" class="btn wide" type="button">Plan the research</button>
       <div id="dr-busy">Ready</div>
@@ -443,7 +456,7 @@
       }
       case 'activity': return formatActivity(d, s);
       case 'error': return `[${s}] ERROR: ${d.message}`;
-      case 'started': case 'done': case 'approve': return `[${s}] ${event}` + (d.elapsed_s ? ` (${d.elapsed_s}s)` : '');
+      case 'started': case 'done': case 'approve': return `[${s}] ${event}` + (d.elapsed_s ? ` (${d.elapsed_s}s)` : '') + (d.document_set_id ? ` · documents ${String(d.document_set_id).slice(0, 8)}` : '');
       default: { const { notes, ...rest } = d; return `[${s}] ${event}: ${JSON.stringify(rest).slice(0, 200)}`; }
     }
   }
@@ -485,6 +498,47 @@
     return { question, sub_questions: subs };
   }
   $('add-row').addEventListener('click', () => addRow([`sq${tbody.children.length + 1}`, '', 'web', '', '']));
+
+  // ---------------------------------------------------------------- uploaded documents
+  let documentSetId = null;
+  let uploadLimits = { max_file_mb: 20, max_request_mb: null };
+  function renderDocs(docs) {
+    const ul = $('doc-list'); ul.textContent = '';
+    for (const d of docs) {
+      const li = document.createElement('li');
+      li.textContent = `${d.filename} · ${d.kind} · ${d.pages} page(s) · ${d.sections} section(s)`
+        + (d.no_text ? ' · no extractable text (not searchable)' : '') + (d.warnings && d.warnings.length ? ' · ' + d.warnings.join('; ') : '');
+      ul.appendChild(li);
+    }
+    $('docs-clear').style.display = docs.length ? 'inline-block' : 'none';
+  }
+  $('docs').addEventListener('change', async () => {
+    const input = $('docs');
+    if (!input.files.length) return;
+    const cap = Math.min(uploadLimits.max_file_mb || 20, uploadLimits.max_request_mb || 1e9);
+    for (const f of input.files) {
+      if (f.size > cap * 1e6) { $('docs-hint').textContent = `${f.name} is larger than the ${cap} MB limit on this server.`; input.value = ''; return; }
+    }
+    const fd = new FormData();
+    for (const f of input.files) fd.append('files', f, f.name);
+    if (documentSetId) fd.append('document_set_id', documentSetId);
+    $('docs-hint').textContent = `Uploading ${input.files.length} file(s)...`;
+    try {
+      const res = await fetch('/api/documents', { method: 'POST', headers: authHeaders(), body: fd });
+      if (!res.ok) { let d = `${res.status}`; try { d += ` ${(await res.json()).detail ?? ''}`; } catch (_) {} $('docs-hint').textContent = `Upload failed: ${d}`; return; }
+      const data = await res.json();
+      documentSetId = data.document_set_id;
+      renderDocs(data.documents || []);
+      $('docs-hint').textContent = `${(data.documents || []).length} document(s) attached; they are searched as the "documents" source.`;
+      $('docs-block').open = true;
+    } catch (err) { $('docs-hint').textContent = `Upload failed: ${err.message || err}`; }
+    finally { input.value = ''; }
+  });
+  $('docs-clear').addEventListener('click', async () => {
+    if (documentSetId) { try { await fetch(`/api/documents/${documentSetId}`, { method: 'DELETE', headers: authHeaders() }); } catch (_) {} }
+    documentSetId = null; renderDocs([]);
+    $('docs-hint').textContent = 'Documents removed.';
+  });
 
   // ---------------------------------------------------------------- API plumbing
   const tokenInput = $('token');
@@ -579,6 +633,12 @@
     const models = h.llm && h.llm.models ? h.llm.models : (h.llm || {});
     row('models', typeof models === 'object' ? Object.entries(models).map(([k, v]) => `${k}: ${v}`).join('\n') : String(models));
     row('reasoning effort', (h.llm && h.llm.reasoning_effort) || 'model default');
+    if (h.uploads) {
+      uploadLimits = h.uploads;
+      const cap = Math.min(h.uploads.max_file_mb || 20, h.uploads.max_request_mb || 1e9);
+      row('uploads', `${(h.uploads.formats || []).join(', ')} · up to ${cap} MB per file, ${h.uploads.max_pages} pages, ${h.uploads.max_docs_per_set} files per set · kept ${h.uploads.retention_days} day(s)`);
+      $('docs-hint').textContent = `Up to ${cap} MB per file. Your files become the "documents" source; the planner is told about them.`;
+    }
     const allowed = h.run_settings && h.run_settings.allowed_models;
     row('allowed models', allowed ? allowed.join(', ') : 'any');
     if (allowed) $('settings-status').textContent = `Only these models may be chosen here: ${allowed.join(', ')}. Sent with each run; remembered in this browser.`;
@@ -613,6 +673,7 @@
     try {
       const body = { question, max_hops: Number($('hops').value) };
       const settings = runSettings(); if (settings) body.settings = settings;
+      if (documentSetId) body.document_set_id = documentSetId;
       for await (const { event, data } of sse('/api/research', body)) {
         if (event === 'started') threadId = data.thread_id;
         if (event !== 'settings') pipelineEvent(event, data);
@@ -634,6 +695,7 @@
     try {
       const body = { plan };
       const settings = runSettings(); if (settings) body.settings = settings;
+      if (documentSetId) body.document_set_id = documentSetId;
       for await (const { event, data } of sse(`/api/research/${threadId}/resume`, body)) {
         if (event !== 'started' && event !== 'settings') pipelineEvent(event, data);   // plan box already set
         logLine(formatEvent(event, data), event === 'error');
