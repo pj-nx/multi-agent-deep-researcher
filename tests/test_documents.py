@@ -157,9 +157,10 @@ async def test_documents_tool_returns_search_results(store):
 # ----------------------------------------------------------------------------- pipeline
 
 @pytest.mark.anyio
-async def test_bound_deps_feed_documents_through_retrieval_and_validation(store, tmp_path):
+async def test_bound_deps_feed_documents_through_retrieval_and_validation(store, tmp_path, monkeypatch):
     from deep_researcher.agents.retriever import retrieve_node
 
+    monkeypatch.setenv("UPLOAD_SECTION_TOKENS", "5")                 # one section per page for this test
     set_id, _ = D.ingest([("trial.pdf", make_pdf(["The four-day week trial RAISES productivity in knowledge work.",
                                                    "Manufacturing output LOWERS under compressed schedules."]))],
                          store=store)
