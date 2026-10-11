@@ -14,8 +14,8 @@ Anthropic route rejected the ``function_calling`` method for Opus with a provide
 
 Roles map to cost tiers; each can be overridden by environment variable:
 
-    OPENROUTER_MODEL_HEAVY   planner, analysis, insight, critic   (default anthropic/claude-opus-5.5)
-    OPENROUTER_MODEL_WORKER  retriever, report                    (default anthropic/claude-sonnet-5)
+    OPENROUTER_MODEL_HEAVY   planner, analysis, insight, critic   (default anthropic/claude-haiku-4.5)
+    OPENROUTER_MODEL_WORKER  retriever, report                    (default anthropic/claude-haiku-4.5)
     OPENROUTER_MODEL_CHEAP   validator                            (default anthropic/claude-haiku-4.5)
     OPENROUTER_MODEL_JUDGE   grader (eval judges)                 (default openai/gpt-5-mini)
     OPENROUTER_MODEL_<ROLE>  e.g. OPENROUTER_MODEL_INSIGHT=openai/gpt-5.1  (beats the tier)
@@ -53,8 +53,8 @@ DEFAULT_APP_URL = "https://github.com/pj-nx/multi-agent-deep-researcher"
 DEFAULT_APP_TITLE = "Multi-Agent Deep Researcher"
 
 TIER_DEFAULTS: dict[str, str] = {
-    "heavy": "anthropic/claude-opus-5.5",
-    "worker": "anthropic/claude-sonnet-5",
+    "heavy": "anthropic/claude-haiku-4.5",
+    "worker": "anthropic/claude-haiku-4.5",
     "cheap": "anthropic/claude-haiku-4.5",
     # Eval judges get their own tier, from a different vendor than the pipeline: a judge that shares
     # the validator's model inherits its blind spots and tends to approve its own family's output.
@@ -79,8 +79,8 @@ ROLE_TEMPERATURE: dict[str, float] = {
 # structured-output call that runs out of budget fails outright (LengthFinishReasonError) rather than
 # degrading. Observed: the critic spent 3.3k reasoning tokens before writing any JSON.
 ROLE_MAX_TOKENS: dict[str, int] = {
-    "planner": 300, "retriever": 300, "validator": 300, "analysis": 300,
-    "insight": 300, "critic": 300, "report": 300, "grader": 300,
+    "planner": 8_000, "retriever": 4_000, "validator": 4_000, "analysis": 16_000,
+    "insight": 16_000, "critic": 12_000, "report": 24_000, "grader": 2_000,
 }
 
 _TRUTHY = {"1", "true", "yes", "on"}
@@ -157,6 +157,18 @@ def fallback_models() -> list[str]:
 STRUCTURED_OUTPUT_METHOD = "json_schema"
 
 
+def max_tokens(role: str) -> int:
+    """Completion budget for ``role``; ``OPENROUTER_MAX_TOKENS`` caps every role (e.g. 300 for low credit)."""
+    default = ROLE_MAX_TOKENS[role]
+    raw = os.getenv("OPENROUTER_MAX_TOKENS", "").strip()
+    if not raw:
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        raise LLMConfigError(f"OPENROUTER_MAX_TOKENS={raw!r}; expected an integer") from None
+
+
 def attribution_headers() -> dict[str, str]:
     return {
         "HTTP-Referer": os.getenv("OPENROUTER_APP_URL", DEFAULT_APP_URL),
@@ -179,7 +191,7 @@ def build_kwargs(role: str, **overrides: Any) -> dict[str, Any]:
     kwargs: dict[str, Any] = {
         "model": model,
         "temperature": ROLE_TEMPERATURE[role],
-        "max_tokens": ROLE_MAX_TOKENS[role],
+        "max_tokens": max_tokens(role),
         "max_retries": 2,
         "timeout": 120,
         "default_headers": attribution_headers(),

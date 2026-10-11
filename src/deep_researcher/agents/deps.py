@@ -64,6 +64,6 @@ class Deps:
     analysis_k: int = 12                   # chunks shown to the analysis model per sub-question
     analysis_chunk_chars: int = 1600
     max_gap_branches: int = 4              # follow-up sub-questions pursued per hop (after de-duplication)
-    max_revisions: int = 2                 # critic rounds that may send insights back
+    max_revisions: int = 1                 # critic rounds that may send insights back
     embedding_id: Callable[[], str] = field(default=_default_embedding_id)
     model_names: Callable[[], str] = field(default=_default_model_names)

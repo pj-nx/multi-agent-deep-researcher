@@ -20,8 +20,8 @@ def llm(monkeypatch):
 
 
 def test_defaults_per_role(llm):
-    assert llm.model_for("planner") == "anthropic/claude-opus-5.5"
-    assert llm.model_for("retriever") == "anthropic/claude-sonnet-5"
+    assert llm.model_for("planner") == "anthropic/claude-haiku-4.5"
+    assert llm.model_for("retriever") == "anthropic/claude-haiku-4.5"
     assert llm.model_for("validator") == "anthropic/claude-haiku-4.5"
     assert llm.model_for("grader") == "openai/gpt-5-mini"
     assert llm.model_for("grader") != llm.model_for("validator")  # judge independent of the pipeline
@@ -40,7 +40,7 @@ def test_tier_and_role_overrides(llm, monkeypatch):
     monkeypatch.setenv("OPENROUTER_MODEL_INSIGHT", "google/gemini-3.1-pro-preview")
     assert llm.model_for("planner") == "openai/gpt-5.1"       # tier
     assert llm.model_for("insight") == "google/gemini-3.1-pro-preview"  # role beats tier
-    assert llm.model_for("report") == "anthropic/claude-sonnet-5"       # untouched tier
+    assert llm.model_for("report") == "anthropic/claude-haiku-4.5"       # untouched tier
 
 
 def test_unknown_role(llm):
@@ -56,14 +56,14 @@ def test_missing_key_is_clear_error(llm):
 
 
 def test_build_kwargs_routing(llm, monkeypatch):
-    monkeypatch.setenv("OPENROUTER_FALLBACK_MODELS", "openai/gpt-5.1, anthropic/claude-sonnet-5")
+    monkeypatch.setenv("OPENROUTER_FALLBACK_MODELS", "openai/gpt-5.1, anthropic/claude-haiku-4.5")
     monkeypatch.setenv("OPENROUTER_PROVIDER_ORDER", "anthropic,google-vertex")
     monkeypatch.setenv("OPENROUTER_ALLOW_FALLBACKS", "false")
     monkeypatch.setenv("OPENROUTER_ZDR", "true")
     kw = llm.build_kwargs("retriever")
-    assert kw["model"] == "anthropic/claude-sonnet-5"
+    assert kw["model"] == "anthropic/claude-haiku-4.5"
     # primary first, duplicates removed; routing travels in the OpenRouter-specific request body
-    assert kw["extra_body"]["models"] == ["anthropic/claude-sonnet-5", "openai/gpt-5.1"]
+    assert kw["extra_body"]["models"] == ["anthropic/claude-haiku-4.5", "openai/gpt-5.1"]
     assert kw["extra_body"]["provider"] == {"order": ["anthropic", "google-vertex"], "allow_fallbacks": False,
                                             "zdr": True}
     assert kw["temperature"] == 0.0 and "role:retriever" in kw["tags"]
@@ -76,7 +76,7 @@ def test_make_llm_constructs_chat_openai_bound_to_openrouter(llm, monkeypatch):
     model = llm.make_llm("insight", temperature=0.9)
     from langchain_openai import ChatOpenAI
     assert isinstance(model, ChatOpenAI)
-    assert model.model_name == "anthropic/claude-opus-5.5"
+    assert model.model_name == "anthropic/claude-haiku-4.5"
     assert model.openai_api_base == "https://openrouter.ai/api/v1"
     assert model.openai_api_key.get_secret_value() == "sk-or-test"
     assert model.default_headers["X-OpenRouter-Title"] == "Unit Test"
@@ -105,7 +105,10 @@ def test_reasoning_effort_env(llm, monkeypatch):
     monkeypatch.setenv("OPENROUTER_REASONING_EFFORT", "turbo")
     with pytest.raises(llm.LLMConfigError):
         llm.build_kwargs("critic")
-    assert llm.ROLE_MAX_TOKENS["critic"] == 300        # capped to fit the available credit
+    assert llm.ROLE_MAX_TOKENS["critic"] >= 8_000      # reasoning tokens count against the budget
+    monkeypatch.delenv("OPENROUTER_REASONING_EFFORT")
+    monkeypatch.setenv("OPENROUTER_MAX_TOKENS", "300")  # opt-in cap to fit low OpenRouter credit
+    assert llm.build_kwargs("critic")["max_tokens"] == 300
 
 
 def test_get_llm_caches_without_overrides(llm, monkeypatch):

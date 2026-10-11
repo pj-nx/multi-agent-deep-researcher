@@ -212,8 +212,8 @@ OPENROUTER_API_KEY=sk-or-...
 
 | Tier | Roles | Default model | Override |
 |---|---|---|---|
-| heavy | planner, analysis, insight, critic | `anthropic/claude-opus-5.5` | `OPENROUTER_MODEL_HEAVY` |
-| worker | retriever, report | `anthropic/claude-sonnet-5` | `OPENROUTER_MODEL_WORKER` |
+| heavy | planner, analysis, insight, critic | `anthropic/claude-haiku-4.5` | `OPENROUTER_MODEL_HEAVY` |
+| worker | retriever, report | `anthropic/claude-haiku-4.5` | `OPENROUTER_MODEL_WORKER` |
 | cheap | validator | `anthropic/claude-haiku-4.5` | `OPENROUTER_MODEL_CHEAP` |
 | judge | grader (eval judges only) | `openai/gpt-5-mini` | `OPENROUTER_MODEL_JUDGE` |
 
