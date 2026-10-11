@@ -1,0 +1,195 @@
+{
+  "case_id": "intermittent-fasting",
+  "question": "Does intermittent fasting outperform continuous calorie restriction for long-term weight maintenance?",
+  "ok": true,
+  "error": null,
+  "thread_id": "388a4db4-a7f2-49f0-8da0-96d4a5989ba3",
+  "plan_seconds": 56.0,
+  "run_seconds": 615.8,
+  "judge_seconds": 40.2,
+  "usage": {
+    "models": {
+      "anthropic/claude-haiku-4.5": {
+        "calls": 11,
+        "input_tokens": 20541,
+        "output_tokens": 12068
+      },
+      "deepseek/deepseek-v4-pro": {
+        "calls": 8,
+        "input_tokens": 23099,
+        "output_tokens": 31281
+      },
+      "anthropic/claude-sonnet-5": {
+        "calls": 1,
+        "input_tokens": 4949,
+        "output_tokens": 3077
+      }
+    },
+    "roles": {
+      "validator": {
+        "calls": 11,
+        "seconds": 111.5
+      },
+      "planner": {
+        "calls": 1,
+        "seconds": 51.5
+      },
+      "analysis": {
+        "calls": 1,
+        "seconds": 57.4
+      },
+      "insight": {
+        "calls": 3,
+        "seconds": 234.1
+      },
+      "critic": {
+        "calls": 3,
+        "seconds": 211.6
+      },
+      "report": {
+        "calls": 1,
+        "seconds": 31.2
+      }
+    }
+  },
+  "est_cost_usd": 0.139435,
+  "stats": {
+    "degradations": 1,
+    "retrieved": 41,
+    "kept": 10,
+    "dropped": 31,
+    "claims": 7,
+    "contradictions": 1,
+    "gaps": 5,
+    "gaps_pursued": 4,
+    "citations_verified": 8,
+    "citations_removed": 0,
+    "embedding_id": "snowflake/snowflake-arctic-embed-m-v1.5@256",
+    "hops": 1,
+    "languages": [
+      "en"
+    ],
+    "filtered_language": 0
+  },
+  "sub_questions": 5,
+  "judges": {
+    "citation_integrity": {
+      "name": "citation_integrity",
+      "score": 1.0,
+      "mode": "deterministic",
+      "details": {
+        "citations": 51,
+        "invalid": [],
+        "sources": 10
+      }
+    },
+    "groundedness": {
+      "name": "groundedness",
+      "score": 1.0,
+      "mode": "model",
+      "details": {
+        "claims": 7,
+        "structurally_valid": 7,
+        "judged": 7,
+        "unsupported": 0,
+        "verdicts": [
+          {
+            "claim": "Intermittent fasting (IF) is defined as any of various meal timing schedules that cycle between voluntary fasting (or reduced calorie intake) and non-fasting over a given period.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The cited source (E-13ed85eb2c) states verbatim: \u2018Intermittent fasting (IF) is any of various meal timing schedules that cycle between voluntary fasting (or reduced calorie intake) and non-fasting ove",
+            "score": 1.0
+          },
+          {
+            "claim": "Common methods of intermittent fasting include alternate-day fasting, periodic fasting such as the 5:2 diet, and daily time-restricted eating.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The cited sources (E-13ed85eb2c, E-ff38be9ce5, E-fc18564f9a, E-a0a8e3da98) explicitly list alternate-day fasting, periodic fasting (e.g., the 5:2 diet), and daily/time-restricted eating as methods of ",
+            "score": 1.0
+          },
+          {
+            "claim": "Time-restricted eating involves eating only within a fixed daily window, most commonly 16 hours of fasting and an 8-hour eating window (16:8), with variations such as 14:10 or 20:4.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The cited texts (E-a0a8e3da98, E-ff38be9ce5, E-fc18564f9a) define time-restricted eating as eating within a defined daily window and state the fasting period is most frequently 16 hours (16:8) with va",
+            "score": 1.0
+          },
+          {
+            "claim": "The 5:2 method consists of eating normally for five days per week and limiting calorie intake to about 500-600 calories on the other two non-consecutive days.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The cited sources (E-ff38be9ce5, E-fc18564f9a, E-13ed85eb2c) describe the 5:2 method as eating normally five days and limiting intake to about 500\u2013600 calories on the other two nonconsecutive days.",
+            "score": 1.0
+          },
+          {
+            "claim": "The eat-stop-eat method involves fasting for 24 hours once or twice per week, consuming no calories during the fast.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The cited sources (E-ff38be9ce5, E-fc18564f9a) state Eat-Stop-Eat involves one or two full 24-hour fasts per week and indicate no calories are consumed during those fasts.",
+            "score": 1.0
+          },
+          {
+            "claim": "Alternate-day fasting ( ADF) alternates between fasting days (which may involve severe calorie restriction or complete fasting) and regular eating days.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The cited texts (E-ff38be9ce5, E-a0a8e3da98, E-38f7ce808c) define alternate-day fasting as switching between fasting days and regular eating days, and note fasting days may involve calorie restriction",
+            "score": 1.0
+          },
+          {
+            "claim": "Continuous calorie restriction ( CCR) is defined as a consistent daily reduction in energy intake, typically by about 500 to 750 kcal per day or 30% of baseline energy requirements.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The cited sources (E-93470fc2d8, E-baf2057945) define continuous calorie restriction as a consistent daily reduction in energy intake and give guidance of about a 500\u2013750 kcal/day deficit or ~30% of b",
+            "score": 1.0
+          }
+        ]
+      }
+    },
+    "coverage": {
+      "name": "coverage",
+      "score": 1.0,
+      "mode": "model",
+      "details": {
+        "facets": [
+          {
+            "facet": "head-to-head randomised trials of fasting versus daily restriction",
+            "covered": true,
+            "where": "no randomized controlled trials directly comparing the two approaches over 12 months or longer were retrieved",
+            "keyword_share": 0.83
+          },
+          {
+            "facet": "adherence and dropout rates",
+            "covered": true,
+            "where": "No evidence on comparative adherence or dropout rates between IF and CCR in trials lasting 12 months or more was retrieved.",
+            "keyword_share": 1.0
+          },
+          {
+            "facet": "metabolic markers beyond body weight",
+            "covered": true,
+            "where": "No evidence on comparative metabolic adaptations (resting metabolic rate, appetite-regulating hormones) between IF and CCR was retrieved.",
+            "keyword_share": 0.4
+          },
+          {
+            "facet": "follow-up of twelve months or longer",
+            "covered": true,
+            "where": "no randomized controlled trials directly comparing the two approaches over 12 months or longer were retrieved",
+            "keyword_share": 0.5
+          }
+        ]
+      }
+    },
+    "contradiction_recall": {
+      "name": "contradiction_recall",
+      "score": null,
+      "mode": "deterministic",
+      "details": {
+        "found": 1,
+        "note": "no contradiction seeded for this case"
+      }
+    }
+  },
+  "total_seconds": 671.8,
+  "total_tokens": 95015,
+  "llm_calls": 20,
+  "mean_score": 1.0
+}

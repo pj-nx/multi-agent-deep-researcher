@@ -423,40 +423,36 @@ verdicts) and `summary.md` / `summary.json`. Tokens are summed from the agents' 
 events, so cost and time need no tracing backend; with LangSmith configured the same judges run as
 evaluators in an experiment over the uploaded dataset.
 
-### Baseline run (2026-10-11)
+### Baseline (2026-10-11, second run)
 
 All ten cases, `--max-hops 1 --budget 240 --concurrency 2`, heavy role `deepseek/deepseek-v4-pro`
-(reasoning effort high), worker `anthropic/claude-sonnet-5`, cheap and grader `anthropic/claude-haiku-4.5`,
-local embeddings. Full table and per-claim verdicts in
-[`evals/results/20261011-011036/summary.md`](evals/results/20261011-011036/summary.md).
+(reasoning effort high), worker `anthropic/claude-sonnet-5`, cheap `anthropic/claude-haiku-4.5`, judge
+`openai/gpt-5-mini`, local embeddings, all sources enabled (Tavily, newsdata.io, arXiv, Semantic Scholar,
+Wikipedia), LangSmith tracing on. Full table and per-claim verdicts in
+[`evals/results/20261011-135920/summary.md`](evals/results/20261011-135920/summary.md).
 
-| | Per run (mean of 10) |
-|---|---|
-| Wall time | 8.5 min (range 4.9 to 12.8) |
-| Model tokens | 86k (range 49k to 122k) |
-| Estimated model cost | $0.13 (range $0.10 to $0.18; $1.33 for the suite) |
-| Sources kept | 13 of about 40 retrieved |
-| Citation integrity | 100% |
-| Groundedness | 92% |
-| Coverage | 73% |
-| Contradiction recall | 50% (9 seeded; 4 matched, 1 other, 4 none) |
+| | Per run (mean of 10) | First baseline (web search disabled by a bad key) |
+|---|---|---|
+| Wall time | 12.7 min (range 9.3 to 16.0) | 8.5 min |
+| Model tokens | 215k (range 95k to 310k) | 86k |
+| Estimated model cost | $0.28 (range $0.14 to $0.34; $2.75 for the suite) | $0.13 |
+| Sources kept | 55 (range 10 to 75) | 13 |
+| Citation integrity | 100% | 100% |
+| Groundedness | 93% | 92% |
+| Coverage | 92% | 73% |
+| Contradiction recall | 94% (9 seeded; 8 matched, 1 other) | 50% |
+| Run health | no critical degradations in any case | n/a (not tracked yet) |
 
-What the numbers say:
-
-- **Citations are always real.** The Report Builder's citation check holds across every section.
-- **Groundedness failures are informative.** The one weak case (GLP-1, 33%) kept only 4 of 34 sources
-  and two of its three claims quoted hazard ratios that are not in the cited abstracts; the grader
-  caught model knowledge leaking into "grounded" claims. Fetching full text (`Deps.fetch_full_text`)
-  and a stricter validator threshold are the obvious levers.
-- **Coverage misses are mostly retrieval misses.** The facets not covered (NuScale cancellation,
-  Hall feeding trial, traffic displacement, hybrid vs fully remote) are the ones that need the web
-  search tool; during this run the Tavily key was invalid (every query returned 401), so retrieval
-  ran on arXiv, Semantic Scholar (rate-limited), newsdata.io and Wikipedia only. Re-run with a valid
-  key to measure the difference.
-- **Contradiction recall is the weakest judge**: four seeded disagreements produced no contradiction
-  at all. The analysis agent only flags contradictions *within* one sub-question's evidence; a
-  cross-sub-question pass before the insight step is the next improvement.
-
+What changed between the runs: a valid Tavily key (web and reports sources back), the merged
+improvements (run health, skills, branch-level validation, search cache, judge tier), and three fixes
+the rerun itself surfaced: the skills-driven outputs exceeded the report and validator schema limits
+and the judge's token budget (all raised), and re-grading a source at a later hop could overwrite its
+earlier "keep" verdict and orphan citations (the assessments reducer now keeps a source any
+sub-question kept). Coverage and contradiction recall are the big movers; they came from more and
+better sources, not from the judges. The price is about twice the tokens and cost per run, mostly in
+analysis (about 10 model-minutes per case summed across parallel calls), which the skills' longer
+outputs and the larger evidence base explain. The weakest remaining judge is groundedness in the
+congestion-charges case (85%), where claims add qualifiers the cited abstracts do not state.
 
 ## License
 

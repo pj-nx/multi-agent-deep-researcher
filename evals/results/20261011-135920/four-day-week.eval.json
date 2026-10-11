@@ -1,0 +1,363 @@
+{
+  "case_id": "four-day-week",
+  "question": "Does the four-day work week raise productivity?",
+  "ok": true,
+  "error": null,
+  "thread_id": "75365ff6-7a44-4367-a1d4-bb6ae0aeb127",
+  "plan_seconds": 71.5,
+  "run_seconds": 801.2,
+  "judge_seconds": 91.3,
+  "usage": {
+    "models": {
+      "anthropic/claude-haiku-4.5": {
+        "calls": 15,
+        "input_tokens": 39259,
+        "output_tokens": 25421
+      },
+      "deepseek/deepseek-v4-pro": {
+        "calls": 18,
+        "input_tokens": 96801,
+        "output_tokens": 78255
+      },
+      "anthropic/claude-sonnet-5": {
+        "calls": 1,
+        "input_tokens": 16060,
+        "output_tokens": 4110
+      }
+    },
+    "roles": {
+      "validator": {
+        "calls": 15,
+        "seconds": 218.3
+      },
+      "planner": {
+        "calls": 1,
+        "seconds": 65.0
+      },
+      "analysis": {
+        "calls": 11,
+        "seconds": 753.2
+      },
+      "insight": {
+        "calls": 3,
+        "seconds": 185.6
+      },
+      "critic": {
+        "calls": 3,
+        "seconds": 258.4
+      },
+      "report": {
+        "calls": 1,
+        "seconds": 43.4
+      }
+    }
+  },
+  "est_cost_usd": 0.292475,
+  "stats": {
+    "degradations": 1,
+    "retrieved": 100,
+    "kept": 67,
+    "dropped": 33,
+    "claims": 46,
+    "contradictions": 5,
+    "gaps": 30,
+    "gaps_pursued": 4,
+    "citations_verified": 23,
+    "citations_removed": 0,
+    "embedding_id": "snowflake/snowflake-arctic-embed-m-v1.5@256",
+    "hops": 1,
+    "languages": [
+      "en"
+    ],
+    "filtered_language": 0
+  },
+  "sub_questions": 5,
+  "judges": {
+    "citation_integrity": {
+      "name": "citation_integrity",
+      "score": 1.0,
+      "mode": "deterministic",
+      "details": {
+        "citations": 144,
+        "invalid": [],
+        "sources": 52
+      }
+    },
+    "groundedness": {
+      "name": "groundedness",
+      "score": 0.9,
+      "mode": "model",
+      "details": {
+        "claims": 46,
+        "structurally_valid": 46,
+        "judged": 30,
+        "unsupported": 3,
+        "verdicts": [
+          {
+            "claim": "The 100:80:100 model (100% pay, 80% time, 100% output) defines productivity as maintaining total output while reducing hours, implying an increase in output per hour.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The cited guide explicitly defines the 100:80:100 model as 100% pay, 80% time, 100% output and discusses that comparing a 32\u2011hour week to a 40\u2011hour week requires measuring output relative to time \u2014 im",
+            "score": 1.0
+          },
+          {
+            "claim": "Measuring output per hour is essential for comparing a reduced-hour week to a standard week; tracking only total hours makes a 4-day week appear as a loss because 20% fewer hours would mean 20% less '",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The source states directly that \u201cIf you only track total hours worked, a 4\u2011day week will always look like a loss because 20% fewer hours will mean 20% less \u2018work\u2019\u201d and that without output\u2011per\u2011hour you",
+            "score": 1.0
+          },
+          {
+            "claim": "Many organizations lack baseline data on output per hour, task completion rates, or team productivity across schedules, hindering proper measurement.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The guide says most companies haven\u2019t established the required baseline and that the typical organization tracks hours or nothing; it explicitly says very few have data on output per hour, task comple",
+            "score": 1.0
+          },
+          {
+            "claim": "In studies of overwork, total output can decrease when average productivity per hour declines enough, demonstrating the distinction between output per hour and total output.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The programming/overwork text states that when overwork reduces average productivity sufficiently total output can fall (example 60\u00d7P60 < 40\u00d7P40), and the other cited note reports per\u2011hour productivit",
+            "score": 1.0
+          },
+          {
+            "claim": "Some four-day week trials report productivity increases near 20% by focusing on output measurement and process redesign, though the exact productivity metric (per hour or total) is not always specifie",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "Autonomy\u2019s analysis in the cited piece reports productivity increases near 20% for firms adopting a four\u2011day week and links those results to process redesign, shorter meetings and measuring outputs ra",
+            "score": 1.0
+          },
+          {
+            "claim": "A four-day week trial dashboard recommends measuring hours, output, quality, etc., implying that output per hour can be derived if both hours and output are tracked.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The trial dashboard source recommends measuring hours, workload, output, quality etc., and the dashboard includes hours and output measures \u2014 which logically permits deriving output per hour if both a",
+            "score": 1.0
+          },
+          {
+            "claim": "In manufacturing contexts, labor productivity improvements require measuring individual task efficiency, not just total output, highlighting the importance of output per hour.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The manufacturing piece states that true labor productivity improvements require measuring individual task efficiency \u2014 not just total output \u2014 and gives numeric examples tying task time reductions to",
+            "score": 1.0
+          },
+          {
+            "claim": "In Iceland's 2015-2019 trials (2,500+ workers, 100+ workplaces, hours reduced to 35-36/week with no pay cut), productivity remained the same or improved in the majority of workplaces.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The Iceland trial sources report trials involving ~2,500+ workers across 100+ workplaces (35\u201336 hour weeks, no pay cut) and state that productivity and service provision 'remained the same or improved",
+            "score": 1.0
+          },
+          {
+            "claim": "In the UK 2022 pilot (61 companies, ~2,900 workers, 20% hour reduction, 6 months), 95% of organisations reported that productivity was maintained or improved.",
+            "verdict": "unsupported",
+            "structural": true,
+            "reason": "The cited excerpt does not contain the claimed 95% figure. The shown text reports other percentages (e.g., 86%, 88%) but does not state that 95% of organisations reported productivity was maintained o",
+            "score": 0.0
+          },
+          {
+            "claim": "The UK pilot saw 92% of companies continuing the four-day week, with most retaining full-time productivity targets and maintaining revenue levels.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The cited reports state 56 of 61 companies (~92%) continued the four\u2011day week, note that most firms retained full\u2011time productivity targets, and indicate revenue/business performance was maintained ov",
+            "score": 1.0
+          },
+          {
+            "claim": "Microsoft Japan's four-day week trial (a single-company experiment) reported a 40% productivity increase.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The cited summaries explicitly state Microsoft Japan reported a ~40% jump in productivity during its four\u2011day week trial.",
+            "score": 1.0
+          },
+          {
+            "claim": "Long-term follow-up indicates that productivity gains are sustained when companies implement operational redesign (cross-training, clear metrics), but may fade if relying solely on morale.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The 4 Day Week Global follow\u2011up excerpt states that sustained benefits were seen at 12 months when firms embedded cross\u2011training, handover protocols and clear metrics, and warns gains can fade when fi",
+            "score": 1.0
+          },
+          {
+            "claim": "A systematic review of 31 academic articles on the four-day work week found the impact on productivity to be inconclusive.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The systematic review states it drew on 31 academic articles and explicitly concludes that the impact on productivity was inconclusive.",
+            "score": 1.0
+          },
+          {
+            "claim": "A systematic review of working time reduction policies in the global North reported unclear productivity effects based on 14 studies of economic outcomes.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The systematic review excerpt reports economic effects (n=14) as mixed and explicitly describes productivity effects as 'unclear'.",
+            "score": 1.0
+          },
+          {
+            "claim": "A systematic literature review noted that four-day work week experimentation has shown potential to increase well-being without compromising productivity.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The cited systematic literature review text states experimentation has shown potential to increase happiness and well\u2011being 'without compromising productivity.'",
+            "score": 1.0
+          },
+          {
+            "claim": "A meta-analytic review of over 50 four-day work week trials across industries assessed productivity but the provided abstract does not report a specific conclusion on the effect.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The meta\u2011analytic review abstract says it draws on over 50 trial implementations and assesses productivity among other outcomes, and the provided abstract does not report a single specific overall eff",
+            "score": 1.0
+          },
+          {
+            "claim": "A longitudinal study in a construction company found that after implementing a four-day compressed workweek, employees experienced increased work-life balance and decreased fatigue and time pressure, ",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The longitudinal construction study abstract reports increased work\u2011life balance, decreased fatigue and time pressure, and that perceived productivity remained stable three months after implementing a",
+            "score": 1.0
+          },
+          {
+            "claim": "In a study of 350 rank-and-file employees in Metro Manila, compressed workweek arrangements reduced job stress, which in turn enhanced both work-life balance and work productivity.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The Metro Manila study (n=350) is cited as finding that compressed workweek implementation reduces job stress, which in turn enhances work\u2011life balance and work productivity.",
+            "score": 1.0
+          },
+          {
+            "claim": "A survey of 155 employees (mostly public sector education) in the UAE found that after a 4.5-day workweek, 70.9% reported higher motivation and 73.6% improved work-life balance, but 36.9% experienced ",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The UAE survey excerpt (n=155, mostly public\u2011sector education) gives the exact figures: 70.9% reported higher motivation, 73.6% improved work\u2011life balance, and 36.9% reported increased weekday stress ",
+            "score": 1.0
+          },
+          {
+            "claim": "A multivocal literature review identified adaptability, dynamic resource allocation, and data-driven insights as critical success factors for transitioning to a four-day workweek, implying organizatio",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The multivocal review explicitly identifies adaptability, dynamic resource allocation and data\u2011driven insights (alongside agility and pilot programs) as critical success factors for transitioning to a",
+            "score": 1.0
+          },
+          {
+            "claim": "In remote work settings, work-life balance satisfaction mediates about one-third of the relationship between work demands and productivity, and physical activity and sleep protect well-being, suggesti",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The remote\u2011work study states work\u2011life balance satisfaction mediates about one\u2011third of the link between work demands and productivity, and that physical activity and sleep protect well\u2011being and impr",
+            "score": 1.0
+          },
+          {
+            "claim": "Employee expectations about the effects of the compressed schedule moderate the actual outcomes, indicating a psychological mechanism: those who expect benefits are more likely to experience them.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The compressed schedule study reports effects were 'contingent on individuals\u2019 expectations' and highlights that expectations shape outcomes, matching the claimed psychological moderation.",
+            "score": 1.0
+          },
+          {
+            "claim": "General survey evidence indicates that work-life balance reduces stress and improves job satisfaction and productivity, supporting the indirect pathway from a four-day week to productivity through enh",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "Both cited survey studies report that better work\u2011life balance reduces stress and increases job satisfaction and performance, supporting an indirect pathway from improved well\u2011being to productivity.",
+            "score": 1.0
+          },
+          {
+            "claim": "In tech/software and marketing industries, a four-day week maintains productivity in over 90% of cases (94% and 91%, respectively).",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The trials summary lists sector successes and explicitly reports 'Tech/software (94% maintained productivity)' and 'Marketing agencies (91% maintained productivity)'.",
+            "score": 1.0
+          },
+          {
+            "claim": "Technology and finance sectors show statistically significant productivity increases (t = -4.69, p = 0.018).",
+            "verdict": "unsupported",
+            "structural": true,
+            "reason": "The provided excerpt of the cited PDF is general and does not show the specific statistical result (t = -4.69, p = 0.018) or the asserted significant increases for technology and finance in the text s",
+            "score": 0.0
+          },
+          {
+            "claim": "Implementation that eliminates low-value work (cutting meetings 30-50%, automating tasks, removing low-priority projects) achieves 94% success in maintaining productivity.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The trials summary links tactics (cutting meetings 30\u201350%, automating tasks, removing low\u2011priority projects) to a 'Success rate: 94% maintained productivity' in the described implementation model.",
+            "score": 1.0
+          },
+          {
+            "claim": "Staggered schedules to maintain five-day coverage have a lower success rate (76% maintained productivity) due to coordination complexity.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The same source describes 'Staggered Schedules' with a reported 'Success rate: 76% maintained productivity' and cites coordination complexity as the challenge.",
+            "score": 1.0
+          },
+          {
+            "claim": "Knowledge work with asynchronous collaboration and output measured by deliverables (rather than hours) is particularly suited to the four-day week.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The summary identifies knowledge work and asynchronous collaboration as sectors where output is measured by deliverables rather than hours, noting these characteristics align with four\u2011day week succes",
+            "score": 1.0
+          },
+          {
+            "claim": "Across diverse industries in a large UK trial, the average productivity impact was -0.7%, with 92% of companies maintaining productivity but some experiencing slight declines.",
+            "verdict": "unsupported",
+            "structural": true,
+            "reason": "The excerpt from the cited summary does not show the specific average productivity impact of \u22120.7%; while it discusses many sector results and a high maintenance rate, the \u22120.7% figure (and its combin",
+            "score": 0.0
+          },
+          {
+            "claim": "Tailoring the four-day week policy to industry and organizational context (e.g., classic Friday off, staggered, annualised, conditional) is associated with high continuation rates (92% of companies co",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The Autonomy report excerpt says companies designed tailored four\u2011day policies (Friday off, staggered, annualised, conditional) and reports 56 of 61 companies (92%) continued the policy, supporting th",
+            "score": 1.0
+          }
+        ]
+      }
+    },
+    "coverage": {
+      "name": "coverage",
+      "score": 1.0,
+      "mode": "model",
+      "details": {
+        "facets": [
+          {
+            "facet": "results of the Iceland, UK or other large pilot trials",
+            "covered": true,
+            "where": "\"Iceland's 2015-2019 trial (2,500+ workers, 100+ workplaces) and the UK's 2022 pilot (61 companies, ~2,900 workers) both found productivity maintained or improved in the large majority of participatin",
+            "keyword_share": 1.0
+          },
+          {
+            "facet": "self-reported versus objectively measured productivity",
+            "covered": true,
+            "where": "\"However, these trials rely largely on self-reported or organisational satisfaction measures rather than standardized objective metrics such as output per hour; neither the Iceland nor UK data specify",
+            "keyword_share": 0.75
+          },
+          {
+            "facet": "differences between knowledge work and manufacturing or service sectors",
+            "covered": true,
+            "where": "\"Conditions matter substantially. Knowledge-work sectors such as technology, software, marketing, and finance show higher success rates in maintaining productivity (94%, 91%, and statistically signifi",
+            "keyword_share": 0.83
+          },
+          {
+            "facet": "employee wellbeing, burnout or retention outcomes",
+            "covered": true,
+            "where": "\"Mechanistically, the proposed pathway runs through well-being: reduced fatigue, lower job stress, and improved work-life balance are associated with stable or improved productivity in several studies",
+            "keyword_share": 0.4
+          },
+          {
+            "facet": "self-selection of volunteer firms as a limitation",
+            "covered": true,
+            "where": "\"This creates a genuine disagreement: trial-level, self-reported data skew positive, while systematic syntheses of the academic literature are more cautious or inconclusive\u2014likely reflecting that tria",
+            "keyword_share": 0.25
+          }
+        ]
+      }
+    },
+    "contradiction_recall": {
+      "name": "contradiction_recall",
+      "score": 0.5,
+      "mode": "model",
+      "details": {
+        "found": 5,
+        "matches_hint": false,
+        "reason": "No. None of the found contradictions pair the specific opposing positions: pilot trials reporting maintained/higher productivity versus critics pointing to self-selected firms and self-reported measures. The closest item is the first (ambiguity about what \u2018productivity\u2019 means\u2014output per hour vs tota"
+      }
+    }
+  },
+  "total_seconds": 872.7,
+  "total_tokens": 259906,
+  "llm_calls": 34,
+  "mean_score": 0.85
+}

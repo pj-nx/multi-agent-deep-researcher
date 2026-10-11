@@ -1,0 +1,357 @@
+{
+  "case_id": "ai-coding-assistants",
+  "question": "Do AI coding assistants improve developer productivity without lowering code quality?",
+  "ok": true,
+  "error": null,
+  "thread_id": "7f9d5bed-c7ae-4ad0-b1f5-9241203d4550",
+  "plan_seconds": 34.3,
+  "run_seconds": 935.7,
+  "judge_seconds": 107.5,
+  "usage": {
+    "models": {
+      "anthropic/claude-haiku-4.5": {
+        "calls": 18,
+        "input_tokens": 41975,
+        "output_tokens": 29589
+      },
+      "deepseek/deepseek-v4-pro": {
+        "calls": 17,
+        "input_tokens": 127066,
+        "output_tokens": 84170
+      },
+      "anthropic/claude-sonnet-5": {
+        "calls": 1,
+        "input_tokens": 22528,
+        "output_tokens": 4680
+      }
+    },
+    "roles": {
+      "validator": {
+        "calls": 18,
+        "seconds": 274.2
+      },
+      "planner": {
+        "calls": 1,
+        "seconds": 28.7
+      },
+      "analysis": {
+        "calls": 10,
+        "seconds": 872.1
+      },
+      "insight": {
+        "calls": 3,
+        "seconds": 182.0
+      },
+      "critic": {
+        "calls": 3,
+        "seconds": 342.9
+      },
+      "report": {
+        "calls": 1,
+        "seconds": 49.8
+      }
+    }
+  },
+  "est_cost_usd": 0.343457,
+  "stats": {
+    "degradations": 1,
+    "retrieved": 97,
+    "kept": 71,
+    "dropped": 26,
+    "claims": 58,
+    "contradictions": 18,
+    "gaps": 30,
+    "gaps_pursued": 4,
+    "citations_verified": 27,
+    "citations_removed": 0,
+    "embedding_id": "snowflake/snowflake-arctic-embed-m-v1.5@256",
+    "hops": 1,
+    "languages": [
+      "en"
+    ],
+    "filtered_language": 0
+  },
+  "sub_questions": 5,
+  "judges": {
+    "citation_integrity": {
+      "name": "citation_integrity",
+      "score": 1.0,
+      "mode": "deterministic",
+      "details": {
+        "citations": 210,
+        "invalid": [],
+        "sources": 68
+      }
+    },
+    "groundedness": {
+      "name": "groundedness",
+      "score": 0.95,
+      "mode": "model",
+      "details": {
+        "claims": 58,
+        "structurally_valid": 58,
+        "judged": 30,
+        "unsupported": 0,
+        "verdicts": [
+          {
+            "claim": "In controlled experiments, AI coding assistants reduce task completion time substantially, e.g., 55.8% faster for a JavaScript task.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-fd49b697ed explicitly states \u201ca bounded JavaScript task was completed 55.8% faster with Copilot,\u201d and E-952d563f8c similarly reports a controlled experiment showing developers using Copilot complete",
+            "score": 1.0
+          },
+          {
+            "claim": "Workplace field trials show a 26.08% increase in completed tasks with AI assistance.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-fd49b697ed reports that pooled workplace trials \u201cfound 26.08% more completed tasks,\u201d directly matching the claim.",
+            "score": 1.0
+          },
+          {
+            "claim": "Some experienced developers may not benefit or even take longer with AI assistance, with one study reporting a 19% increase in time for maintainers and another noting some experienced developers see n",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-fd49b697ed reports \u201cexperienced maintainers in mature repositories took 19% longer when AI was permitted,\u201d and E-d5f477d345 notes that \u201cexperienced developers sometimes see no time savings,\u201d support",
+            "score": 1.0
+          },
+          {
+            "claim": "A longitudinal field study found 84% of developers reported productivity improvement at both time points, but the proportion with worsened developer experience nearly doubled from 14% to 27%.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-234b7b4874 reports that 84% reported productivity improvement at both time points and that among matched participants the proportion reporting worsened developer experience nearly doubled from 14% t",
+            "score": 1.0
+          },
+          {
+            "claim": "AI assistants shift developer focus from code creation to verification, introducing 'supervisory engineering work'.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-234b7b4874 states participants reported a \u201cshift in focus from creation to verification activities\u201d and explicitly proposes the category \u201csupervisory engineering work\u201d for directing/evaluating/corre",
+            "score": 1.0
+          },
+          {
+            "claim": "A systematic review of 39 studies found that the majority report productivity benefits, but code quality impact remains unresolved and concerns about cognitive offloading exist.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-d776bef828 (systematic review of 39 studies) states the majority report benefits, notes concerns about cognitive offloading, and says whether assistants improve or degrade code quality remains unres",
+            "score": 1.0
+          },
+          {
+            "claim": "Long-term productivity dimensions like technical expertise and ownership are important but often missing from current evaluations, as shown in a survey of 2,989 developers.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-5cd2260e3d describes a survey of 2,989 developer responses and reports that long-term metrics (e.g., technical expertise and ownership) are important and often missing from current evaluations.",
+            "score": 1.0
+          },
+          {
+            "claim": "AI-generated code has higher defect rates than human-written code. One large telemetry study found a 50% increase in defect injection rate (from 3.2 to 4.8 bugs per 1,000 lines of code) [E-ec9effb8a3]",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-ec9effb8a3 reports defect injection rates up 50% (3.2 \u2192 4.8 bugs/1,000 LOC), E-deda05c2fd reports AI-generated PRs have ~1.7\u00d7 more issues, and E-5f2dc1bb11 / E-95e1448d13 describe a \u226530% defect risk",
+            "score": 1.0
+          },
+          {
+            "claim": "Security vulnerabilities increase with AI coding assistants. One report observed a 61.1% rise in security vulnerability flags [E-ec9effb8a3]; another found security vulnerabilities 1.5\u20132x higher, and ",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-ec9effb8a3 reports security vulnerability flags up 61.1%; E-deda05c2fd and E-25523f97e7 report security issues 1.5\u20132\u00d7 and up to 2.74\u00d7 higher respectively; E-53c5e95c2f documents diverse security wea",
+            "score": 1.0
+          },
+          {
+            "claim": "Maintainability is negatively affected: readability problems appear more than 3x as often as in human code [E-deda05c2fd, E-25523f97e7]; code churn within 30 days rises 67.8% [E-ec9effb8a3]; code comp",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-deda05c2fd and E-25523f97e7 report readability problems >3\u00d7 more often in AI code; E-ec9effb8a3 reports 30-day code churn up 67.8%; E-e69c76c8d2 reports code complexity rose ~41% after adoption; and",
+            "score": 1.0
+          },
+          {
+            "claim": "AI-generated code reduces some error types: spelling mistakes occur 1.76x less often, and code testing issues are reduced by 1.32x compared to human-written code [E-04eaa9ccf3].",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-04eaa9ccf3 lists advantages including that AI reduced spelling errors by a factor of 1.76 and reduced code testing issues by a factor of 1.32, matching the claim's figures.",
+            "score": 1.0
+          },
+          {
+            "claim": "High-maturity engineering organizations that use automated guardrails and test-driven development can mitigate over 80% of the defect and security penalty from AI-assisted code [E-ec9effb8a3].",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-ec9effb8a3 explicitly states that high-maturity orgs (automated guardrails + TDD) \u201cmitigate 80%+ of the defect/security penalty.\u201d",
+            "score": 1.0
+          },
+          {
+            "claim": "Code review outcomes worsen: PR review lead time increases by 41.5% for reviewers [E-ec9effb8a3], and major outages at Amazon have been directly linked to AI-assisted code changes, prompting stricter ",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-ec9effb8a3 reports PR review lead time up 41.5% for reviewers; E-0017ad9540 documents outages linked to AI-assisted code changes at Amazon and reporting that Amazon moved to stricter human oversight",
+            "score": 1.0
+          },
+          {
+            "claim": "81% of enterprise leaders report more production issues tied to AI-generated code, and developers do not fully trust it; the root cause is often lack of system context, not syntax errors [E-e69c76c8d2",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-e69c76c8d2 states \u201c81% of enterprise leaders report more production issues tied to AI-generated code,\u201d notes developers do not fully trust AI-generated code (survey figures cited), and says failures",
+            "score": 1.0
+          },
+          {
+            "claim": "A meta-analysis of empirical studies indicates that AI-generated code often suffers from quality, maintainability, and security problems, even as it increases developer productivity; the 55% faster ta",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-3c1642d3c0 (a synthesis/meta-analysis) states AI-generated code shows problems in quality, maintainability, and security while also noting productivity/speed gains\u2014supporting the interpretation of a",
+            "score": 1.0
+          },
+          {
+            "claim": "AI-assisted developers produced 3 to \u01b04x more commits in a Fortune 500 environment, but this was accompanied by larger pull requests, greater dependency sprawl, and a broader application attack surfac",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-bc98ab2641 reports Apiiro\u2019s analysis in a Fortune 500 environment showing AI-assisted developers produced 3\u20134\u00d7 more commits and that this was accompanied by larger PRs, greater dependency sprawl, an",
+            "score": 1.0
+          },
+          {
+            "claim": "45% of developers report that debugging AI-generated code is more time-consuming than debugging their own code.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-bc98ab2641 cites Stack Overflow 2025 results stating \u201c45% say debugging AI-generated code is more time-consuming.\u201d",
+            "score": 1.0
+          },
+          {
+            "claim": "In a randomized 2025 trial, experienced open-source developers took 19% longer to complete tasks when using AI tools, despite believing that the tools made them faster.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-bc98ab2641 reports a randomized 2025 trial in which experienced open-source developers were 19% slower with AI tools despite believing the tools made them faster (METR 2025).",
+            "score": 1.0
+          },
+          {
+            "claim": "In a controlled experiment with60 undergraduate students in a deep lerning practicum, the group using generative AI tools achieved significantly higher code quality scores (20.77 vs. 18.12 out of 25) ",
+            "verdict": "partially_supported",
+            "structural": true,
+            "reason": "E-1bc7867d31 reports the controlled study with 60 undergraduates and shows significantly higher code quality scores (20.77 vs. 18.12/25) and higher conceptual scores for the AI group, but the provided",
+            "score": 0.5
+          },
+          {
+            "claim": "66% of developers cite AI output that is \u201calmost right, but not quite\u201d as their top frustration, reflecting a gap between productivity expectations and actual code correctness.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-bc98ab2641 (citing Stack Overflow 2025) reports that 66% of developers cite AI output being \u201calmost right, but not quite\u201d as their top frustration, supporting the claim and its interpretation about ",
+            "score": 1.0
+          },
+          {
+            "claim": "the meta-analysis emphasizes that a \u201chuman in the loop",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-3c1642d3c0 explicitly states that using a \u201chuman in the loop\u201d approach is very important for risk mitigation and assurance of software correctness, i.e., the meta-analysis emphasizes human-in-the-lo",
+            "score": 1.0
+          },
+          {
+            "claim": "A Harvard Business School study found a 17%\u201343% productivity improvement for knowledge workers including developers when using AI, but the study did not directly examine the trade-off with code qualit",
+            "verdict": "partially_supported",
+            "structural": true,
+            "reason": "E-eefeafebe7 reports the Harvard Business School study finding a 17%\u201343% productivity improvement for knowledge workers (including developers). The excerpt does not show whether the study directly exa",
+            "score": 0.5
+          },
+          {
+            "claim": "GitHub Copilot and Amazon CodeWhisperer (now Amazon Q Developer) are among the most widely used AI coding assistants. Evidence comparing these two tools explicitly labels them as 'most popular options",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-a17bbe8c6c and related comparison pieces explicitly label GitHub Copilot and Amazon CodeWhisperer (now Amazon Q Developer) among the most popular options and center comparisons on them; the excerpts",
+            "score": 1.0
+          },
+          {
+            "claim": "In a real-world test, AI-assisted teams completed projects 32-37% faster than traditional methods. GitHub Copilot X team finished 37% faster; CodeWhisperer team 32% faster. Routine tasks showed approx",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-e3ad6c6fd3 reports real-world testing where the Copilot X team finished 37% faster and the CodeWhisperer team 32% faster (projects 32\u201337% faster overall) and states routine tasks showed \u224840% product",
+            "score": 1.0
+          },
+          {
+            "claim": "Code quality metrics favored Amazon CodeWhisperer over GitHub Copilot X: lower cyclomatic complexity (10.8 vs 12.3), less code duplication (3.7% vs 4.2%), higher test coverage (81% vs 76%), and fewer ",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-e3ad6c6fd3 lists CodeWhisperer\u2019s code-quality figures: cyclomatic complexity 10.8 vs 12.3, duplication 3.7% vs 4.2%, test coverage 81% vs 76%, bugs 0.7 vs 0.8 per 100 LOC, and states CodeWhisperer p",
+            "score": 1.0
+          },
+          {
+            "claim": "Amazon CodeWhisperer includes built-in security scanning with real-time OWASP detection, dependency chain CVE analysis, and permission boundary oversight. Its enterprise compliance features are being ",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-e3ad6c6fd3 describes CodeWhisperer\u2019s security scanning (real-time OWASP detection, dependency chain CVE analysis, permission boundary oversight) and E-532b7a0808 notes enterprise compliance features",
+            "score": 1.0
+          },
+          {
+            "claim": "GitHub Copilot offers context-aware suggestions that understand local context and cross-file relationships. Amazon CodeWhisperer extends context awareness with AWS resource awareness, which aids teams",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-532b7a0808 and E-bb6e193205 describe Copilot as offering context-aware suggestions (local/cross-file context) and CodeWhisperer as extending context awareness with AWS resource/ecosystem awareness, ",
+            "score": 1.0
+          },
+          {
+            "claim": "GitHub Copilot is user-friendly with auto-complete and variable detection, and junior developers adapted to Copilot X in 2-3 days (vs. 4-5 days for CodeWhisperer). However, CodeWhisperer had higher sa",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-73be05813c documents Copilot\u2019s user-friendly auto-complete and variable-detection and its learning-tool role; E-e3ad6c6fd3 reports junior devs adapted to Copilot X in 2\u20133 days vs. 4\u20135 days for CodeW",
+            "score": 1.0
+          },
+          {
+            "claim": "CodeWhisperer tends to be slightly faster than Copilot in generating suggestions, but Copilot generally produces higher-quality code suggestions for complex algorithms and design patterns, according t",
+            "verdict": "partially_supported",
+            "structural": true,
+            "reason": "E-a17bbe8c6c supports the second part (it states Copilot generally produces higher-quality suggestions for complex algorithms/design patterns) but the provided excerpts do not support\u2014 and other excer",
+            "score": 0.5
+          },
+          {
+            "claim": "Tabnine is a security-focused, enterprise-only AI coding assistant that offers on-premises, private VPC, or air-gapped deployment, with personalization from local code and optional model customization",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-f4b392f67c describes Tabnine as enterprise-focused with on\u2011prem/private VPC/air\u2011gapped deployment, personalization from local code, optional custom models, a promise not to train on customer code un",
+            "score": 1.0
+          }
+        ]
+      }
+    },
+    "coverage": {
+      "name": "coverage",
+      "score": 1.0,
+      "mode": "model",
+      "details": {
+        "facets": [
+          {
+            "facet": "controlled experiments measuring task completion speed (for example the GitHub Copilot study)",
+            "covered": true,
+            "where": "a controlled experiment found 55.8% faster completion of a JavaScript task with a higher success rate (78% vs 70%) [E-fd49b697ed][E-952d563f8c]",
+            "keyword_share": 0.88
+          },
+          {
+            "facet": "effects on code quality, defects or security vulnerabilities",
+            "covered": true,
+            "where": "One telemetry study reports a 50% rise in defect injection rate (3.2 to 4.8 bugs per 1,000 lines of code), a 61.1% rise in security-vulnerability flags, a 67.8% rise in 30-day code churn, and a 41.5% ",
+            "keyword_share": 1.0
+          },
+          {
+            "facet": "differences between junior and senior developers",
+            "covered": true,
+            "where": "However, these gains are not uniform: experienced maintainers working in mature repositories took 19% longer when AI use was permitted [E-fd49b697ed] ... A controlled classroom study of 60 undergradua",
+            "keyword_share": 0.5
+          },
+          {
+            "facet": "field or telemetry studies compared with lab experiments",
+            "covered": true,
+            "where": "No single study in the retrieved evidence base directly and simultaneously quantifies both productivity and quality for the same population and task in a real-world setting; the trade-off is only part",
+            "keyword_share": 1.0
+          }
+        ]
+      }
+    },
+    "contradiction_recall": {
+      "name": "contradiction_recall",
+      "score": 1.0,
+      "mode": "model",
+      "details": {
+        "found": 18,
+        "matches_hint": true,
+        "reason": "Yes. For example: 'A: AI assistants reduce task completion time in controlled, bounded tasks (55.8% faster)' vs 'B: Experienced maintainers in mature repositories took 19% longer when AI was permitted' directly contrasts controlled-experiment speed gains with negative/no gains in field maintenance. "
+      }
+    }
+  },
+  "total_seconds": 970.0,
+  "total_tokens": 310008,
+  "llm_calls": 36,
+  "mean_score": 0.988
+}

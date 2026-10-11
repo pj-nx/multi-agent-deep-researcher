@@ -1,0 +1,357 @@
+{
+  "case_id": "remote-work-innovation",
+  "question": "Has remote work reduced innovation in firms that adopted it broadly?",
+  "ok": true,
+  "error": null,
+  "thread_id": "6c492696-aff9-45f8-8cea-1e1fb16902b8",
+  "plan_seconds": 74.7,
+  "run_seconds": 623.6,
+  "judge_seconds": 81.7,
+  "usage": {
+    "models": {
+      "anthropic/claude-haiku-4.5": {
+        "calls": 16,
+        "input_tokens": 38968,
+        "output_tokens": 25425
+      },
+      "deepseek/deepseek-v4-pro": {
+        "calls": 15,
+        "input_tokens": 57621,
+        "output_tokens": 54506
+      },
+      "anthropic/claude-sonnet-5": {
+        "calls": 1,
+        "input_tokens": 12189,
+        "output_tokens": 2884
+      }
+    },
+    "roles": {
+      "validator": {
+        "calls": 16,
+        "seconds": 227.7
+      },
+      "planner": {
+        "calls": 1,
+        "seconds": 66.4
+      },
+      "analysis": {
+        "calls": 10,
+        "seconds": 546.0
+      },
+      "insight": {
+        "calls": 2,
+        "seconds": 158.5
+      },
+      "critic": {
+        "calls": 2,
+        "seconds": 157.5
+      },
+      "report": {
+        "calls": 1,
+        "seconds": 29.6
+      }
+    }
+  },
+  "est_cost_usd": 0.254104,
+  "stats": {
+    "degradations": 1,
+    "retrieved": 99,
+    "kept": 41,
+    "dropped": 58,
+    "claims": 39,
+    "contradictions": 5,
+    "gaps": 32,
+    "gaps_pursued": 4,
+    "citations_verified": 7,
+    "citations_removed": 0,
+    "embedding_id": "snowflake/snowflake-arctic-embed-m-v1.5@256",
+    "hops": 1,
+    "languages": [
+      "en"
+    ],
+    "filtered_language": 1
+  },
+  "sub_questions": 5,
+  "judges": {
+    "citation_integrity": {
+      "name": "citation_integrity",
+      "score": 1.0,
+      "mode": "deterministic",
+      "details": {
+        "citations": 87,
+        "invalid": [],
+        "sources": 30
+      }
+    },
+    "groundedness": {
+      "name": "groundedness",
+      "score": 0.9,
+      "mode": "model",
+      "details": {
+        "claims": 39,
+        "structurally_valid": 39,
+        "judged": 30,
+        "unsupported": 1,
+        "verdicts": [
+          {
+            "claim": "Patent counts and citation-weighted patent counts are among the most common firm-level innovation measures, often treated as R&D output.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The cited sources explicitly report that patent statistics (counts and citation-weighted measures) are widely used as measures of innovation at the firm level and are often treated as R&D output (E-0e",
+            "score": 1.0
+          },
+          {
+            "claim": "R&D spending is another frequently used measure, though it is not always reported by firms and its link to innovative output is uncertain.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The sources state R&D spending is a frequently used measure but is only sometimes recorded by firms and that it is unclear to what extent R&D spending translates into innovative output (E-3166edb4aa; ",
+            "score": 1.0
+          },
+          {
+            "claim": "Innovation surveys capture new product introductions and other innovation types (process, marketing, organisational) and show that many firms introduce new products without performing R&D or patenting",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The OECD firm-level innovation survey text shows surveys capture product, process, marketing and organisational innovations and reports firms introduce new products without necessarily performing R&D ",
+            "score": 1.0
+          },
+          {
+            "claim": "Trademarks have been proposed as an alternative measure of product innovation, especially for firms that do not patent or report R&D.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The UCI piece describes using trademarks as an alternative way to measure product innovation, noting many firms that have product trademarks do not report R&D or register patents, supporting the propo",
+            "score": 1.0
+          },
+          {
+            "claim": "Measurement of process innovation output at the firm level is still underdeveloped.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The Rammer (2022) excerpt states that measuring process innovation output at the firm level is still in its infancy, directly supporting the claim (E-125dc3b1a9).",
+            "score": 1.0
+          },
+          {
+            "claim": "A profit-based measure of innovativeness derived from accounting data has been proposed as an alternative to large-scale surveys.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The ESCoE description outlines a profit-based accounting-data measure of innovativeness proposed as an alternative to large-scale surveys and shows it can be implemented from company accounts (E-88620",
+            "score": 1.0
+          },
+          {
+            "claim": "Remote work adoption significantly increases both major releases and new feature introductions per mobile app, with no reduction in the originality of digital product innovation, as shown by a stagger",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The paper on mobile apps uses a staggered difference-in-differences design and reports that remote work adoption significantly increases both major releases and new feature introductions per app and d",
+            "score": 1.0
+          },
+          {
+            "claim": "The positive effect of remote work on digital product innovation is stronger for app development teams with prior modular collaboration experience through open-source participation.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The same mobile-app study explicitly states the positive effects of remote work are stronger for teams with prior modular collaboration experience through open-source participation (E-8c591334f7).",
+            "score": 1.0
+          },
+          {
+            "claim": "Remote work enables teams to expand their workforce and increase collective skill capacity, which are associated with improved digital product innovation outcomes.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The mobile-app study text reports remote work enables teams to expand their workforce and increase collective skill capacity, both associated with improved digital product innovation outcomes (E-8c591",
+            "score": 1.0
+          },
+          {
+            "claim": "Firms adopting work-from-home increased patents for non\u2013face-to-face technologies, with smaller, younger firms in the ICT-related industry driving the results. The study design is not specified, so ca",
+            "verdict": "partially_supported",
+            "structural": true,
+            "reason": "The cited snippet reports that firms adopting WFH increased patents for non\u2013face-to-face technologies and that smaller, younger ICT firms drove results, but the provided text does not describe the stu",
+            "score": 0.5
+          },
+          {
+            "claim": "In a 2022 study of biotech R&D teams, 58% developed 15% more novel ideas with hybrid work, but the study design is not described and likely not quasi-experimental.",
+            "verdict": "partially_supported",
+            "structural": true,
+            "reason": "The compiled statistics state '58% of biotech R&D teams developed 15% more novel ideas with hybrid work' (attributed to a 2022 study), but the provided snippet does not describe the study\u2019s design or ",
+            "score": 0.5
+          },
+          {
+            "claim": "A natural experiment at the USPTO found that transitioning from work-from-home to work-from-anywhere increased patent examiner output by 4.4% without affecting rework. This outcome is productivity, no",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The USPTO natural experiment is described: moving from WFH to WFA increased examiner output by 4.4% with no increase in rework; the study is about worker productivity at the USPTO (not a firm-level in",
+            "score": 1.0
+          },
+          {
+            "claim": "Fully remote work is associated with about 10% lower productivity than fully in-person work, with challenges in communicating and innovating cited as contributing factors.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The Evolution of Working from Home summary states fully remote work is associated with about 10% lower productivity than fully in-person work and cites communication/mentoring/culture/self-motivation ",
+            "score": 1.0
+          },
+          {
+            "claim": "Virtual communication curbs creative idea generation, as reported by Brucks & Levav (2022) in Nature.",
+            "verdict": "unsupported",
+            "structural": true,
+            "reason": "The provided excerpt does not mention Brucks & Levav (2022) or report a specific finding that 'virtual communication curbs creative idea generation'; the snippet only makes more general statements abo",
+            "score": 0.0
+          },
+          {
+            "claim": "Broad remote work reduces serendipitous interactions (e.g., watercooler moments), which harms the discovery phase of innovation; one tech company saw a 24% drop in time spent on idea generation and br",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The PEX Network piece documents reduced idea discovery in remote work, cites the loss of spontaneous 'watercooler' interactions, and gives an example of one tech company reporting a 24% drop in time s",
+            "score": 1.0
+          },
+          {
+            "claim": "The development stage of innovation, which requires deep focus, thrives in remote settings because employees face fewer distractions; in-office distractions can reduce focus by up to 42%.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The same PEX Network text argues the development stage benefits from deep, uninterrupted focus in remote settings and reports employees cited up to a 42% drop in focus from in-office distractions (E-4",
+            "score": 1.0
+          },
+          {
+            "claim": "Remote work can support innovation through employee autonomy and outcomes-focused management, helping employees feel less restricted when pursuing creative solutions.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The Penn LPS piece states remote setups can support innovation via autonomy and that outcomes-focused management helps employees feel less restricted when pursuing creative solutions (E-99774006f8).",
+            "score": 1.0
+          },
+          {
+            "claim": "Work communication in remote settings can improve job satisfaction by reducing employee alienation, but virtual meetings are associated with increased workload, stress, and fatigue.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The cited review reports that work communication in remote settings can improve job satisfaction by reducing employee alienation, and it also notes virtual meetings are associated with increased workl",
+            "score": 1.0
+          },
+          {
+            "claim": "Remote collaboration tools are claimed to foster innovation and streamline workflows, but the evidence for this is thin and comes from low-credibility sources.",
+            "verdict": "partially_supported",
+            "structural": true,
+            "reason": "The web articles assert that remote collaboration tools 'foster innovation' and 'streamline workflows' (E-fe8e6dee62; E-2e7cf696f3), but the claim that the evidence is thin and from low\u2011credibility so",
+            "score": 0.5
+          },
+          {
+            "claim": "63% of biotech firms reported improved cross-functional collaboration with hybrid models.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The biotech statistics compilation explicitly states 63% of biotech firms reported improved cross\u2011functional collaboration with hybrid models (attributed to a BIO survey) (E-cdafac755d).",
+            "score": 1.0
+          },
+          {
+            "claim": "58% of biotech R&D teams developed 15% more novel ideas with hybrid work.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The same compilation reports that 58% of biotech R&D teams developed 15% more novel ideas with hybrid work (attributed to a 2022 study) (E-cdafac755d).",
+            "score": 1.0
+          },
+          {
+            "claim": "72% of biotech professionals use digital collaboration tools more effectively in hybrid setups, leading to faster idea sharing.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The compilation states 72% of biotech professionals use digital collaboration tools more effectively in hybrid setups, leading to faster idea sharing (attributed to a 2023 Gartner report) (E-cdafac755",
+            "score": 1.0
+          },
+          {
+            "claim": "49% of biotech startups saw increased partnerships with external researchers due to hybrid work accessibility.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The compilation reports 49% of biotech startups saw increased partnerships with external researchers due to hybrid work accessibility (attributed to a 2023 TechCrunch survey) (E-cdafac755d).",
+            "score": 1.0
+          },
+          {
+            "claim": "52% of biotech leaders stated remote work maintained or increased R&D output.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The compilation states 52% of biotech leaders said remote work maintained or increased R&D output in 2023 (attributed to McKinsey's Life Sciences Insights Report) (E-cdafac755d).",
+            "score": 1.0
+          },
+          {
+            "claim": "Telework can impair communication and knowledge flows, according to the OECD.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The OECD excerpt explicitly lists impaired communication and knowledge flows as a cost of telework that must be balanced against benefits, supporting the claim (E-b6a81cb264).",
+            "score": 1.0
+          },
+          {
+            "claim": "In mobile app development, remote work adoption significantly increases major releases and new feature introductions, and does not reduce the introduction of novel (more radical) features relative to ",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The mobile-app study reports remote work adoption significantly increases major releases and new feature introductions per app and finds it does not reduce the originality of digital product innovatio",
+            "score": 1.0
+          },
+          {
+            "claim": "Firm size and industry influence how remote work initiatives are implemented, but the retrieved evidence does not contain any direct analysis of whether the impact of remote work on innovation differs",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The implementation study notes firm size and industry significantly affect how remote work initiatives are executed (E-ed82d20be9). The other retrieved snippets do not present a direct analysis of whe",
+            "score": 1.0
+          },
+          {
+            "claim": "In the legal industry, larger firms are more likely to adopt hybrid work and generative AI, whereas smaller firms maintain stricter in-office requirements and slower AI adoption, suggesting that firm ",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The Legal Loop summary reports larger legal firms are more likely to adopt hybrid work and generative AI while smaller firms enforce stricter in\u2011office requirements and show slower AI adoption; the pi",
+            "score": 1.0
+          },
+          {
+            "claim": "Remote work adoption led to a significant increase in major app releases and new feature introductions per app, indicating improved digital product innovation performance.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The mobile-app study finds remote work adoption significantly increases both major releases and new feature introductions per app, which the authors interpret as improved digital product innovation pe",
+            "score": 1.0
+          },
+          {
+            "claim": "Remote work did not reduce the originality of digital product innovation; both novel and imitative feature introductions increased.",
+            "verdict": "partially_supported",
+            "structural": true,
+            "reason": "The mobile-app paper reports remote work increases new feature introductions and 'does not reduce the originality' of innovation, but the provided text does not explicitly state that counts of both no",
+            "score": 0.5
+          }
+        ]
+      }
+    },
+    "coverage": {
+      "name": "coverage",
+      "score": 1.0,
+      "mode": "model",
+      "details": {
+        "facets": [
+          {
+            "facet": "communication or collaboration network studies (for example the Microsoft remote-work study)",
+            "covered": true,
+            "where": "Distributed environments limit contacts, reducing chance encounters [E-f2dd2bca9e].",
+            "keyword_share": 0.4
+          },
+          {
+            "facet": "patent, publication or product output measures",
+            "covered": true,
+            "where": "Firm-level studies typically measure innovation using patents, R&D spending, and new product introductions.",
+            "keyword_share": 0.75
+          },
+          {
+            "facet": "hybrid versus fully remote arrangements",
+            "covered": true,
+            "where": "Industry survey data, concentrated almost entirely in biotechnology, suggest hybrid work is associated with more novel ideas and better cross-functional collaboration [E-cdafac755d].",
+            "keyword_share": 0.75
+          },
+          {
+            "facet": "causal identification versus correlational evidence",
+            "covered": true,
+            "where": "The only rigorous causal (quasi-experimental) study identified uses a staggered difference-in-differences design on a panel of mobile applications and finds that remote work adoption increased digital",
+            "keyword_share": 0.33
+          }
+        ]
+      }
+    },
+    "contradiction_recall": {
+      "name": "contradiction_recall",
+      "score": 1.0,
+      "mode": "model",
+      "details": {
+        "found": 5,
+        "matches_hint": true,
+        "reason": "Yes. Several found contradictions (notably items 2, 3 and 4) present the same two opposing positions as expected: (A) remote/telework impairs creativity, knowledge flows and novelty (the network/patent-type finding) versus (B) remote/hybrid work causes no productivity/innovation loss or even increas"
+      }
+    }
+  },
+  "total_seconds": 698.3,
+  "total_tokens": 191593,
+  "llm_calls": 32,
+  "mean_score": 0.975
+}

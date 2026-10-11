@@ -1,0 +1,357 @@
+{
+  "case_id": "ultra-processed-food",
+  "question": "How strong is the evidence linking ultra-processed food consumption to all-cause mortality?",
+  "ok": true,
+  "error": null,
+  "thread_id": "29001f30-c415-47f6-ab47-a321b45def0d",
+  "plan_seconds": 42.7,
+  "run_seconds": 512.9,
+  "judge_seconds": 95.5,
+  "usage": {
+    "models": {
+      "anthropic/claude-haiku-4.5": {
+        "calls": 12,
+        "input_tokens": 27647,
+        "output_tokens": 16812
+      },
+      "deepseek/deepseek-v4-pro": {
+        "calls": 10,
+        "input_tokens": 44166,
+        "output_tokens": 38842
+      },
+      "anthropic/claude-sonnet-5": {
+        "calls": 1,
+        "input_tokens": 12164,
+        "output_tokens": 4913
+      }
+    },
+    "roles": {
+      "validator": {
+        "calls": 12,
+        "seconds": 146.2
+      },
+      "planner": {
+        "calls": 1,
+        "seconds": 39.1
+      },
+      "analysis": {
+        "calls": 7,
+        "seconds": 467.8
+      },
+      "insight": {
+        "calls": 1,
+        "seconds": 51.5
+      },
+      "critic": {
+        "calls": 1,
+        "seconds": 106.7
+      },
+      "report": {
+        "calls": 1,
+        "seconds": 54.5
+      }
+    }
+  },
+  "est_cost_usd": 0.210607,
+  "stats": {
+    "degradations": 1,
+    "retrieved": 63,
+    "kept": 40,
+    "dropped": 23,
+    "claims": 37,
+    "contradictions": 3,
+    "gaps": 24,
+    "gaps_pursued": 4,
+    "citations_verified": 2,
+    "citations_removed": 0,
+    "embedding_id": "snowflake/snowflake-arctic-embed-m-v1.5@256",
+    "hops": 1,
+    "languages": [
+      "en"
+    ],
+    "filtered_language": 0
+  },
+  "sub_questions": 4,
+  "judges": {
+    "citation_integrity": {
+      "name": "citation_integrity",
+      "score": 1.0,
+      "mode": "deterministic",
+      "details": {
+        "citations": 85,
+        "invalid": [],
+        "sources": 36
+      }
+    },
+    "groundedness": {
+      "name": "groundedness",
+      "score": 0.917,
+      "mode": "model",
+      "details": {
+        "claims": 37,
+        "structurally_valid": 37,
+        "judged": 30,
+        "unsupported": 1,
+        "verdicts": [
+          {
+            "claim": "The NOVA classification was proposed in 2009 by researchers at the University of S\u00e3o Paulo, Brazil.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-305ae249f2 explicitly states: \"Researchers at the University of S\u00e3o Paulo, Brazil, proposed the system in 2009.\"",
+            "score": 1.0
+          },
+          {
+            "claim": "NOVA classifies foods into four groups: Group 1 (unprocessed or minimally processed foods), Group 2 (processed culinary ingredients), Group 3 (processed foods), and Group 4 (ultra-processed food and d",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-bb7566f3db, E-46a0f238b0 and E-305ae249f2 all list the four NOVA groups as: unprocessed/minimally processed; processed culinary ingredients; processed foods; ultra-processed food and drink products.",
+            "score": 1.0
+          },
+          {
+            "claim": "The stated purpose of NOVA is to classify foods according to the nature, extent, and purposes of industrial processing, with the aim of relating processing to diet quality.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-bb7566f3db quotes NOVA\u2019s stated purpose to classify \"all foods according to the nature, extent, and purposes of the industrial processes they undergo,\" and E-772d1236bb states NOVA seeks to relate p",
+            "score": 1.0
+          },
+          {
+            "claim": "Ultra-processed foods are defined by extensive industrial processes that include fractioning, chemical modifications, and frequent use of additives; they typically contain little to no whole foods and",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-b93a63b803 and E-2e92bc4b1c define UPFs via fractioning, chemical modifications and frequent additive use, note they often contain little/no whole foods and are designed to be ready-to-eat, shelf-st",
+            "score": 1.0
+          },
+          {
+            "claim": "Examples of ultra-processed foods include packaged snacks, carbonated drinks, instant noodles, ready-made meals, mass-produced breads, ice cream, sweetened yogurts, hot dogs, deli meats, cheese puffs,",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "Examples given in E-2e92bc4b1c, E-51057f5c58 and E-9391912259 include packaged snacks, carbonated drinks, instant noodles, ready meals, mass-produced breads, ice cream, sweetened yogurts, hot dogs/del",
+            "score": 1.0
+          },
+          {
+            "claim": "Alcoholic distilled beverages such as vodka and whiskey are classified as ultra-processed under the NOVA system.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-2e92bc4b1c explicitly states that \"Distilled alcoholic beverages from Group 1 foods, such as vodka and whiskey, are also included in this category.\"",
+            "score": 1.0
+          },
+          {
+            "claim": "The definition of ultra-processed foods has varied over time, and the system often relies on lists of examples; NOVA considers ingredients, processing, and marketing, but does not directly evaluate nu",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-772d1236bb notes the definition of UPFs has varied and that lists of examples are used; E-9391912259 states NOVA considers ingredients, processing and marketing and that \"nutritional content is not ",
+            "score": 1.0
+          },
+          {
+            "claim": "The quality of evidence in systematic reviews and meta-analyses on UPFs and health has consistently been rated as low or very low, with high risk of bias and flawed reporting.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-1c8c9c979a states that results of systematic reviews/meta-analyses are low quality, subject to high risk of bias and flawed reporting, with most evidence rated low to very low quality.",
+            "score": 1.0
+          },
+          {
+            "claim": "The observational evidence base is likely biased by confounding from nutrients, energy, diet quality, dietary patterns, and reverse causality.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-1c8c9c979a explicitly says the evidence base is likely biased by confounding including nutrients, energy, diet quality and dietary patterns, as well as by reverse causality.",
+            "score": 1.0
+          },
+          {
+            "claim": "Selection bias and publication bias are recognized as threats, where the former leads to systematic error and the latter hinders accurate evidence review.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-315af10076 defines selection bias (systematic error from non-representative samples) and publication bias (selective publication hindering accurate review) and describes their effects on evidence ev",
+            "score": 1.0
+          },
+          {
+            "claim": "The Nova classification has considerable limitations for practical application, and coding assumptions in nutrient databases can introduce measurement error and bias.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-f770b1291e notes NOVA has \"considerable limitations for practical application,\" and E-a1da4fc119 highlights that assumptions about coding (ultra-/processed food categories) in nutrient databases can",
+            "score": 1.0
+          },
+          {
+            "claim": "High-quality research methodologies and mechanistic understanding are needed to strengthen the evidence base.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-315af10076 and E-1c8c9c979a call for better mechanistic understanding and more rigorous research methodologies to improve the evidence base.",
+            "score": 1.0
+          },
+          {
+            "claim": "The ELAPSE project (Stafoggia et al. 2022) is a large recent cohort study covering 28 million people from seven European cohorts, examining long-term exposure to low ambient air pollution concentratio",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-576bdd7fa4 cites Stafoggia et al. (2022): \"Long-term exposure to low ambient air pollution concentrations and mortality among 28 million people: results from seven large European cohorts within the ",
+            "score": 1.0
+          },
+          {
+            "claim": "An updated systematic review and meta-analysis for the WHO global air quality guidelines found significant positive associations between long-term exposure to PM2.5 and PM10 and all-cause and cause-sp",
+            "verdict": "partially_supported",
+            "structural": true,
+            "reason": "E-a7d4f82f9d (WHO update summary) shows pooled effect analyses for PM2.5 and all\u2011cause and cause\u2011specific mortality and indicates an updated review with additional studies, but the excerpts provided d",
+            "score": 0.5
+          },
+          {
+            "claim": "The PURE study (Hystad et al. 2020) investigated long-term PM2.5 and cardiovascular mortality in a large pooled cohort from 21 countries, predominantly low- and middle-income, but found no consistent ",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-adb3116f36 describes the PURE study (Hystad et al. 2020) as a large pooled cohort from 21 countries (mostly low-/middle-income), finding associations with cardiovascular mortality but \"No consistent",
+            "score": 1.0
+          },
+          {
+            "claim": "A 2023 analysis of Asian cohorts (Downward and Vermeulen, Asia Cohort Consortium) examined ambient air pollution and all-cause and cause-specific mortality, providing recent large-scale data from Asia",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-adb3116f36 includes the citation: \"Downward GS, Vermeulen R; Asia Cohort Consortium Executive Board. 2023. Ambient Air Pollution and All-Cause...\", indicating a 2023 analysis of Asian cohorts on amb",
+            "score": 1.0
+          },
+          {
+            "claim": "A forest plot from the HRAPIE-2 project includes many recent cohort studies published in 2022 and 2023 (e.g., Bouma 2023, Hao 2023, Li 2023), indicating that new large cohort evidence has been incorpo",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-576bdd7fa4 displays a forest plot listing many recent studies (e.g., Bouma 2023, Hao 2023, Li 2023) among the pooled estimates, indicating recent cohort evidence was incorporated.",
+            "score": 1.0
+          },
+          {
+            "claim": "A recent prospective cohort study assessed ambient air pollution, lifestyle, and genetic predisposition on all-cause and cause-specific mortality, using a lifestyle score and polygenic risk score to e",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-5e42cddbc3 abstract describes a prospective cohort study that used a lifestyle score (smoking, activity, alcohol, diet, sleep) and a polygenic risk score (12 variants) to examine air pollution, life",
+            "score": 1.0
+          },
+          {
+            "claim": "Several systematic reviews and meta-analyses were commissioned for the WHO AQG update, including long-term PM and mortality (Chen & Hoek) and long-term NO2/O3 and mortality (Huangfu & Atkinson), repre",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-235d2deea2 lists the systematic reviews commissioned for the WHO AQG update, including Chen & Hoek (long-term PM and mortality) and Huangfu & Atkinson (long-term NO2/O3 and mortality).",
+            "score": 1.0
+          },
+          {
+            "claim": "A meta-analysis on PM2.5 and lung cancer reported a meta-estimate of 1.11 (95% CI: 1.05, 1.18) for mortality and 1.08 (95% CI: 1.03, 1.12) for incidence, synthesizing recent evidence.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-0e2e10b2cb reports the meta-estimate for lung cancer risk associated with PM2.5 as 1.11 (95% CI: 1.05\u20131.18) for mortality and 1.08 (95% CI: 1.03\u20131.12) for incidence.",
+            "score": 1.0
+          },
+          {
+            "claim": "Stafoggia et al. (2022) analysed long-term exposure to low air pollution and mortality among 28 million people from seven European cohorts within the ELAPSE project.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-576bdd7fa4 cites Stafoggia et al. (2022) analysing long-term exposure and mortality among 28 million people from seven European cohorts within ELAPSE.",
+            "score": 1.0
+          },
+          {
+            "claim": "Hystad et al. (2020) investigated PM2.5 and mortality in a large pooled cohort from 21 countries (PURE study).",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-adb3116f36 describes Hystad et al. (2020) (PURE study) investigating long-term PM2.5 and all-cause and cardiovascular mortality in a pooled cohort from 21 countries.",
+            "score": 1.0
+          },
+          {
+            "claim": "Downward and Vermeulen (2023) reported on ambient air pollution and mortality in Asian cohorts (Asia Cohort Consortium).",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-adb3116f36 includes the 2023 citation for Downward & Vermeulen (Asia Cohort Consortium) on ambient air pollution and all-cause mortality in Asian cohorts.",
+            "score": 1.0
+          },
+          {
+            "claim": "A UK Biobank cohort study (271,075 participants) examined lifestyle, air pollution, and all-cause mortality; the publication year is not given in the evidence.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-567d654986 and E-eb76adec8d describe the UK Biobank analysis using 271,075 participants to study lifestyle, air pollution and all-cause mortality; the provided excerpts do not show a publication yea",
+            "score": 1.0
+          },
+          {
+            "claim": "Hao et al. (2023) conducted a national cohort study linking PM2.5 constituents to all-cause mortality.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-fa52e0d7d6 (Hao 2023) reports a national cohort study where increased exposure to PM2.5 mass and its main constituents were significantly linked to elevated all-cause mortality.",
+            "score": 1.0
+          },
+          {
+            "claim": "Hu et al. (2023) studied long-term PM2.5 exposure and mortality in a Yinzhou, China cohort.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-aabd6e4903 (Hu 2023) states the study investigated long-term PM2.5 exposure and non-accidental/cause\u2011specific mortality in Yinzhou, China.",
+            "score": 1.0
+          },
+          {
+            "claim": "The HRAPIE-2 forest plot lists many additional cohort studies published since 2020 (e.g., Bouma 2023, Brauer 2022, Brown 2022, Chen 2021, Guo 2022, Hales 2021, Hao 2023, Huang 2023, Hwang 2020, Jalali",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-576bdd7fa4's forest plot lists the named studies published since 2020 (Bouma 2023, Brauer 2022, Brown 2022, Chen 2021, Guo 2022, Hales 2021, Hao 2023, Huang 2023, Hwang 2020, Jalali 2021, Kim 2020, ",
+            "score": 1.0
+          },
+          {
+            "claim": "An updated WHO Global Air Quality Guidelines systematic review and meta-analysis states that it greatly expanded the evidence base of the previous review that informed the 2021 WHO guidelines and incl",
+            "verdict": "partially_supported",
+            "structural": true,
+            "reason": "E-a7d4f82f9d indicates the updated WHO review includes newer cohort data (it references ELAPSE 2022 among post\u20112021 studies), but the provided excerpts do not explicitly use the phrase \"greatly expand",
+            "score": 0.5
+          },
+          {
+            "claim": "The updated WHO meta-analysis reports significant positive associations between long-term PM2.5 and PM10 and all-cause and cause-specific mortality, except PM10 and cerebrovascular mortality, which wa",
+            "verdict": "partially_supported",
+            "structural": true,
+            "reason": "E-a7d4f82f9d presents pooled analyses for PM2.5 and cause\u2011specific mortality, supporting a positive association for PM2.5, but the excerpts provided do not explicitly present the PM10 results or the p",
+            "score": 0.5
+          },
+          {
+            "claim": "Because of small sample sizes, the updated WHO review did not meta-analyse associations for post-neonatal mortality or for PM10 and acute lower respiratory infection.",
+            "verdict": "unsupported",
+            "structural": true,
+            "reason": "The provided excerpt from E-a7d4f82f9d does not state that the updated WHO review omitted meta-analysis for post\u2011neonatal mortality or for PM10 and acute lower respiratory infection due to small sampl",
+            "score": 0.0
+          }
+        ]
+      }
+    },
+    "coverage": {
+      "name": "coverage",
+      "score": 0.75,
+      "mode": "model",
+      "details": {
+        "facets": [
+          {
+            "facet": "prospective cohort studies and meta-analyses of mortality",
+            "covered": true,
+            "where": "the sub-question designed to retrieve systematic reviews and meta-analyses of prospective cohort studies on UPF intake and all-cause mortality returned no usable evidence at all.",
+            "keyword_share": 1.0
+          },
+          {
+            "facet": "the NOVA classification and criticisms of it",
+            "covered": true,
+            "where": "the NOVA classification system underlying most UPF research is defined largely by lists of example foods and processing characteristics (fractioning, chemical modification, additives) rather than a fi",
+            "keyword_share": 0.67
+          },
+          {
+            "facet": "confounding by overall diet quality, income or lifestyle",
+            "covered": true,
+            "where": "Confounding from nutrients, total energy intake, overall diet quality, broader dietary patterns, and possible reverse causality are identified as principal threats to causal interpretation of UPF-heal",
+            "keyword_share": 1.0
+          },
+          {
+            "facet": "randomised feeding trials such as the Hall et al. inpatient study",
+            "covered": false,
+            "where": "No substantive discussion of randomized feeding trials (e.g., the Hall et al. inpatient study) appears in the report; such trials are not mentioned or analysed.",
+            "keyword_share": 0.2
+          }
+        ]
+      }
+    },
+    "contradiction_recall": {
+      "name": "contradiction_recall",
+      "score": 1.0,
+      "mode": "model",
+      "details": {
+        "found": 3,
+        "matches_hint": true,
+        "reason": "Yes. Contradiction 3 directly matches the expected disagreement: A asserts a causal effect of PM2.5 on all-cause mortality, while B argues the association is non-causal and likely driven by bias/confounding. Contradiction 1 also embodies the same theme (meta-analysis showing consistent positive asso"
+      }
+    }
+  },
+  "total_seconds": 555.6,
+  "total_tokens": 144544,
+  "llm_calls": 23,
+  "mean_score": 0.917
+}

@@ -1,0 +1,357 @@
+{
+  "case_id": "grid-batteries",
+  "question": "Can grid-scale batteries alone handle the intermittency of a mostly renewable grid?",
+  "ok": true,
+  "error": null,
+  "thread_id": "8aa75e97-1db7-4201-aaac-cf0cb20eb4ae",
+  "plan_seconds": 69.2,
+  "run_seconds": 604.9,
+  "judge_seconds": 105.9,
+  "usage": {
+    "models": {
+      "anthropic/claude-haiku-4.5": {
+        "calls": 19,
+        "input_tokens": 47114,
+        "output_tokens": 32247
+      },
+      "deepseek/deepseek-v4-pro": {
+        "calls": 15,
+        "input_tokens": 59348,
+        "output_tokens": 55432
+      },
+      "anthropic/claude-sonnet-5": {
+        "calls": 1,
+        "input_tokens": 15358,
+        "output_tokens": 4537
+      }
+    },
+    "roles": {
+      "validator": {
+        "calls": 19,
+        "seconds": 281.1
+      },
+      "planner": {
+        "calls": 1,
+        "seconds": 63.2
+      },
+      "analysis": {
+        "calls": 12,
+        "seconds": 667.0
+      },
+      "insight": {
+        "calls": 1,
+        "seconds": 93.5
+      },
+      "critic": {
+        "calls": 1,
+        "seconds": 133.4
+      },
+      "report": {
+        "calls": 1,
+        "seconds": 48.0
+      }
+    }
+  },
+  "est_cost_usd": 0.319975,
+  "stats": {
+    "degradations": 3,
+    "retrieved": 115,
+    "kept": 55,
+    "dropped": 60,
+    "claims": 57,
+    "contradictions": 4,
+    "gaps": 37,
+    "gaps_pursued": 4,
+    "citations_verified": 28,
+    "citations_removed": 0,
+    "embedding_id": "snowflake/snowflake-arctic-embed-m-v1.5@256",
+    "hops": 1,
+    "languages": [
+      "en"
+    ],
+    "filtered_language": 0
+  },
+  "sub_questions": 6,
+  "judges": {
+    "citation_integrity": {
+      "name": "citation_integrity",
+      "score": 1.0,
+      "mode": "deterministic",
+      "details": {
+        "citations": 162,
+        "invalid": [],
+        "sources": 49
+      }
+    },
+    "groundedness": {
+      "name": "groundedness",
+      "score": 0.983,
+      "mode": "model",
+      "details": {
+        "claims": 57,
+        "structurally_valid": 57,
+        "judged": 30,
+        "unsupported": 0,
+        "verdicts": [
+          {
+            "claim": "Grids approaching 80% to 90% renewable penetration are deploying systems extending to 8-12 hours or longer of storage duration to handle multi-day weather patterns.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The cited Datainte text explicitly states: 'Grids approaching 80% to 90% renewable penetration, such as South Australia and the California ISO, are deploying systems extending to 8-12 hours or longer ",
+            "score": 1.0
+          },
+          {
+            "claim": "Multi-day storage (MDS) with durations beyond 10 hours provides critical inter-week flexibility and firming, stepping in to meet demand during multi-day renewable lulls.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The New York multi-day storage modeling text states that 'MDS provides critical inter-week flexibility and firming... and it steps in to meet demand during multi-day renewable lulls,' and reports MDS ",
+            "score": 1.0
+          },
+          {
+            "claim": "By 2035-2040, most high-renewable grids will operate a portfolio of storage: Li-ion for intraday balancing, flow/iron-air for 8-100 hour applications, and green hydrogen for seasonal balancing.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The cited analysis states: 'By 2035... most high-renewable grids will operate a portfolio of storage technologies' and lists Li\u2011ion for intraday balancing, flow/iron\u2011air for 8\u2013100 hour applications, a",
+            "score": 1.0
+          },
+          {
+            "claim": "Shorter duration systems of 1-2 hours remain valuable for frequency regulation and ancillary services even in high VRE scenarios.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The Datainte excerpt directly says 'Shorter duration systems of 1-2 hours remain valuable for frequency regulation and ancillary services.'",
+            "score": 1.0
+          },
+          {
+            "claim": "Iron-air batteries, providing multi-day storage, can reduce total resource needs in a 24/7 carbon-free portfolio by 25% relative to Li-ion-only, and meet up to 90% of net load during renewable lulls.",
+            "verdict": "partially_supported",
+            "structural": true,
+            "reason": "The GRE white paper excerpt shows iron\u2011air 'meets... as much as 90 percent at its maximum' during renewable lulls and reports a 723 MW (25%) reduction in total resource needed in a 400 MW 24/7 portfol",
+            "score": 0.5
+          },
+          {
+            "claim": "Mandating enough long-duration energy storage to enable year-long storage cycles could reduce peak electricity prices by over 70%, especially valuable in wind-dominant regions.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The Nature Communications study (cited in the Green Fuel Jo excerpt) is quoted as finding that mandating enough LDES for year\u2011long cycles 'could reduce electricity prices during peak demand events by ",
+            "score": 1.0
+          },
+          {
+            "claim": "NREL projections for 4-hour lithium-ion battery systems estimate overnight capital costs by 2030 ranging from low of $124/kWh and high of $338/kWh to low of $76/kWh and high of $258/kWh by 2050 (value",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The NREL excerpts list 4\u2011hour battery system capital costs of $124/kWh (low) to $338/kWh (high) in 2030 and $76/kWh (low) to $258/kWh (high) in 2050.",
+            "score": 1.0
+          },
+          {
+            "claim": "A 2020 NREL update projected 4-hour system costs of $144/kWh (low), $208/kWh (mid), and $293/kWh (high) in 2030, and $88/kWh (low), $156/kWh (mid), and $219/kWh (high) in2050.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The 2020 NREL update excerpt gives 4\u2011hour system costs of $144/$208/$293 (low/mid/high) in 2030 and $88/$156/$219 (low/mid/high) in 2050.",
+            "score": 1.0
+          },
+          {
+            "claim": "The 2025 NREL update indicates that, relative to 2024, 4-hour battery system costs could fall by 56% (low) or rise by 2% (high) by 2035, and by 2050 could fall by 68% (low) or 8% (high).",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The 2025 NREL excerpt reports by 2035 costs change by \u221256%, \u221228%, and \u22122% (low/mid/high) and by 2050 by \u221268%, \u221247%, and \u22128%; the \u22122% corresponds to an approximate 2% rise in the high case by 2035, mat",
+            "score": 1.0
+          },
+          {
+            "claim": "Industry forecasts (including NREL, BNEF, RMI) envision sub-USD100/kWh installed costs for standard lithium-ion storage by the end of the 2020s.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The cited industry text explicitly states that industry forecasts (NREL, BNEF, RMI, etc.) 'envision sub\u2011100 USD/kWh installed costs by the end of this decade' for standard lithium\u2011ion storage.",
+            "score": 1.0
+          },
+          {
+            "claim": "In 2024-2025, the fully installed cost of a 4-hour LFP utility-scale battery system ranges from ~150-250 USD/kWh.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The cited piece states: 'In real life a 4\u2011hour Lithium\u2011Ion LFP utility\u2011scale battery system... in 2024 to 2025 range between 150\u2011250 USD/kWh.'",
+            "score": 1.0
+          },
+          {
+            "claim": "Lithium-ion batteries are most cost-effective for storage durations of 30 minutes to 3 hours, but are commonly deployed for 4-hour applications; NREL focuses on 4-hour systems.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The Li\u2011ion overview says lithium batteries are most cost\u2011effective for 30 minutes to three hours, are widely used for up to 4\u2011hour applications, and the NREL work explicitly focuses on 4\u2011hour duration",
+            "score": 1.0
+          },
+          {
+            "claim": "Utility-scale lithium-ion batteries have an expected lifespan of 10-13 years and a real-life round-trip efficiency (RTE) of about 70-80%, with recommended daily usage between 20% and 80% state of char",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The cited industry excerpt reports utility\u2011scale batteries 'are expected to last on average 10\u201113 years,' real\u2011life round\u2011trip efficiency 'around 70\u201180%,' and a recommended operational SoC window of a",
+            "score": 1.0
+          },
+          {
+            "claim": "NREL reports include assumed operations and maintenance costs, lifetimes, and round-trip efficiency values for 4-hour systems, but the specific numbers are not given in the provided chunks.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The NREL report excerpts note that 'Battery variable operations and maintenance costs, lifetimes, and efficiencies are... discussed' and 'recommended values selected,' and the provided chunks do not i",
+            "score": 1.0
+          },
+          {
+            "claim": "NREL demonstrated 72 hours of continuous operation of a campus using only wind, solar, and a 1 MW lithium-ion battery, showing battery-only balancing is possible for small-scale, multi-day periods.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "NREL text reports powering a campus for 72 hours 'using a 1.5\u2011megawatt wind turbine, a 450\u2011kilowatt PV system, and a 1\u2011megawatt Lithium\u2011ion battery,' demonstrating 72 hours continuous operation from w",
+            "score": 1.0
+          },
+          {
+            "claim": "NREL claims that the approach of using only wind, solar, and batteries can be extended to large state or regional grids, citing clear technical solutions.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The NREL excerpt states 'our approach can extend to much larger systems' and that they 'have clear technical solutions to reach full\u2011renewable operation on systems as big as states or regional power g",
+            "score": 1.0
+          },
+          {
+            "claim": "For the Maui grid, NREL states that inverter-based resources including battery storage can provide all grid ancillary services and is preparing for instantaneously operating with 100% solar, wind, and",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "NREL project text for Maui quotes that 'Technically, inverter\u2011based resources like wind, solar, and battery storage can provide all types of grid ancillary services by programming the controls,' and d",
+            "score": 1.0
+          },
+          {
+            "claim": "A study of the Java-Bali grid finds that seasonal fluctuations in a 100% renewable scenario create high storage demand, and that special long-term storage or bioenergy are needed to reduce that demand",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The Java\u2011Bali study states seasonal fluctuations in a 100% renewable supply 'come along with high storage demand' and recommends options to reduce demand including increasing PV, using bioenergy for s",
+            "score": 1.0
+          },
+          {
+            "claim": "A policy report notes that lithium-ion batteries are viable for hourly and daily load balancing but will not come close to meeting the need for seasonal storage solutions, and are significantly less v",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The Kleinman Center policy report says lithium\u2011ion batteries are viable for hourly and daily load balancing but 'won't come close to meeting the need for seasonal storage solutions' and are 'significa",
+            "score": 1.0
+          },
+          {
+            "claim": "A report on long-duration storage states that as renewable penetration increases beyond 50%, storage of 8-100+ hours is required, and traditional lithium-ion batteries (effective only for minutes to h",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The long\u2011duration storage report states that as renewable penetration increases beyond ~50% the need for 8\u2013100+ hour storage becomes critical and that lithium\u2011ion (effective for minutes\u2013hours) cannot ",
+            "score": 1.0
+          },
+          {
+            "claim": "Simulation of a 100% renewable island grid with only a BESS found the system stable in normal operation but collapsed shortly after the battery went out of service, highlighting heavy reliance on the ",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The island simulation study concludes the grid 'is unable to be supported only by the renewables and that the system ends up collapsing shortly after the battery runs out\u2011of\u2011service,' showing dependen",
+            "score": 1.0
+          },
+          {
+            "claim": "California ISO market data shows that battery storage resources sometimes fail to deliver full nameplate capacity during peak net load hours due to short discharge durations, modeling limitations, and",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The CAISO Special Report excerpt notes battery resources may not reach nameplate during some peak net\u2011load hours and cites 'short discharging durations, modeling limitations, and bidding behavior' as ",
+            "score": 1.0
+          },
+          {
+            "claim": "A 1997 Sandia survey found that many electricity providers and experts viewed battery storage as important for enabling increased use of renewable energy, but did not specifically address whether batt",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The 1997 Sandia\u2011sponsored survey excerpt states many surveyed groups 'viewed battery storage as an important technology to enable increased use of renewable energy' and the quoted text does not addres",
+            "score": 1.0
+          },
+          {
+            "claim": "Grid stability requires a set of reliability services: inertia, frequency response, voltage support, and black start.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The cited reports list required reliability services (e.g., inertia, frequency response, voltage support, black start) when discussing grid stability and battery roles.",
+            "score": 1.0
+          },
+          {
+            "claim": "Grid-scale batteries equipped with grid-forming inverters can provide virtual inertia and fast frequency response through advanced control algorithms.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The cited literature on grid\u2011forming BESS and inverters describes using advanced control algorithms (droop, virtual inertia, etc.) so grid\u2011forming batteries can provide virtual inertia and fast freque",
+            "score": 1.0
+          },
+          {
+            "claim": "Batteries can supply voltage support via reactive power control and voltage regulation.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The RMI and grid\u2011forming inverter excerpts describe batteries providing voltage support and reactive power control / voltage regulation.",
+            "score": 1.0
+          },
+          {
+            "claim": "Batteries can initiate black start but cannot support as much inrush current as synchronous generators of equal capacity, so load re-energization must be managed carefully.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The Battery Energy Storage Systems report explicitly states batteries can be used to black start but 'cannot support as much inrush current as traditional synchronous generators of the same capacity,'",
+            "score": 1.0
+          },
+          {
+            "claim": "A 2019 UK report concluded that renewable-based technologies may never deliver the full set of black start requirements that large synchronous generators provide.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The June 2019 UK report excerpt acknowledges that the renewable technologies investigated 'will never be capable of providing the full set of Black Start requirements such as is offered presently from",
+            "score": 1.0
+          },
+          {
+            "claim": "Hybrid power plants that combine batteries with synchronous condensers or generators are proposed to supply the full suite of grid-forming services, including system strength, short circuit current, a",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The NREL hybridization and coordination papers describe hybrid concepts (synchronous condensers or generators combined with GFM BESS) proposed to provide system strength, short\u2011circuit/overcurrent cap",
+            "score": 1.0
+          },
+          {
+            "claim": "South Australia achieved 72% of its electricity demand from wind and solar over the past year, exceeding the 70% threshold.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The news excerpt states wind and solar 'accounting for 72 per cent of local demand over the last year' in South Australia, exceeding 70%.",
+            "score": 1.0
+          }
+        ]
+      }
+    },
+    "coverage": {
+      "name": "coverage",
+      "score": 1.0,
+      "mode": "model",
+      "details": {
+        "facets": [
+          {
+            "facet": "duration limits of lithium-ion storage (hours rather than days)",
+            "covered": true,
+            "where": "Batteries excel at sub-daily tasks: frequency regulation, short-duration arbitrage, and smoothing of minutes-to-hours variability. (Report notes lithium\u2011ion projections focus on 4\u2011hour systems and tha",
+            "keyword_share": 1.0
+          },
+          {
+            "facet": "seasonal or multi-day shortfalls such as Dunkelflaute",
+            "covered": true,
+            "where": "The core limitation is duration. As renewable penetration rises above roughly 50-70%, studies indicate a need for storage durations of 8 to 100+ hours to manage multi-day lulls, with some analyses cal",
+            "keyword_share": 0.5
+          },
+          {
+            "facet": "battery cost trajectories",
+            "covered": true,
+            "where": "Lithium-ion costs are projected to fall substantially\u2014from roughly $124-$338/kWh in 2030 to $76-$258/kWh by 2050 depending on scenario\u2014but these projections apply to 4\u2011hour systems, not the 8\u2013100+ hou",
+            "keyword_share": 0.67
+          },
+          {
+            "facet": "alternatives including long-duration storage, transmission, demand response and firm generation",
+            "covered": true,
+            "where": "The evidence supports a portfolio view: batteries are necessary but not sufficient ... requiring complementary resources such as long-duration storage (flow, iron-air, hydrogen), demand response, firm",
+            "keyword_share": 0.75
+          }
+        ]
+      }
+    },
+    "contradiction_recall": {
+      "name": "contradiction_recall",
+      "score": 1.0,
+      "mode": "model",
+      "details": {
+        "found": 4,
+        "matches_hint": true,
+        "reason": "The third found contradiction directly matches the expected disagreement: A asserts battery-only balancing (based on a short campus demo/extrapolation) can support 100% RE/daily variability, while B argues batteries cannot meet multi-day/seasonal storage needs and other resources are required. These"
+      }
+    }
+  },
+  "total_seconds": 674.1,
+  "total_tokens": 214036,
+  "llm_calls": 35,
+  "mean_score": 0.996
+}

@@ -1,0 +1,357 @@
+{
+  "case_id": "microplastics-health",
+  "question": "Is microplastic exposure a demonstrated risk to human health?",
+  "ok": true,
+  "error": null,
+  "thread_id": "98beed27-a076-433c-aacf-645ebd4040f1",
+  "plan_seconds": 35.8,
+  "run_seconds": 925.3,
+  "judge_seconds": 147.6,
+  "usage": {
+    "models": {
+      "anthropic/claude-haiku-4.5": {
+        "calls": 17,
+        "input_tokens": 41614,
+        "output_tokens": 25472
+      },
+      "deepseek/deepseek-v4-pro": {
+        "calls": 17,
+        "input_tokens": 112424,
+        "output_tokens": 76165
+      },
+      "anthropic/claude-sonnet-5": {
+        "calls": 1,
+        "input_tokens": 18471,
+        "output_tokens": 5157
+      }
+    },
+    "roles": {
+      "validator": {
+        "calls": 17,
+        "seconds": 223.1
+      },
+      "planner": {
+        "calls": 1,
+        "seconds": 30.9
+      },
+      "analysis": {
+        "calls": 10,
+        "seconds": 700.5
+      },
+      "insight": {
+        "calls": 3,
+        "seconds": 200.1
+      },
+      "critic": {
+        "calls": 3,
+        "seconds": 333.0
+      },
+      "report": {
+        "calls": 1,
+        "seconds": 51.9
+      }
+    }
+  },
+  "est_cost_usd": 0.312767,
+  "stats": {
+    "degradations": 1,
+    "retrieved": 96,
+    "kept": 75,
+    "dropped": 21,
+    "claims": 52,
+    "contradictions": 4,
+    "gaps": 29,
+    "gaps_pursued": 4,
+    "citations_verified": 42,
+    "citations_removed": 0,
+    "embedding_id": "snowflake/snowflake-arctic-embed-m-v1.5@256",
+    "hops": 1,
+    "languages": [
+      "en"
+    ],
+    "filtered_language": 0
+  },
+  "sub_questions": 5,
+  "judges": {
+    "citation_integrity": {
+      "name": "citation_integrity",
+      "score": 1.0,
+      "mode": "deterministic",
+      "details": {
+        "citations": 230,
+        "invalid": [],
+        "sources": 70
+      }
+    },
+    "groundedness": {
+      "name": "groundedness",
+      "score": 0.933,
+      "mode": "model",
+      "details": {
+        "claims": 52,
+        "structurally_valid": 52,
+        "judged": 30,
+        "unsupported": 0,
+        "verdicts": [
+          {
+            "claim": "Microplastics are generally defined as plastic particles smaller than 5 mm, but the lower size boundary varies from 1 nm (EPA) to 1 \u03bcm (some research).",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "Multiple cited sources define microplastics as <5 mm (EEA, reviews) and show differing lower bounds: the EPA text defines MPs down to 1 nm while another source defines the lower bound as 1 \u00b5m.",
+            "score": 1.0
+          },
+          {
+            "claim": "The U.S. Environmental Protection Agency (EPA) defines microplastics as plastic particles ranging from 1 nanometer to5 millimeters.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The EPA source (and secondary summaries) explicitly states EPA researchers define microplastics as particles in the size range 1 nm to 5 mm.",
+            "score": 1.0
+          },
+          {
+            "claim": "Microplastics are classified into primary (intentionally manufactured at microscopic size) and secondary (resulting from the fragmentation of larger plastics).",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "Cited texts (EPA and reviews) explicitly define primary MPs as intentionally manufactured small particles and secondary MPs as those produced by fragmentation of larger plastics.",
+            "score": 1.0
+          },
+          {
+            "claim": "Primary microplastics include intentionally added microbeads in cosmetics, plastic pellets (nurdles), synthetic microfibers, and plastic glitter.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The cited sources list primary microplastics examples including microbeads in cosmetics, plastic pellets/nurdles, synthetic microfibers, and plastic glitter.",
+            "score": 1.0
+          },
+          {
+            "claim": "Major identified sources of microplastics are vehicle tires, synthetic textiles, road markings/paint-based markings, plastic resins, and city dust.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The review and sources identify vehicle tyres, synthetic textiles, paint/road markings, plastic resins/pellets, and city dust among major identified sources of microplastics.",
+            "score": 1.0
+          },
+          {
+            "claim": "Secondary microplastics stem from the breakdown of larger plastic items, such as water bottles, fishing nets, microwave containers, and tea bags.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The cited review states secondary microplastics arise from breakdown of larger items and explicitly lists water/soda bottles, fishing nets, microwave containers, tea bags, etc., as examples.",
+            "score": 1.0
+          },
+          {
+            "claim": "Tire wear particles are a significant source; they arise from abrasion, can be carried by rainwater into waters, and their classification as primary or secondary differs among sources.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "Sources describe tire wear arising from abrasion and being washed into water systems by rain; different sources place tire-derived particles under different classifications (primary vs secondary), ind",
+            "score": 1.0
+          },
+          {
+            "claim": "Microplastics have been detected in oceans, freshwater rivers, agricultural soil, indoor air, and tap water.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The cited material explicitly reports detection of microplastics in ocean water, freshwater rivers, agricultural soil, indoor air, and tap water.",
+            "score": 1.0
+          },
+          {
+            "claim": "Microplastics can carry chemical and biological agents associated with negative effects on the environment and human health.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "An EEA review excerpt states microplastics may carry chemical and biological agents (e.g., toxic additives, persistent organic pollutants) with associated negative effects on environment and human hea",
+            "score": 1.0
+          },
+          {
+            "claim": "The sources and fate of terrestrial microplastics remain relatively unknown compared to aquatic environments.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The cited review explicitly states that the sources and fate of terrestrial microplastics are relatively unknown.",
+            "score": 1.0
+          },
+          {
+            "claim": "Microplastics and nanoplastics enter humans via ingestion, inhalation, and dermal contact, as stated in multiple reviews and supported by detection in relevant biological samples.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "Multiple reviews state MPs/NPs enter humans via ingestion, inhalation, and skin contact and note detections in relevant biological samples supporting those pathways.",
+            "score": 1.0
+          },
+          {
+            "claim": "Gastrointestinal absorption of MPs is limited to particles below 150 micrometres; rodent and in vitro human tissue studies indicate absorption fractions of 0.04% to 0.3% of the dose, rising to 0.45% i",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The fisheries/aquaculture review states only MPs <150 \u00b5m may translocate across gut epithelium and cites rodent/in vitro human data showing absorption of ~0.04%\u20130.3%, rising to ~0.45% in inflamed gut ",
+            "score": 1.0
+          },
+          {
+            "claim": "No human mass-balance study has measured the absorption fraction of MPs from the gastroenterinal tract, so quantitative uptake remains uncertain.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The ADME review explicitly states no human mass-balance study has measured an absorption fraction, leaving quantitative uptake undefined.",
+            "score": 1.0
+          },
+          {
+            "claim": "Inhaled MPs have been detected in human lung tissue, confirming that airborne plastic particles can reach and deposit in the lungs.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "Multiple cited reviews and studies report detection of microplastics in human lung tissue (including studies of airborne MPs), supporting that inhaled particles can reach/deposit in lungs.",
+            "score": 1.0
+          },
+          {
+            "claim": "Dermal exposure to MP additives is demonstrated: PBDE flame retardants in MPs are bioavailable (up to8%) and permeate skin (less than or equal to 0.1% of applied dose) in3D human skin equivalent model",
+            "verdict": "partially_supported",
+            "structural": true,
+            "reason": "The 3D human skin equivalent study shows PBDE additives from MPs crossed the skin and were bioavailable up to ~8% of the exposure dose, but the provided excerpts do not show the claimed \u22640.1% skin\u2011per",
+            "score": 0.5
+          },
+          {
+            "claim": "Evidence for dermal uptake of intact MP particles is absent from these studies; the dermal route significance for plastic particles remains unproven.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The cited dermal study demonstrates additive leaching and dermal bioavailability but reports additive uptake rather than intact particle translocation; the excerpts contain no evidence that intact MPs",
+            "score": 1.0
+          },
+          {
+            "claim": "A broad range of human tissues (blood, lung, placenta, liver, brain, testicular, atherosclerotic plaques, kidney, spleen, sputum, faeces, urine, breast milk, semen) have tested positive for MPs, confi",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "Multiple reviews compile detections of MPs in a wide range of human tissues and fluids (blood, lung, placenta, liver, brain, testicular tissue, atherosclerotic plaques, kidney, spleen, sputum, feces, ",
+            "score": 1.0
+          },
+          {
+            "claim": "Analytical methodologies for detecting MPs in human samples vary widely, lack standardization, and have differing sensitivity, particularly for submicrometre particles, which limits comparability of e",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The cited reviews and methods paper note wide methodological heterogeneity, lack of standardised detection methods, inconsistent metrics and limits in detectability (especially for small/submicrometre",
+            "score": 1.0
+          },
+          {
+            "claim": "An observational cohort study found that MPs in carotid atherosclerotic plaques were associated with a4.53-fold higher hazard of major adverse cardiovascular events (95% CI 2.00 to10.27).",
+            "verdict": "partially_supported",
+            "structural": true,
+            "reason": "The review cites an observational cohort reporting an association between plaque microplastics and major adverse cardiovascular events (HR 4.53, 95% CI 2.00\u201310.27). The provided text gives the HR and ",
+            "score": 0.5
+          },
+          {
+            "claim": "No data exist on systemic clearance kinetics or elimination half-lives of MPs in humans, and excretion pathways remain poorly characterised.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The ADME review states excretion pathways remain poorly characterised and that systemic clearance kinetics/elimination half\u2011lives are entirely unknown in humans.",
+            "score": 1.0
+          },
+          {
+            "claim": "Smaller plastic particles (NPs) exhibit greater cytotoxicity, cellular uptake, and ROS induction than larger MPs, with toxicity increasing with concentration and exposure time.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The cited review summarizes studies showing smaller (nano) plastics are more cytotoxic, have greater cellular uptake and ROS induction, and that toxicity increases with concentration and exposure time",
+            "score": 1.0
+          },
+          {
+            "claim": "Polystyrene MPs inhibit antioxidant enzymes (SOD2, catalase) and cause oxidative stress in mammalian cells, with particle size influencing the intensity.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The cited synthesis reports polystyrene MPs increase ROS and interfere with antioxidant enzymes, including inhibition of SOD2 and catalase, and notes particle size influences oxidative stress intensit",
+            "score": 1.0
+          },
+          {
+            "claim": "Large (50 \u03bcm) polystyrene MPs induce oxidative stress and apoptotic priming in mouse hepatocytes, with surface amine modification showing minimal additional effect.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The experimental study on AML12 mouse hepatocytes reports 50 \u00b5m polystyrene MPs induce ROS/oxidative stress and apoptotic priming, and that amine surface modification had minimal additional effects.",
+            "score": 1.0
+          },
+          {
+            "claim": "In fish, polystyrene MPs cause dose-dependent liver oxidative damage and reduction in CAT, GST, SOD activities.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The crucian carp study shows dose\u2011dependent liver pathological and oxidative damage from PS\u2011MP exposure, with higher concentrations causing greater reductions in antioxidant enzymes (CAT, GST, SOD).",
+            "score": 1.0
+          },
+          {
+            "claim": "Microplastics activate inflammatory pathways, including TLR4/NF-\u03baB/NLRP3, in ovarian and intestinal models.",
+            "verdict": "partially_supported",
+            "structural": true,
+            "reason": "The polystyrene nanoplastic ovarian study demonstrates activation of the TLR4/NF\u2011\u03baB/NLRP3 inflammatory axis in ovarian models, but the provided excerpt does not show evidence from intestinal models, s",
+            "score": 0.5
+          },
+          {
+            "claim": "In rodents, MP ingestion leads to oxidative stress, inflammation, and negative reproductive outcomes, though mechanisms are not fully elucidated.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "A review of rodent studies notes microplastic ingestion induces oxidative stress and impacts reproductive biomarkers; it also states toxicity mechanisms are only partially understood.",
+            "score": 1.0
+          },
+          {
+            "claim": "Mice orally exposed to microplastics show neuroinflammation, oxidative stress, and cognitive impairments.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The cited review summarizes mouse experiments reporting that ingested microplastics can reach brain tissue and induce neuroinflammation, oxidative stress, and cognitive/behavioral impairments.",
+            "score": 1.0
+          },
+          {
+            "claim": "Polystyrene nanoplastics induce cell cycle arrest and apoptosis in human placental trophoblast cells at high concentrations (100\u2013200 \u03bcg/mL).",
+            "verdict": "partially_supported",
+            "structural": true,
+            "reason": "The placental review and reported assays reference high\u2011dose exposures (100\u2013200 \u00b5g/mL) of nanoplastics in placental models, suggesting adverse effects; however the provided excerpts do not explicitly ",
+            "score": 0.5
+          },
+          {
+            "claim": "Polylactic acid micro/nanoplastics cause male reproductive toxicity in mice by disrupting spermatogenesis and mitochondrial function.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The PubMed entry and article title explicitly state that polylactic acid micro/nanoplastic exposure induces male reproductive toxicity in mice by disrupting spermatogenesis and causing mitochondrial d",
+            "score": 1.0
+          },
+          {
+            "claim": "In vitro, microplastics affect cytotoxicity, oxidative stress, and immune response, but genotoxicity was not observed in the reviewed studies.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The in\u2011vitro review reports microplastics affected cytotoxicity, oxidative stress, immune responses and barrier properties in cell studies, and notes that reviewed studies did not report genotoxicity.",
+            "score": 1.0
+          }
+        ]
+      }
+    },
+    "coverage": {
+      "name": "coverage",
+      "score": 0.75,
+      "mode": "model",
+      "details": {
+        "facets": [
+          {
+            "facet": "detection of microplastics in human blood, placenta or other tissue",
+            "covered": true,
+            "where": "\"Detection studies confirm that MPs/NPs reach human blood, lung, placenta, liver, brain, testes, atherosclerotic plaques, kidney, spleen, sputum, faeces, urine, breast milk and semen..., demonstrating",
+            "keyword_share": 1.0
+          },
+          {
+            "facet": "toxicology evidence and dose considerations",
+            "covered": true,
+            "where": "\"Toxicological evidence from in vitro and animal models consistently shows that MPs/NPs can induce oxidative stress, antioxidant enzyme inhibition, inflammatory signaling (e.g., TLR4/NF-\u03baB/NLRP3 activ",
+            "keyword_share": 0.33
+          },
+          {
+            "facet": "epidemiological outcome studies such as the carotid plaque study",
+            "covered": true,
+            "where": "\"The strongest and most specific human finding is a case-control study showing higher fecal microplastic concentrations in inflammatory bowel disease (IBD) patients than controls, with levels correlat",
+            "keyword_share": 1.0
+          },
+          {
+            "facet": "measurement, contamination and standardisation limitations",
+            "covered": false,
+            "where": "",
+            "keyword_share": 0.5
+          }
+        ]
+      }
+    },
+    "contradiction_recall": {
+      "name": "contradiction_recall",
+      "score": 1.0,
+      "mode": "model",
+      "details": {
+        "found": 4,
+        "matches_hint": true,
+        "reason": "Yes. The genotoxicity contradiction (A: \u201cGenotoxicity was not reported for microplastics\u201d [E-c6885e49ac] vs B: \u201cNano- and microplastics induce genotoxicity (DNA damage)\u201d [E-4f43093f6d]) directly maps to the expected disagreement \u2014 one side reports harmful effects while the other reports no/insuffici"
+      }
+    }
+  },
+  "total_seconds": 961.1,
+  "total_tokens": 279303,
+  "llm_calls": 35,
+  "mean_score": 0.921
+}

@@ -1,0 +1,357 @@
+{
+  "case_id": "smr-economics",
+  "question": "Are small modular nuclear reactors economically competitive with wind and solar plus storage?",
+  "ok": true,
+  "error": null,
+  "thread_id": "eabff5b3-c342-404e-a8ae-b8de749feddf",
+  "plan_seconds": 46.6,
+  "run_seconds": 764.5,
+  "judge_seconds": 90.0,
+  "usage": {
+    "models": {
+      "anthropic/claude-haiku-4.5": {
+        "calls": 18,
+        "input_tokens": 46530,
+        "output_tokens": 29480
+      },
+      "deepseek/deepseek-v4-pro": {
+        "calls": 16,
+        "input_tokens": 90508,
+        "output_tokens": 73401
+      },
+      "anthropic/claude-sonnet-5": {
+        "calls": 1,
+        "input_tokens": 19237,
+        "output_tokens": 5919
+      }
+    },
+    "roles": {
+      "validator": {
+        "calls": 18,
+        "seconds": 264.9
+      },
+      "planner": {
+        "calls": 1,
+        "seconds": 39.7
+      },
+      "analysis": {
+        "calls": 11,
+        "seconds": 754.4
+      },
+      "insight": {
+        "calls": 2,
+        "seconds": 177.4
+      },
+      "critic": {
+        "calls": 2,
+        "seconds": 215.2
+      },
+      "report": {
+        "calls": 1,
+        "seconds": 64.7
+      }
+    }
+  },
+  "est_cost_usd": 0.341144,
+  "stats": {
+    "degradations": 1,
+    "retrieved": 106,
+    "kept": 66,
+    "dropped": 40,
+    "claims": 50,
+    "contradictions": 9,
+    "gaps": 35,
+    "gaps_pursued": 4,
+    "citations_verified": 27,
+    "citations_removed": 0,
+    "embedding_id": "snowflake/snowflake-arctic-embed-m-v1.5@256",
+    "hops": 1,
+    "languages": [
+      "en"
+    ],
+    "filtered_language": 0
+  },
+  "sub_questions": 5,
+  "judges": {
+    "citation_integrity": {
+      "name": "citation_integrity",
+      "score": 1.0,
+      "mode": "deterministic",
+      "details": {
+        "citations": 158,
+        "invalid": [],
+        "sources": 53
+      }
+    },
+    "groundedness": {
+      "name": "groundedness",
+      "score": 0.933,
+      "mode": "model",
+      "details": {
+        "claims": 50,
+        "structurally_valid": 50,
+        "judged": 30,
+        "unsupported": 0,
+        "verdicts": [
+          {
+            "claim": "A 2024 MIT study projects the NOAK LCOE for a 300 MWe water-cooled SMR at $95/MWh (2024 USD).",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The 2024 MIT report excerpt explicitly states: \u201cFor a 300 MWe water-cooled Small Modular Reactor (SMR), NOAK LCOE increases by approximately 45% to $95/MWhre.\u201d The source is the 2024 MIT report cited.",
+            "score": 1.0
+          },
+          {
+            "claim": "The NuScale UAMPS project's LCOE estimate rose from $55/MWh in 2016 to $119/MWh in January 2023, and the project was cancelled later that year.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The cited text states NuScale UAMPS LCOE rose \u201cfrom $55/MWh in 2016 to $119/MWh in January of 2023\u201d and that \u201cThe project was ultimately cancelled in November 2023,\u201d matching the claim.",
+            "score": 1.0
+          },
+          {
+            "claim": "A 2019\u20132020 analysis reported a UAMPS/NuScale LCOE range of $45\u2013$65/MWh (2018$), a PacifiCorp estimate of $94.62/MWh, and a study base case of $66.56/MWh.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The analysis text reports UAMPS/NuScale SMR LCOE between $45\u2013$65/MWh (2018$), PacifiCorp\u2019s 2019 IRP lists $94.62/MWh (2018$), and the study assumed a base-case LCOE of $66.56/MWh (inflation-adjusted f",
+            "score": 1.0
+          },
+          {
+            "claim": "Arthur D. Little analysis (2025) states that SMRs must achieve LCOE targets of \u20ac52\u2013119/MWh to be competitive under current market conditions.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The Arthur D. Little analysis is quoted as stating SMRs must hit LCOE targets of around \u20ac52/MWh to \u20ac119/MWh to be competitive \u201cunder current market conditions.\u201d",
+            "score": 1.0
+          },
+          {
+            "claim": "For HTR-PM, CAREM 100 MW, and VBER 300 MW SMR designs in Indonesia, LCOE ranges from $60 to $120/MWh at discount rates of 5\u201310%.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The Indonesian study states that with discount rates between 5% and 10% the LCOE of HTR\u2011PM, CAREM\u2011100 and VBER\u2011300 ranges from USD 0.06 to 0.12/kWh (i.e., $60\u2013$120/MWh).",
+            "score": 1.0
+          },
+          {
+            "claim": "FOAK SMR plants are expected to have significantly higher LCOE than NOAK plants, though specific FOAK LCOE values are not provided in the retrieved evidence.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The sources state initial (FOAK) SMR deployments would have relatively high LCOE compared with NOAK plants (due to capital amortization) and the cited snippets do not show specific FOAK LCOE values, s",
+            "score": 1.0
+          },
+          {
+            "claim": "In the US in 2024, the LCOE range for standalone onshore wind was $27\u2013$73/MWh, and for onshore wind with attached storage it was $45\u2013$133/MWh (Lazard).",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "Lazard\u2019s 2024 summary in the cited text gives onshore wind standalone LCOE $27\u2013$73/MWh and onshore wind with attached storage $45\u2013$133/MWh.",
+            "score": 1.0
+          },
+          {
+            "claim": "In the US in 2024, the LCOE range for standalone utility-scale solar PV was $29\u2013$92/MWh, and for solar PV with attached storage it was $60\u2013$210/MWh (Lazard).",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "Lazard\u2019s 2024 findings in the cited text give utility\u2011scale solar PV standalone $29\u2013$92/MWh and solar PV with attached storage $60\u2013$210/MWh.",
+            "score": 1.0
+          },
+          {
+            "claim": "Lazard\u2019s US average LCOE for standalone onshore wind rose from $38/MWh in 2021 to $50/MWh in 2023 and 2024; for standalone utility-scale solar it rose from $36/MWh in 2021 to $60/MWh (2023) and $61/MW",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The cited Lazard June 2024 summary reports standalone onshore wind rising from $38/MWh (2021) to $50/MWh (2023 and 2024), and standalone utility\u2011scale solar rising from $36/MWh (2021) to $60/MWh (2023",
+            "score": 1.0
+          },
+          {
+            "claim": "Lazard\u2019s 2026 analysis gives an unsubsidized US utility-scale solar LCOE range of $40\u2013$98/MWh, compared with $38\u2013$78/MWh in 2025.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The cited Lazard 2026 reporting states unsubsidized US utility\u2011scale solar LCOE is approximately $40\u2013$98/MWh in 2026 versus $38\u2013$78/MWh in 2025.",
+            "score": 1.0
+          },
+          {
+            "claim": "Lazard\u2019s 2026 levelized cost of storage (LCOS) for a 100 MW, four-hour BESS is $210\u2013$292/MWh, with overall storage costs up 27% since 2020.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The Lazard 2026 excerpt reports LCOS for a 100 MW, 4\u2011hour BESS at approximately $210\u2013$292/MWh and states storage costs overall have risen ~27% since 2020.",
+            "score": 1.0
+          },
+          {
+            "claim": "IRENA reports a global average LCOE for solar PV of $43/MWh (US$0.043/kWh) in 2024, and for onshore wind $34/MWh (US$0.034/kWh); China\u2019s solar PV LCOE was $33/MWh, India\u2019s $38/MWh, while the US solar ",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The IRENA summary in the cited text reports global solar PV LCOE US$0.043/kWh (US$43/MWh) in 2024, onshore wind US$0.034/kWh (US$34/MWh), China solar US$0.033/kWh, India US$0.038/kWh, and US solar ris",
+            "score": 1.0
+          },
+          {
+            "claim": "In the US, 17 hybrid solar-plus-storage projects (4.5 GW solar and 7.7 GWh battery) achieved a weighted average LCOE of $79/MWh (IRENA 2024).",
+            "verdict": "partially_supported",
+            "structural": true,
+            "reason": "The cited IRENA summary mentions 17 US hybrid projects combining 4.5 GW solar and 7.7 GWh battery, but the shown text does not include the asserted weighted\u2011average LCOE of $79/MWh.",
+            "score": 0.5
+          },
+          {
+            "claim": "IRENA\u2019s firm solar-plus-storage LCOE (optimized for reliability) fell to $54\u2013$82/MWh in 2025 in high-resource regions, with some estimates at $54\u2013$74/MWh across test markets (2026 report).",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The IRENA excerpts state firm solar\u2011plus\u2011storage firm LCOE in 2025 fell to around US$54\u201382/MWh in high\u2011resource regions, and a related IRENA test\u2011market analysis places firm costs at US$54\u201374/MWh.",
+            "score": 1.0
+          },
+          {
+            "claim": "An earlier BNEF global benchmark (circa 2020) put onshore wind LCOE at $44/MWh, utility-scale solar at $50/MWh, and battery storage at $150/MWh; the storage benchmark was roughly half the level of two",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The BNEF summary cited states benchmarks of onshore wind $44/MWh, utility\u2011scale PV $50/MWh, and battery storage $150/MWh, and notes the storage benchmark was about half its level two years earlier.",
+            "score": 1.0
+          },
+          {
+            "claim": "One portfolio comparison (using PacifiCorp 2019 IRP assumptions) matched energy and capacity of a 185 MW SMR portfolio with wind/solar plus market alternatives, but did not include full integration co",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The Energy Strategies study excerpt says portfolios were designed to match the energy and capacity of the 185 MW SMR, used PacifiCorp 2019 IRP assumptions, included only IRP\u2011consistent integration cos",
+            "score": 1.0
+          },
+          {
+            "claim": "A techno-economic assessment reports overnight capital costs of $8,349/kW for SMR, $1,808/kW for solar (with daily storage), and $2,098/kW for wind (without storage); it adds 620 GWh of pumped hydro s",
+            "verdict": "partially_supported",
+            "structural": true,
+            "reason": "The techno\u2011economic paper explicitly gives overnight capital costs of USD 8,349/kW (SMR), USD 1,808/kW (solar with daily storage) and USD 2,098/kW (wind without storage) and states 620 GWh PHES costin",
+            "score": 0.5
+          },
+          {
+            "claim": "Grid-level system costs for variable renewable energy (VRE) replacing dispatchable sources are estimated at $15\u201380/MWh, depending on country, context and technology (onshore wind < offshore wind < sol",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The World Nuclear Association excerpt states grid\u2011level system costs for VRE replacing dispatchable sources are large ($15\u201380/MWh) and depend on country, context and technology, with ordering onshore ",
+            "score": 1.0
+          },
+          {
+            "claim": "A pro-SMR report projects an LCOE of $64\u201377/MWh for SMRs in Australia, claiming it would be the cheapest 24/7 zero-emission source, but explicitly states this does not account for grid enhancement inv",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The pro\u2011SMR report excerpt projects future SMR LCOE in Australia of $64\u2013$77/MWh, claims this would make SMRs the cheapest 24/7 zero\u2011emission source there, and explicitly says it does not account for g",
+            "score": 1.0
+          },
+          {
+            "claim": "A 100% wind-water-solar (WWS) study for 139 countries finds that WWS energy costs per unit are similar to business-as-usual, but WWS requires ~42.5% less energy, potentially reducing capital and consu",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The 100% WWS study excerpt states WWS and BAU energy costs per unit are similar, WWS requires ~42.5% less energy (base case) and may reduce capital and consumer costs; the shown excerpt contains no co",
+            "score": 1.0
+          },
+          {
+            "claim": "Bottom-up estimates for advanced SMRs give overnight capital costs of $4,844/kW for a light-water SMR, $4,355/kW for a gas-cooled SMR, and $3,985/kW for a molten salt SMR.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The bottom\u2011up analysis excerpt reports overnight capital costs of $4,844/kW for the LW\u2011SMR, $4,355/kW for the GC\u2011SMR, and $3,985/kW for the MS\u2011SMR.",
+            "score": 1.0
+          },
+          {
+            "claim": "Median overnight construction cost projections for a 300 MW SMR are $8,568/kW in 2030, declining to $5,623/kW in 2040 and $4,284/kW in 2050 (2024 dollars).",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The cited cost\u2011projection table (converted to 2024 dollars) lists the median OCC for a 300 MW SMR as $8,568/kW in 2030, $5,623/kW in 2040 and $4,284/kW in 2050.",
+            "score": 1.0
+          },
+          {
+            "claim": "General overnight capital cost estimates for SMRs range from $3,500 to $7,500 per kW, with first-of-a-kind units at the high end; a NuScale plant was estimated at about $3,465/kW base construction cos",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The cited summary states SMR OCC estimates generally run $3,500\u2013$7,500/kW with FOAK at the high end, and notes a widely cited independent NuScale base construction cost estimate of ~$3,465/kW.",
+            "score": 1.0
+          },
+          {
+            "claim": "Onshore wind capital investment costs are $1,700\u20132,450/kW, and offshore wind costs are $3,300\u20135,000/kW.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The IRENA table in the cited text lists capital investment costs (USD/kW) as 1,700\u20132,450 for onshore and 3,300\u20135,000 for offshore wind.",
+            "score": 1.0
+          },
+          {
+            "claim": "A wind project report estimates total capital requirements of $1,315\u20131,369/kW for a 50 MW onshore wind farm and $1,279\u20131,332/kW for a 200 MW farm, with a construction timeline of 2.5 years from siting",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The wind project report gives total capital requirements for the 50 MW case of $65.76M\u2013$68.46M (\u2248$1,315\u2013$1,369/kW) and for the 200 MW case ~$255.9M\u2013$266.5M (\u2248$1,279\u2013$1,332/kW), and states construction",
+            "score": 1.0
+          },
+          {
+            "claim": "Wind farm capital costs typically range from $1.6 million to $2.8 million per MW installed ($1,600\u20132,800/kW).",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The wind\u2011farm cost guide excerpt explicitly states wind farm capital costs typically range from $1.6 million to $2.8 million per MW installed ($1,600\u2013$2,800/kW).",
+            "score": 1.0
+          },
+          {
+            "claim": "A detailed bottom-up assessment for a 1,000 MW offshore wind farm (15 MW turbines, 50 m water depth) gives total CAPEX of \u00a33,470,000/MW (approx. $4,300/kW).",
+            "verdict": "partially_supported",
+            "structural": true,
+            "reason": "The bottom\u2011up offshore assessment in the cited text gives Total CAPEX = \u00a33,470,000/MW for a 1,000 MW project; the shown excerpt does not provide the claimed approximate conversion to $4,300/kW.",
+            "score": 0.5
+          },
+          {
+            "claim": "Higher overnight capital costs and longer construction times for SMRs relative to wind are expected to increase financing costs due to interest during construction and risk premiums, but direct eviden",
+            "verdict": "partially_supported",
+            "structural": true,
+            "reason": "The cost\u2011projection material and summaries show SMRs have higher OCC and longer construction profiles (which affect capital expenditure timing) implying larger financing/interest\u2011during\u2011construction i",
+            "score": 0.5
+          },
+          {
+            "claim": "A review of LCOE reports found that when firming costs are included, the midpoint unsubsidized LCOE of renewables plus firming lies below the lower bound of nuclear LCOE (US$141/MWh), and the gap is e",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The LCOE review excerpt states that all midpoint unsubsidized LCOE + firming values lie below (or at) the unsubsidized nuclear lower bound of US$141/MWh, and that the midpoint nuclear value is $182.5/",
+            "score": 1.0
+          },
+          {
+            "claim": "A meta-analysis of advanced nuclear reactor cost estimations warns that LCOE comparisons between variable renewable sources and firm baseload nuclear are misleading because LCOE does not account for s",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The meta\u2011analysis excerpt warns that comparing variable renewables with firm baseload nuclear via LCOE is misleading because LCOE does not account for system\u2011wide costs, and advises caution in such co",
+            "score": 1.0
+          }
+        ]
+      }
+    },
+    "coverage": {
+      "name": "coverage",
+      "score": 1.0,
+      "mode": "model",
+      "details": {
+        "facets": [
+          {
+            "facet": "cost estimates or levelised cost comparisons",
+            "covered": true,
+            "where": "Across the available evidence, small modular reactors (SMRs) generally show higher levelized costs of electricity (LCOE) than standalone wind and solar, and in most comparable analyses also higher or ",
+            "keyword_share": 0.75
+          },
+          {
+            "facet": "cancelled or delayed projects such as NuScale and UAMPS",
+            "covered": true,
+            "where": "the UAMPS/NuScale project saw its LCOE estimate escalate from $55/MWh in 2016 to $119/MWh in 2023 before cancellation.",
+            "keyword_share": 0.8
+          },
+          {
+            "facet": "first-of-a-kind versus nth-of-a-kind cost arguments",
+            "covered": true,
+            "where": "FOAK costs are consistently indicated to be substantially higher than NOAK, though precise FOAK LCOE figures are not given in the retrieved snippets.",
+            "keyword_share": 0.33
+          },
+          {
+            "facet": "system value of firm capacity versus variable renewables",
+            "covered": true,
+            "where": "Grid-level integration costs for variable renewables are estimated at $8\u201380/MWh depending on source and country context, versus $1\u20133/MWh for nuclear.",
+            "keyword_share": 0.83
+          }
+        ]
+      }
+    },
+    "contradiction_recall": {
+      "name": "contradiction_recall",
+      "score": 1.0,
+      "mode": "model",
+      "details": {
+        "found": 9,
+        "matches_hint": true,
+        "reason": "Yes. The first found contradiction (Early UAMPS/NuScale: optimistic $45/MWh estimate vs escalation to $119/MWh and project cancellation) directly matches the expected disagreement\u2014vendor/system optimistic claims of competitiveness at scale versus later independent/project evidence showing much highe"
+      }
+    }
+  },
+  "total_seconds": 811.1,
+  "total_tokens": 265075,
+  "llm_calls": 35,
+  "mean_score": 0.983
+}

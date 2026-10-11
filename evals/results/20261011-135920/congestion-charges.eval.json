@@ -1,0 +1,357 @@
+{
+  "case_id": "congestion-charges",
+  "question": "Do urban congestion charges reduce air pollution without harming local businesses?",
+  "ok": true,
+  "error": null,
+  "thread_id": "2680656b-8592-417b-9337-3bdc3c904376",
+  "plan_seconds": 41.6,
+  "run_seconds": 820.8,
+  "judge_seconds": 88.4,
+  "usage": {
+    "models": {
+      "anthropic/claude-haiku-4.5": {
+        "calls": 17,
+        "input_tokens": 39322,
+        "output_tokens": 24952
+      },
+      "deepseek/deepseek-v4-pro": {
+        "calls": 15,
+        "input_tokens": 69972,
+        "output_tokens": 59580
+      },
+      "anthropic/claude-sonnet-5": {
+        "calls": 1,
+        "input_tokens": 14385,
+        "output_tokens": 4236
+      }
+    },
+    "roles": {
+      "validator": {
+        "calls": 17,
+        "seconds": 226.5
+      },
+      "planner": {
+        "calls": 1,
+        "seconds": 32.9
+      },
+      "analysis": {
+        "calls": 10,
+        "seconds": 575.3
+      },
+      "insight": {
+        "calls": 2,
+        "seconds": 271.1
+      },
+      "critic": {
+        "calls": 2,
+        "seconds": 190.8
+      },
+      "report": {
+        "calls": 1,
+        "seconds": 43.2
+      }
+    }
+  },
+  "est_cost_usd": 0.274703,
+  "stats": {
+    "degradations": 3,
+    "retrieved": 96,
+    "kept": 56,
+    "dropped": 40,
+    "claims": 32,
+    "contradictions": 10,
+    "gaps": 25,
+    "gaps_pursued": 4,
+    "citations_verified": 26,
+    "citations_removed": 0,
+    "embedding_id": "snowflake/snowflake-arctic-embed-m-v1.5@256",
+    "hops": 1,
+    "languages": [
+      "en"
+    ],
+    "filtered_language": 0
+  },
+  "sub_questions": 4,
+  "judges": {
+    "citation_integrity": {
+      "name": "citation_integrity",
+      "score": 1.0,
+      "mode": "deterministic",
+      "details": {
+        "citations": 162,
+        "invalid": [],
+        "sources": 41
+      }
+    },
+    "groundedness": {
+      "name": "groundedness",
+      "score": 0.85,
+      "mode": "model",
+      "details": {
+        "claims": 32,
+        "structurally_valid": 32,
+        "judged": 30,
+        "unsupported": 2,
+        "verdicts": [
+          {
+            "claim": "Urban congestion charges are fees imposed on drivers for entering designated congested areas of a city, typically during peak hours, with the goals of reducing traffic congestion, improving air qualit",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The cited sources define congestion charging/road pricing as charges levied on drivers entering urban areas (LSHTM, Road pricing, PTOLEMUS). They state these operate in daytime/peak periods, aim to re",
+            "score": 1.0
+          },
+          {
+            "claim": "London implemented a congestion charge in 2003, Stockholm a congestion tax in 2006, and Milan an Area C charge in 2008; these are three of the largest European schemes.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The LSHTM evidence explicitly states 'the three largest urban road pricing schemes in Europe started in London in 2003, in Stockholm in 2006, and in Milan in 2008.' The Road pricing entry also lists L",
+            "score": 1.0
+          },
+          {
+            "claim": "Singapore has operated an Electronic Road Pricing (ERP) system since 1998, a cordon- and point-based congestion pricing scheme that was the world's first electronic road toll collection system for con",
+            "verdict": "partially_supported",
+            "structural": true,
+            "reason": "The ERP source states the system was implemented on 1 April 1998 and that Singapore was the first city to implement an electronic road toll collection system for congestion pricing. However, the provi",
+            "score": 0.5
+          },
+          {
+            "claim": "Gothenburg has a congestion tax, though it faced strong public opposition and a negative referendum result.",
+            "verdict": "unsupported",
+            "structural": true,
+            "reason": "The provided Cardiff University excerpt does not mention Gothenburg, its congestion tax, public opposition, or a referendum result; no supporting text for this claim appears in the shown snippet.",
+            "score": 0.0
+          },
+          {
+            "claim": "Durham in the UK has a road congestion pricing scheme as of 2019.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The 'Road pricing in the United Kingdom' source states that schemes in place in the UK as of 2019 include 'road congestion pricing in London and Durham,' directly supporting the claim.",
+            "score": 1.0
+          },
+          {
+            "claim": "Berlin implemented a congestion charge in 2008, charging a fee for entering a designated area during peak hours.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The PTOLEMUS 'What is congestion charging?' excerpt explicitly states 'Berlin Congestion Charge: Implemented in 2008, this system charges a fee for entering a designated area of the city during peak h",
+            "score": 1.0
+          },
+          {
+            "claim": "New York City has a Central Business District Tolling Program, inspired by other cities' congestion pricing, though one source describes it as 'on the verge' of implementation.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The New York Times piece says New York was 'on the verge' of charging drivers for entering its busiest areas and explicitly compares it to London, Stockholm and Singapore. The ERP excerpt notes Singap",
+            "score": 1.0
+          },
+          {
+            "claim": "A study of London's Congestion Charging Zone (CCZ) found that its introduction led to substantial reductions in carbon monoxide (CO), particulate matter less than10 micrometres (PM10), and nitrogen mo",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The 'Did the London Congestion Charge Reduce Pollution?' paper reports that 'The introduction of the CCZ lead to substantial reductions in CO, PM10 and NO,' directly supporting the claim.",
+            "score": 1.0
+          },
+          {
+            "claim": "Modelled emissions analysis for London's CCZ indicated a12.0% reduction in nitrogen oxides (NOx) and an11.9% reduction in PM10 emissions inside the charged zone.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The Evidence Review reports modelled emissions showing total (modelled) NOx emissions reduced by \u221212.0% \u00b112% in the charged zone and modelled PM10 emissions reduced by \u221211.9% in the charging zone, mat",
+            "score": 1.0
+          },
+          {
+            "claim": "A regression discontinuity analysis of London's CCZ found a negligible or adverse impact on pollution, with significant increases in ambient PM10 (12.46 \u00b5g/m3) and PM2.5 (5.95 \u00b5g/m3) after the charge ",
+            "verdict": "partially_supported",
+            "structural": true,
+            "reason": "The Percoco regression discontinuity paper documents 'a negligible and adverse impact' of the charge and notes spatial heterogeneity; it supports the 'negligible/adverse impact' characterization. The ",
+            "score": 0.5
+          },
+          {
+            "claim": "A network-wide analysis of New York City's2025 congestion pricing program found no evidence of impact on ambient air quality in the central business district.",
+            "verdict": "unsupported",
+            "structural": true,
+            "reason": "The provided 'Network-wide Effects of Congestion Pricing' excerpt discusses speed and distributional effects but does not report findings about ambient air quality in the central business district; th",
+            "score": 0.0
+          },
+          {
+            "claim": "A PurpleAir monitor study detected significant reductions in PM1.0 (0.33 \u00b5g/m3) and PM2.5 (0.47 \u00b5g/m3) during weekday morning rush hour inside the NYC congestion pricing zone, but compensating increas",
+            "verdict": "partially_supported",
+            "structural": true,
+            "reason": "The PurpleAir study excerpt reports significant reductions during morning rush hours of PM1.0 (\u22120.33 \u00b5g/m3) and PM2.5 (\u22120.47 \u00b5g/m3) inside the congestion zone. The provided text does not show explicit",
+            "score": 0.5
+          },
+          {
+            "claim": "Monitoring near the Queensboro Bridge in New York City observed a drop in PM2.5 spikes after the introduction of congestion pricing.",
+            "verdict": "partially_supported",
+            "structural": true,
+            "reason": "The Queensboro Bridge monitoring study reports PM2.5 monitoring near the bridge, notes decreased vehicle numbers during the PM rush hour after congestion pricing, and concludes congestion pricing may ",
+            "score": 0.5
+          },
+          {
+            "claim": "Evidence from London indicates spatial displacement: concentrations of NO, NO2, and NOx decreased inside the charged zone but increased in surrounding areas, and overall deterioration was found for oz",
+            "verdict": "partially_supported",
+            "structural": true,
+            "reason": "The Evidence Review and Percoco paper together support spatial displacement: modelled NOx (and NO/NO2) decreased inside the charged zone and increased on surrounding roads/inner ring road, and Percoco",
+            "score": 0.5
+          },
+          {
+            "claim": "Ambient air pollution measurements alone were insufficient to assess the London CCZ's impact because meteorological conditions in2003 were unusual, making modelled emissions more informative.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The Evidence Review states that assessing air pollution impacts using ambient measurements alone was difficult because concentrations in 2003 were higher than in 2002 due to unusual meteorology, and t",
+            "score": 1.0
+          },
+          {
+            "claim": "In London, the congestion charge was associated with a statistically significant decrease in weekly sales at the John Lewis store on Oxford Street (inside the charging zone), after controlling for oth",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The Working Paper on retail finds the congestion charge dummy variable is negatively associated with weekly sales at John Lewis Oxford Street and is 'statistically significantly different from zero at",
+            "score": 1.0
+          },
+          {
+            "claim": "The London congestion charge did not have a significant effect on overall retail sales in central London (an area larger than the charging zone), based on an econometric analysis of a total retail sal",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The 'Impact of Congestion Charge on Retail' analysis reports that while John Lewis Oxford Street showed an effect, the charge did not affect overall retail sales in central London (the larger area), b",
+            "score": 1.0
+          },
+          {
+            "claim": "A survey of London businesses (39% response rate) found that 43% of retail establishments, 39% of restaurants/caf\u00e9s, 20% of hotel/leisure, and 27% of distribution businesses reported a decrease in per",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The cited TfL business survey (response rate 39%) is quoted as reporting 43% of retail establishments, 39% of restaurants/caf\u00e9s, 20% of hotel/leisure businesses, and 27% of distribution businesses rep",
+            "score": 1.0
+          },
+          {
+            "claim": "Evidence from Stockholm and San Francisco in the provided chunks does not address local business activity, sales, or employment; the Stockholm chunk only mentions increased sales of exempt alternative",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The Stockholm excerpt mentions that exemptions for alternative-fuel vehicles 'substantially increased the sales of such vehicles' but does not discuss local business activity/sales/employment broadly.",
+            "score": 1.0
+          },
+          {
+            "claim": "None of the retrieved evidence chunks describe a study that simultaneously examines both air pollution and local business impacts of congestion charging. The evidence covers air pollution outcomes (e.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The provided chunks include studies on air pollution (NOx, PM, health) and separate studies/surveys on business impacts (retail sales, business opinions), but none of the shown excerpts presents a sin",
+            "score": 1.0
+          },
+          {
+            "claim": "In a San Francisco case study using a market equilibrium model, both trip-based and time-based congestion charges did not significantly reduce the number of TNC vehicles, implying no significant direc",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The San Francisco market-equilibrium case study reports that both trip-based and time-based charges reduce trips but 'the number of TNC vehicles reduced is not significant,' implying limited reduction",
+            "score": 1.0
+          },
+          {
+            "claim": "A report on the proposed NYC congestion pricing warns that if not carefully implemented, the policy could lead to job losses for taxi and FHV drivers due to reduced ridership from fare hikes and the i",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The University Transportation report warns taxi and FHV industries 'have not fully recovered' post-COVID and that 'any drastic fare hike might further dampen ridership' and explicitly states 'If not d",
+            "score": 1.0
+          },
+          {
+            "claim": "In London, 43% of retail establishments reported a decrease in their performance after the introduction of congestion charging.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The TfL business survey excerpt reports that 43 percent of retail establishments reported a decrease in performance after the charge, directly supporting the claim.",
+            "score": 1.0
+          },
+          {
+            "claim": "39% of restaurants and caf\u00e9s reported a decrease in performance.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The same TfL survey excerpt reports that 39 percent of restaurants and caf\u00e9s reported a decrease in performance, matching the claim.",
+            "score": 1.0
+          },
+          {
+            "claim": "20% of hotel and leisure businesses reported a decrease in performance.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The TfL survey excerpt states 20 percent of hotel and leisure businesses reported a decrease in performance, which supports the claim.",
+            "score": 1.0
+          },
+          {
+            "claim": "27% of distribution businesses reported a decrease in performance.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The cited TfL business survey excerpt records that 27 percent of distribution businesses reported a decrease in performance, directly supporting the claim.",
+            "score": 1.0
+          },
+          {
+            "claim": "Transport for London (TfL) concluded that in aggregate, the congestion charge had no significant impact on business activity, a finding that Ernst & Young reviewed and found reasonable.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The Project MUSE excerpt states TfL 'reports that in aggregate, LCC has had no significant impact on business activity' and that Ernst & Young (2006) reviewed TfL's assessment and 'finds that TfL's co",
+            "score": 1.0
+          },
+          {
+            "claim": "The London congestion charge had a statistically significant negative association with weekly sales at the John Lewis store on Oxford Street (inside the charging zone) over the period studied.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The Working Paper revisiting John Lewis data finds the congestion charge dummy is negatively associated with weekly sales at John Lewis Oxford Street and is statistically significant at the 95% level,",
+            "score": 1.0
+          },
+          {
+            "claim": "The congestion charge did not affect overall retail sales in central London, a larger area encompassing the charging zone.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The 'Impact of Congestion Charge on Retail' analysis concludes the charge did not affect overall retail sales in central London (the larger area), as stated in the cited excerpt.",
+            "score": 1.0
+          },
+          {
+            "claim": "Simulations of cordon tolls for Washington, DC indicate that all cordon pricing schemes increase welfare and lead to GDP growth in the long run. ",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The Resources for the Future working paper (Safirova et al.) reports that their long-run simulations of cordon-based pricing for Washington, DC 'find that all cordon pricing schemes increase welfare o",
+            "score": 1.0
+          }
+        ]
+      }
+    },
+    "coverage": {
+      "name": "coverage",
+      "score": 1.0,
+      "mode": "model",
+      "details": {
+        "facets": [
+          {
+            "facet": "pollutant or traffic reductions in London, Stockholm, Singapore or Milan",
+            "covered": true,
+            "where": "Modelled emissions for London's CCZ show a 12.0% reduction in NOx and 11.9% reduction in PM10 inside the zone [E-d3663f9270].",
+            "keyword_share": 1.0
+          },
+          {
+            "facet": "effects on retail sales, footfall or business closures",
+            "covered": true,
+            "where": "Two econometric studies found a statistically significant decline in weekly sales at the John Lewis department store on Oxford Street, inside the charging zone, after the charge was introduced [E-da4e",
+            "keyword_share": 0.6
+          },
+          {
+            "facet": "traffic displacement to areas outside the charging zone",
+            "covered": true,
+            "where": "London evidence shows spatial displacement: NO, NO2 and NOx fell inside the charging zone but rose in surrounding areas [E-d3663f9270][E-b7016efc90].",
+            "keyword_share": 1.0
+          },
+          {
+            "facet": "health outcomes attributed to the schemes",
+            "covered": true,
+            "where": "a PurpleAir sensor study found statistically significant but small morning rush-hour reductions in PM1.0 (0.33 \u00b5g/m3) and PM2.5 (0.47 \u00b5g/m3) that were offset by increases at other times, yielding no n",
+            "keyword_share": 0.75
+          }
+        ]
+      }
+    },
+    "contradiction_recall": {
+      "name": "contradiction_recall",
+      "score": 1.0,
+      "mode": "model",
+      "details": {
+        "found": 10,
+        "matches_hint": true,
+        "reason": "Yes. Multiple found contradictions directly match the expert\u2019s expected disagreements: (1) Mixed/null pollutant findings \u2014 e.g. 'London CCZ led to substantial reductions in PM10' vs 'London CCZ led to significant increases in PM10/PM2.5', plus '2020 study shows reductions' vs '2011 HEI finds little "
+      }
+    }
+  },
+  "total_seconds": 862.4,
+  "total_tokens": 212447,
+  "llm_calls": 33,
+  "mean_score": 0.963
+}

@@ -1,0 +1,357 @@
+{
+  "case_id": "glp1-cardiovascular",
+  "question": "Do GLP-1 receptor agonists reduce cardiovascular risk independently of weight loss?",
+  "ok": true,
+  "error": null,
+  "thread_id": "853d7084-74f2-45f4-a71d-63f169e49ccd",
+  "plan_seconds": 35.9,
+  "run_seconds": 520.9,
+  "judge_seconds": 151.8,
+  "usage": {
+    "models": {
+      "anthropic/claude-haiku-4.5": {
+        "calls": 16,
+        "input_tokens": 40046,
+        "output_tokens": 23538
+      },
+      "deepseek/deepseek-v4-pro": {
+        "calls": 11,
+        "input_tokens": 56791,
+        "output_tokens": 41629
+      },
+      "anthropic/claude-sonnet-5": {
+        "calls": 1,
+        "input_tokens": 16306,
+        "output_tokens": 4326
+      }
+    },
+    "roles": {
+      "validator": {
+        "calls": 16,
+        "seconds": 208.0
+      },
+      "planner": {
+        "calls": 1,
+        "seconds": 31.1
+      },
+      "analysis": {
+        "calls": 8,
+        "seconds": 521.6
+      },
+      "insight": {
+        "calls": 1,
+        "seconds": 131.8
+      },
+      "critic": {
+        "calls": 1,
+        "seconds": 62.6
+      },
+      "report": {
+        "calls": 1,
+        "seconds": 41.0
+      }
+    }
+  },
+  "est_cost_usd": 0.26285,
+  "stats": {
+    "degradations": 2,
+    "retrieved": 88,
+    "kept": 65,
+    "dropped": 23,
+    "claims": 41,
+    "contradictions": 3,
+    "gaps": 21,
+    "gaps_pursued": 4,
+    "citations_verified": 25,
+    "citations_removed": 0,
+    "embedding_id": "snowflake/snowflake-arctic-embed-m-v1.5@256",
+    "hops": 1,
+    "languages": [
+      "en"
+    ],
+    "filtered_language": 0
+  },
+  "sub_questions": 5,
+  "judges": {
+    "citation_integrity": {
+      "name": "citation_integrity",
+      "score": 1.0,
+      "mode": "deterministic",
+      "details": {
+        "citations": 154,
+        "invalid": [],
+        "sources": 50
+      }
+    },
+    "groundedness": {
+      "name": "groundedness",
+      "score": 0.9,
+      "mode": "model",
+      "details": {
+        "claims": 41,
+        "structurally_valid": 41,
+        "judged": 30,
+        "unsupported": 1,
+        "verdicts": [
+          {
+            "claim": "GLP-1 receptor agonists reduce major adverse cardiovascular events (MACE) by 12\u201314% compared with placebo in patients with type 2 diabetes. A meta-analysis of 7 trials (56,004 participants) reported a",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-a21acb0330 reports a 7\u2011trial meta\u2011analysis (56,004 participants) with HR 0.88 (95% CI 0.82\u20130.94) and E-e2803c1399 reports an OR 0.86 (95% CI 0.80\u20130.94) from 13 trials; the second cited meta\u2011analysis",
+            "score": 1.0
+          },
+          {
+            "claim": "The MACE reduction is driven by consistent effects on its individual components: cardiovascular death (HR 0.88, 95% CI 0.81\u20130.96), fatal or non-fatal stroke (HR 0.84, 0.76\u20130.93), and fatal or non-fata",
+            "verdict": "partially_supported",
+            "structural": true,
+            "reason": "E-a21acb0330 explicitly gives HRs for CV death (0.88, 0.81\u20130.96), stroke (0.84, 0.76\u20130.93) and MI (0.91, 0.84\u20131.00). The second citation (E-831d2ac551) discusses mechanisms and CV effects but the prov",
+            "score": 0.5
+          },
+          {
+            "claim": "The cardiovascular benefit extends to people without diabetes. When the SELECT trial (participants with cardiovascular disease and BMI \u226527 kg/m\u00b2 without diabetes) was included, the MACE reduction rema",
+            "verdict": "partially_supported",
+            "structural": true,
+            "reason": "E-3c6aa7f9b1 states that the SELECT trial (non\u2011diabetic, BMI \u226527) was included post hoc, supporting extension of analyses to non\u2011diabetic participants, but the provided snippet does not show the poole",
+            "score": 0.5
+          },
+          {
+            "claim": "The MACE benefit is consistent across key subgroups: both sexes, patients with and without a history of cardiovascular disease, BMI above or below 30 kg/m\u00b2, and eGFR below or above 60 ml/min/1.73 m\u00b2 [",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-e2803c1399 explicitly reports that GLP\u20111 RAs reduced MACE in both sexes and regardless of CVD history, BMI above/below 30 kg/m2, and eGFR below/above 60 ml/min/1.73 m2.",
+            "score": 1.0
+          },
+          {
+            "claim": "Although individual CVOT results have been heterogeneous, the cardiovascular benefit is regarded as a class effect of GLP-1 receptor agonists, with duration of drug exposure being the factor that most",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-e91b4f2aaa states CVOT results have been heterogeneous, concludes time/exposure is the factor most prominently explaining heterogeneity, and argues the CV benefit should be regarded as a class effec",
+            "score": 1.0
+          },
+          {
+            "claim": "Real-world data from a transportability analysis of the LEADER trial in US veterans confirmed that liraglutide reduces MACE and all-cause mortality, with a potentially smaller number needed to treat (",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-af9db2d3df (transportability analysis) reports liraglutide generalized to US veterans with reduced MACE and all\u2011cause mortality and gives NNTs (50 vs 62.5 for MACE; 67 vs 111 for mortality), consist",
+            "score": 1.0
+          },
+          {
+            "claim": "In the SELECT trial, time-varying weight loss did not mediate semaglutide\u2019s MACE reduction; the hazard ratio remained 0.81 after adjustment for weight loss as a time-varying covariate, compared to the",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-992ec2a692 reports an unadjusted HR 0.80 (95% CI 0.72\u20130.90) and an adjusted HR 0.81 (95% CI 0.71\u20130.93) after accounting for time\u2011varying weight loss, concluding no mediation by weight loss.",
+            "score": 1.0
+          },
+          {
+            "claim": "In mediation analyses of the LEADER and REWIND trials, body weight was not a significant mediator of MACE reduction.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-08c3d13b00 (REWIND analysis) states that body weight was not found to be a mediator for MACE reduction and cites a similar LEADER exploratory analysis reaching the same conclusion.",
+            "score": 1.0
+          },
+          {
+            "claim": "Changes in HbA1c and urine albumin-to-creatinine ratio (UACR) together mediated 42\u201365% of dulaglutide\u2019s effect on MACE in the REWIND trial.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-08c3d13b00 reports that changes in HbA1c and UACR together might mediate 42\u201365% of dulaglutide\u2019s effect on MACE in REWIND.",
+            "score": 1.0
+          },
+          {
+            "claim": "A meta-analysis showed that GLP-1 receptor agonists that induce minimal weight loss can still reduce MACE.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-5fa29b9c8d explicitly states a meta\u2011analysis showed GLP\u20111 RAs that induce minimal weight loss can still reduce MACE.",
+            "score": 1.0
+          },
+          {
+            "claim": "Across trials, greater weight loss (over 9% in SELECT) was associated with a 20% relative MACE reduction, compared to a 15% reduction in trials with 2\u20135% weight loss.",
+            "verdict": "unsupported",
+            "structural": true,
+            "reason": "E-44b90b2821 discusses mechanisms and animal data and states GLP\u20111RAs have weight\u2011independent effects, but the provided excerpt does not present the trial\u2011level quantitative comparison (20% vs 15% MAC",
+            "score": 0.0
+          },
+          {
+            "claim": "Early change in waist circumference mediated 33% of semaglutide\u2019s MACE reduction in SELECT.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-992ec2a692 reports that an early waist\u2011circumference change mediated 33% of semaglutide\u2019s subsequent MACE risk reduction, with HR attenuated to 0.86 (95% CI 0.77\u20130.97).",
+            "score": 1.0
+          },
+          {
+            "claim": "Weight loss improves blood pressure, lipids, glycemic control, and systemic inflammation, thereby contributing to cardiovascular risk reduction.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-d5314fca26 states that weight loss improves blood pressure, lipids, glycemic control, and systemic inflammation, and that these improvements contribute to cardiovascular risk reduction.",
+            "score": 1.0
+          },
+          {
+            "claim": "Some evidence suggests that cardiovascular benefits occur independently of weight loss and glycemic control, through direct vascular and anti\u2011inflammatory effects.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-5dc516aa7d (and supporting commentary E-9b0ac37e9b) describe preclinical and clinical evidence for weight\u2011independent cardioprotective mechanisms (improved endothelial function, reduced inflammation",
+            "score": 1.0
+          },
+          {
+            "claim": "No clinical trial or analysis described in the provided evidence directly controlled for weight loss in order to isolate the independent effect of GLP-1 receptor agonists on cardiovascular outcomes; i",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "The cited reviews (E-7209a86ddb, E-84e397a0ee, E-e2803c1399) infer weight\u2011independent effects from cross\u2011trial comparisons, subgroup/mediation analyses and consistency across agents rather than report",
+            "score": 1.0
+          },
+          {
+            "claim": "Analysis of outcome trial data shows comparable reductions in MACE with dulaglutide and albiglutide (modest weight loss) versus semaglutide and liraglutide (larger weight loss), suggesting that weight",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-7209a86ddb highlights similar primary MACE reductions with dulaglutide and albiglutide (modest weight loss) versus semaglutide and liraglutide (larger weight loss), arguing weight loss does not full",
+            "score": 1.0
+          },
+          {
+            "claim": "The SELECT trial reported that semaglutide reduced the risk of major cardiovascular events by roughly 20% in people with obesity, independent of weight loss.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-84e397a0ee states that SELECT reported \u224820% MACE reduction in people with obesity and frames this benefit as independent of weight loss in its discussion.",
+            "score": 1.0
+          },
+          {
+            "claim": "A meta-analysis of 13 placebo-controlled randomized trials concluded that the cardiovascular benefits from GLP-1 RAs beyond weight loss are clear.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-e2803c1399 (13\u2011trial meta\u2011analysis) explicitly states 'The cardiovascular benefits from GLP\u20111RAs beyond weight loss is clear' and reports MACE reductions across trials.",
+            "score": 1.0
+          },
+          {
+            "claim": "In a multifactorial mouse model of HFpEF, liraglutide and semaglutide showed cardioprotective effects that exceeded those of dietary weight loss, indicating direct, weight-loss-independent cardiac act",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-44b90b2821 reports that in a multifactorial mouse HFpEF model liraglutide and semaglutide reduced LV hypertrophy/fibrosis and improved function, and that these effects exceeded those of dietary weig",
+            "score": 1.0
+          },
+          {
+            "claim": "Multiple mechanisms\u2014including direct cardioprotection, vasodilation, anti-inflammation, and improvements in lipid profile\u2014are described as contributing to cardiovascular risk reduction independently o",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-831d2ac551 (and related reviews) list multiple mechanisms\u2014direct cardioprotection, vasodilation, anti\u2011inflammation, lipid improvements, natriuresis, plaque stabilization\u2014contributing to CV risk redu",
+            "score": 1.0
+          },
+          {
+            "claim": "In the SELECT trial of overweight/obese patients with CVD, semaglutide reduced MACE before significant weight loss occurred, and mediation analysis indicated only 33% of the benefit was explained by w",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-618eb2768b and E-992ec2a692 report SELECT findings: early CV risk reduction occurred before significant weight loss and mediation analyses attributed ~33% of semaglutide\u2019s benefit to waist\u2011circumfer",
+            "score": 1.0
+          },
+          {
+            "claim": "Semaglutide cardiovascular outcomes align more closely with attained dose than with achieved weight loss, indicating that mechanisms beyond weight change drive the reduction in events.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-2679982396 reports that cardiovascular outcomes correlated with attained (maximum) semaglutide dose rather than magnitude of weight loss, suggesting mechanisms beyond weight change contribute to eve",
+            "score": 1.0
+          },
+          {
+            "claim": "In a real-world study of T2D patients, liraglutide improved cardiometabolic parameters (surrogate markers) in both obese and non-obese (BMI <30) groups, though the benefit was greater in the obese.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-7a966cbd6e describes a real\u2011world T2D cohort split into obese (BMI\u226530) and non\u2011obese (BMI<30) treated with liraglutide and the study title/abstract indicate greater cardiometabolic parameter improve",
+            "score": 1.0
+          },
+          {
+            "claim": "A retrospective cohort study found that GLP-1 RAs vs DPP-4 inhibitors reduced CV death and heart failure hospitalization more in patients with BMI \u226525, with kidney protection consistent across BMI cat",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-9892a2c1bc (AJMC summary of a JAMA Net Open study) reports that GLP\u20111 RAs vs DPP\u20114 inhibitors showed larger reductions in CV death and HF hospitalization in patients with higher BMI (\u226525) while kidn",
+            "score": 1.0
+          },
+          {
+            "claim": "Most clinical trials of GLP-1 RAs for cardiovascular outcomes enrolled overweight or obese populations; evidence in normal-weight individuals is sparse, and expert opinion calls for further investigat",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-6316f4a781 explicitly states most research of GLP\u20111 therapies has focused on overweight/obese populations and calls for further clinical investigation in normal\u2011weight individuals.",
+            "score": 1.0
+          },
+          {
+            "claim": "FDA approval of semaglutide for CV risk reduction now includes patients with CVD regardless of BMI, but the pivotal SELECT trial did not include normal BMI participants, and this claim comes from a ne",
+            "verdict": "partially_supported",
+            "structural": true,
+            "reason": "E-ee0cf25f16 (news) reports FDA approval of Wegovy/semaglutide for reducing heart attack/stroke in patients with CVD regardless of BMI (and is itself a news report). The provided excerpt does not, how",
+            "score": 0.5
+          },
+          {
+            "claim": "A mouse HFpEF model showed that liraglutide and semaglutide produced cardioprotective effects that exceeded those of dietary weight loss, indicating direct weight-loss-independent cardiac actions.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-44b90b2821 reports, in a mouse HFpEF model, liraglutide and semaglutide produced cardioprotective effects that exceeded dietary weight loss, indicating direct weight\u2011loss\u2011independent actions (same s",
+            "score": 1.0
+          },
+          {
+            "claim": "In a retrospective study, GLP-1 RAs including liraglutide, dulaglutide, and tirzepatide reduced atrial fibrillation risk similarly in subgroups with >=10% weight loss, <10% weight loss, and weight gai",
+            "verdict": "partially_supported",
+            "structural": true,
+            "reason": "E-6d177aa996 summarizes a retrospective study presented at Heart Rhythm 2026 showing GLP\u20111 RAs were associated with reduced AF risk independent of weight change, but the provided excerpt does not give",
+            "score": 0.5
+          },
+          {
+            "claim": "A meta-analysis of placebo-controlled RCTs found that GLP-1 RAs reduced MACE regardless of BMI category (above or below 30 kg/m2), supporting cardiovascular benefits beyond weight loss.",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "E-e2803c1399 reports that GLP\u20111 RAs significantly reduced MACE irrespective of BMI above or below 30 kg/m2 and states the benefit extends beyond weight loss.",
+            "score": 1.0
+          },
+          {
+            "claim": "None of the retrieved evidence chunks describe a randomized controlled trial that assigns participants to weight loss interventions alongside GLP-1 receptor agonists specifically to experimentally iso",
+            "verdict": "supported",
+            "structural": true,
+            "reason": "Among the provided evidence, no trial is described that randomized participants to matched weight\u2011loss interventions vs GLP\u20111 RA specifically to isolate drug\u2011specific cardiovascular effects; the one r",
+            "score": 1.0
+          }
+        ]
+      }
+    },
+    "coverage": {
+      "name": "coverage",
+      "score": 0.75,
+      "mode": "model",
+      "details": {
+        "facets": [
+          {
+            "facet": "cardiovascular outcome trials such as SELECT, LEADER or SUSTAIN-6",
+            "covered": true,
+            "where": "Multiple large meta-analyses of cardiovascular outcomes trials (CVOTs) show that GLP-1 receptor agonists (GLP-1 RAs) reduce major adverse cardiovascular events (MACE) by roughly 12\u201314% in people with ",
+            "keyword_share": 0.83
+          },
+          {
+            "facet": "mediation analyses separating weight loss from direct drug effects",
+            "covered": true,
+            "where": "In SELECT, adjusting for time-varying weight loss left semaglutide's MACE hazard ratio essentially unchanged (0.81 vs. 0.80 unadjusted), indicating that overall weight loss explains little of the bene",
+            "keyword_share": 0.83
+          },
+          {
+            "facet": "proposed mechanisms such as inflammation, blood pressure or lipids",
+            "covered": true,
+            "where": "Mechanistically, several weight-independent pathways have been proposed, including anti-inflammatory effects (NF-\u03baB inhibition, reduced TNF-\u03b1), improved endothelial function via eNOS activation, reduc",
+            "keyword_share": 1.0
+          },
+          {
+            "facet": "results in people with and without diabetes",
+            "covered": false,
+            "where": "",
+            "keyword_share": 1.0
+          }
+        ]
+      }
+    },
+    "contradiction_recall": {
+      "name": "contradiction_recall",
+      "score": 1.0,
+      "mode": "model",
+      "details": {
+        "found": 3,
+        "matches_hint": true,
+        "reason": "Yes. Contradictions 2 and 3 map onto the same opposing positions: one side attributes cardiovascular benefit mainly to weight/glycaemic-mediated effects, while the other reports weight-loss\u2013independent or direct cardioprotective effects (mediation analyses showing body weight did not mediate MACE; a"
+      }
+    }
+  },
+  "total_seconds": 556.8,
+  "total_tokens": 182636,
+  "llm_calls": 28,
+  "mean_score": 0.912
+}
