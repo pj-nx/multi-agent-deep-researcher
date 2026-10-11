@@ -190,7 +190,11 @@ class PipelineProgress:
         if kind == "llm_start" and stage:
             model = str(data.get("model") or "model").split("/")[-1]
             label = data.get("label")
-            self._activate(stage, f"{label}: {model}" if label and stage == "analyze" else f"calling {model}")
+            note = f"{label}: {model}" if label and stage == "analyze" else f"calling {model}"
+            if stage == "validate" and self.stages["retrieve"].status == "active":
+                self._set("validate", "active", note)      # grading inside a retrieve branch: both run
+            else:
+                self._activate(stage, note)
         elif kind == "llm_end" and stage:
             tokens = data.get("tokens")
             note = f"{data.get('elapsed_s')}s" + (f", {tokens / 1000:.1f}k tok" if tokens else "")

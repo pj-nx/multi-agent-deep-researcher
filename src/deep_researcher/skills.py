@@ -18,18 +18,13 @@ log = logging.getLogger(__name__)
 SKILLS_FILE = Path(__file__).with_name("skills.md")
 
 AGENT_SKILLS: dict[str, tuple[str, ...]] = {
-    "planner": ("adaptive-research-planning", "autonomous-decision-making", "search-quality",
-                "academic-paper-search", "heavy-document-retrieval", "tool-call-efficiency",
-                "research-depth-completeness"),
-    "validator": ("content-safety-guardrails", "search-quality"),
-    "analysis": ("citation-verification", "factual-correctness", "hallucination-prevention",
-                 "context-window-management", "content-safety-guardrails"),
-    "insight": ("citation-verification", "factual-correctness", "hallucination-prevention",
-                "research-depth-completeness", "adaptive-research-planning"),
-    "critic": ("citation-verification", "factual-correctness", "research-depth-completeness",
-               "autonomous-decision-making", "tool-call-efficiency", "adaptive-research-planning"),
-    "report": ("citation-verification", "factual-correctness", "hallucination-prevention",
-               "research-depth-completeness", "content-safety-guardrails"),
+    "planner": ("adaptive-research-planning", "search-quality", "academic-paper-search",
+                "heavy-document-retrieval", "tool-call-efficiency"),
+    "validator": ("content-safety-guardrails",),
+    "analysis": ("citation-verification", "hallucination-prevention", "context-window-management"),
+    "insight": ("citation-verification", "hallucination-prevention", "research-depth-completeness"),
+    "critic": ("citation-verification", "research-depth-completeness", "autonomous-decision-making"),
+    "report": ("citation-verification", "factual-correctness", "content-safety-guardrails"),
     "guardrails": ("content-safety-guardrails",),
 }
 

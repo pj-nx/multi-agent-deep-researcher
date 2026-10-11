@@ -186,8 +186,8 @@ that are appended to an agent's system prompt on every model call. [`skills.py`]
 maps agents to skills (`AGENT_SKILLS`). Skills: `adaptive-research-planning` (the research-supervisor
 prompt), `autonomous-decision-making`, `academic-paper-search`, `heavy-document-retrieval`, `search-quality`,
 `context-window-management`, `citation-verification`, `factual-correctness`, `research-depth-completeness`,
-`hallucination-prevention`, `tool-call-efficiency`, `content-safety-guardrails`. Each adds roughly 240 to
-1,400 tokens per call depending on the agent. `SKILLS=off` disables injection. The file is validated against
+`hallucination-prevention`, `tool-call-efficiency`, `content-safety-guardrails`. Skills add about
+110 to 590 tokens per call depending on the agent (planner largest, analysis about 270). `SKILLS=off` disables injection. The file is validated against
 the mapping when the graph is built, and a broken file never crashes an agent: the skill is skipped and the
 report's Run health says so.
 

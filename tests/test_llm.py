@@ -113,3 +113,13 @@ def test_get_llm_caches_without_overrides(llm, monkeypatch):
     a, b = llm.get_llm("grader"), llm.get_llm("grader")
     assert a is b
     assert llm.get_llm("grader", temperature=0.5) is not a
+
+
+def test_reasoning_effort_per_role_override(llm, monkeypatch):
+    monkeypatch.setenv("OPENROUTER_REASONING_EFFORT", "high")
+    monkeypatch.setenv("OPENROUTER_REASONING_EFFORT_ANALYSIS", "low")
+    assert llm.build_kwargs("analysis")["extra_body"]["reasoning"] == {"effort": "low"}
+    assert llm.build_kwargs("critic")["extra_body"]["reasoning"] == {"effort": "high"}      # global kept
+    monkeypatch.setenv("OPENROUTER_REASONING_EFFORT_CRITIC", "turbo")
+    with pytest.raises(llm.LLMConfigError):
+        llm.build_kwargs("critic")

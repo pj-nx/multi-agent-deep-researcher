@@ -318,8 +318,11 @@ def _event_for(node: str, update: dict[str, Any] | None) -> tuple[str, dict[str,
                 "warning", "queries", "filtered_irrelevant", "filtered_language", "languages_dropped")
         data.update({k: v for k, v in rows[0].items() if k in keep})
     elif node == "validate":
-        a = update.get("assessments") or {}
-        data.update({"assessed": len(a), "kept": sum(1 for x in a.values() if x.get("keep", True))})
+        v = update.get("validation")
+        if v is None:                       # direct node updates without the hop summary
+            a = update.get("assessments") or {}
+            v = {"assessed": len(a), "kept": sum(1 for x in a.values() if x.get("keep", True))}
+        data.update(v)
     elif node == "analyze":
         summaries = update.get("summaries") or {}
         data["sub_questions"] = list(summaries)

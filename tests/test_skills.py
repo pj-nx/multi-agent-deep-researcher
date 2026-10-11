@@ -31,7 +31,7 @@ def test_skills_file_is_valid_and_complete():
 
 def test_planner_carries_the_supervisor_prompt():
     text = skills.skill_prompt("planner")
-    assert "lead research supervisor" in text and "Never launch additional work merely to look thorough" in text
+    assert "lead research supervisor" in text and "Never launch work merely to look thorough" in text
     assert "citation-verification" not in text      # planner does not get the citation skill
 
 

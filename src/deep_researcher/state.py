@@ -30,6 +30,7 @@ class ResearchState(TypedDict, total=False):
     retrieval_log: Annotated[list[dict[str, Any]], operator.add]   # one row per (sub-question, hop)
     # validation
     assessments: Annotated[dict[str, dict[str, Any]], merge_dicts]  # evidence_id -> SourceAssessment dump
+    validation: dict[str, int]                                      # hop summary from the validate step
     # analysis
     extra_sub_questions: Annotated[list[dict[str, Any]], operator.add]  # gap-derived SubQuestion dumps
     summaries: Annotated[dict[str, dict[str, Any]], merge_dicts]   # sub_question_id -> Summary dump

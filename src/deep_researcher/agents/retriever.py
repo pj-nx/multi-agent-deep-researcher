@@ -17,6 +17,7 @@ from urllib.parse import urlsplit, urlunsplit
 
 from deep_researcher.agents.common import emit
 from deep_researcher.agents.deps import Deps
+from deep_researcher.agents.validator import assess
 from deep_researcher.health import degrade, tool_errors
 from deep_researcher.schemas import Evidence, SubQuestion
 from deep_researcher.tools import language as lang
@@ -217,8 +218,16 @@ async def retrieve_node(payload: dict[str, Any], deps: Deps) -> dict[str, Any]:
         stored = await asyncio.to_thread(store.add_evidence, evidence)   # embedding is CPU-bound
         emit("embed_end", sub_question_id=sq.id, chunks=stored)
 
+    # Grade this branch's sources now, so validation overlaps with slower branches still searching.
+    assessments: dict[str, dict[str, Any]] = {}
+    if evidence:
+        assessments, validator_degradations = await assess([e.model_dump() for e in evidence],
+                                                           {sq.id: sq.question}, deps)
+        degradations.extend(validator_degradations)
+
     elapsed = round(time.monotonic() - started, 1)
     return {
+        "assessments": assessments,
         "degradations": degradations,
         "evidence": [e.model_dump() for e in evidence],
         "retrieval_log": [{"sub_question_id": sq.id, "hop": hop, "tools": per_tool, "sources": len(evidence),

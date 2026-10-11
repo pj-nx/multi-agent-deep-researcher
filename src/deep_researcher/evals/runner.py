@@ -31,9 +31,14 @@ log = logging.getLogger(__name__)
 
 @dataclass
 class Usage:
-    """Token totals per model, summed from ``llm_end`` activity events."""
+    """Token totals per model and call time per role, summed from ``llm_end`` activity events.
+
+    ``roles[role]["seconds"]`` is the sum of call durations, not wall time: parallel calls overlap, so it
+    shows where model time is spent, and a role's wall contribution is at most this number.
+    """
 
     models: dict[str, dict[str, int]] = field(default_factory=dict)
+    roles: dict[str, dict[str, float]] = field(default_factory=dict)
 
     def add(self, event: dict[str, Any]) -> None:
         model = str(event.get("model") or "unknown")
@@ -41,6 +46,9 @@ class Usage:
         row["calls"] += 1
         row["input_tokens"] += int(event.get("input_tokens") or 0)
         row["output_tokens"] += int(event.get("output_tokens") or 0)
+        rrow = self.roles.setdefault(str(event.get("role") or "unknown"), {"calls": 0, "seconds": 0.0})
+        rrow["calls"] += 1
+        rrow["seconds"] = round(rrow["seconds"] + float(event.get("elapsed_s") or 0), 1)
 
     @property
     def total_tokens(self) -> int:
@@ -251,6 +259,10 @@ def aggregate(runs: list[CaseRun]) -> dict[str, Any]:
             else None
         ),
         "mean_score": mean_of([r.mean for r in ok]),
+        "mean_role_seconds": {
+            role: mean_of([r.usage.roles.get(role, {}).get("seconds", 0.0) for r in ok])
+            for role in sorted({role for r in ok for role in r.usage.roles})
+        },
     }
     for name in JUDGE_NAMES:
         agg[name] = mean_of([r.judges[name].score for r in ok if name in r.judges])
@@ -337,6 +349,13 @@ def summary_markdown(
         "models used; embeddings are not included.",
         "",
     ]
+    if agg.get("mean_role_seconds"):
+        lines += [
+            "Model call time by role (mean per case; summed call durations, so parallel calls overlap and "
+            "the total can exceed wall time): "
+            + ", ".join(f"{role} {sec:g}s" for role, sec in agg["mean_role_seconds"].items()),
+            "",
+        ]
     return "\n".join(lines)
 
 

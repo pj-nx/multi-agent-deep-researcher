@@ -28,6 +28,8 @@ Routing knobs (all optional):
     OPENROUTER_ZDR               true → only zero-data-retention endpoints
     OPENROUTER_SORT              price|throughput|latency
     OPENROUTER_REASONING_EFFORT  none|minimal|low|medium|high  (`reasoning.effort`; "none" disables)
+    OPENROUTER_REASONING_EFFORT_<ROLE>  same values, one role only (beats the global value), e.g.
+                                 OPENROUTER_REASONING_EFFORT_ANALYSIS=low  (unset roles keep the global value)
     OPENROUTER_APP_URL / OPENROUTER_APP_TITLE   attribution headers shown on openrouter.ai
 
 Usage::
@@ -135,12 +137,16 @@ def provider_preferences() -> dict[str, Any] | None:
     return prefs or None
 
 
-def reasoning_effort() -> str | None:
-    v = (os.getenv("OPENROUTER_REASONING_EFFORT") or "").strip().lower()
+def reasoning_effort(role: str | None = None) -> str | None:
+    """Effort for ``role``: its ``OPENROUTER_REASONING_EFFORT_<ROLE>``, else the global value, else None."""
+    name = "OPENROUTER_REASONING_EFFORT"
+    if role and os.getenv(f"{name}_{role.upper()}"):
+        name = f"{name}_{role.upper()}"
+    v = (os.getenv(name) or "").strip().lower()
     if not v:
         return None
     if v not in {"none", "minimal", "low", "medium", "high"}:
-        raise LLMConfigError(f"OPENROUTER_REASONING_EFFORT={v!r}; expected none|minimal|low|medium|high")
+        raise LLMConfigError(f"{name}={v!r}; expected none|minimal|low|medium|high")
     return v
 
 
@@ -168,7 +174,7 @@ def build_kwargs(role: str, **overrides: Any) -> dict[str, Any]:
         extra_body["models"] = [model, *[m for m in fb if m != model]]
     if (prefs := provider_preferences()) and "provider" not in extra_body:
         extra_body["provider"] = prefs
-    if (effort := reasoning_effort()) and "reasoning" not in extra_body:
+    if (effort := reasoning_effort(role)) and "reasoning" not in extra_body:
         extra_body["reasoning"] = {"enabled": False} if effort == "none" else {"effort": effort}
     kwargs: dict[str, Any] = {
         "model": model,
