@@ -55,7 +55,7 @@ shows the planner's sub-questions and asks before retrieving. The same graph ser
 
 ```bash
 uv run python -m deep_researcher.ui        # Gradio UI at http://127.0.0.1:7860 (uv sync --extra ui)
-uv run uvicorn api.index:app --reload      # HTTP API at http://localhost:8000/api/health, UI at public/index.html
+uv run uvicorn api.index:app --reload      # HTTP API at http://localhost:8000; the hosted UI (public/index.html) at /
 ```
 
 The Gradio UI (flat, minimalist; Matrix-green accent on white, dark by default, with a toggle that remembers your
@@ -94,7 +94,8 @@ only the keyless sources, `papers` means arXiv, which is thin outside maths/phys
 
 ## Deployment
 
-The same FastAPI app runs locally, in a container, on AWS Lambda and on Vercel. Hosted runs need
+The same FastAPI app runs locally, in a container, on AWS Lambda and on Vercel, and serves the
+hosted UI at `/` (see [Hosted UI](#hosted-ui) below). Hosted runs need
 three things the local defaults do not: `CHECKPOINTER=postgres` with `DATABASE_URL` (plan approval
 resumes from the database), `CHROMA_MODE=http` or `cloud` (the evidence store cannot live on an
 ephemeral disk), and `EMBEDDINGS_PROVIDER=openrouter` (no local model in the image). The container
@@ -135,7 +136,59 @@ path before FastAPI sees it. Deploy with `npx vercel login`, `npx vercel link`, 
 `EMBEDDINGS_PROVIDER=openrouter`, `MAX_HOPS=0`, `RUN_BUDGET_SECONDS=240`, Sonnet as the heavy tier
 and SQLite + embedded Chroma under `/tmp`: fine for a demo, but plan approval only resumes while the
 same function instance is warm. Switch to `CHECKPOINTER=postgres` + `CHROMA_MODE=cloud` for durable
-hosting. The API needs the `API_AUTH_TOKEN` bearer; the hosted page at `/` asks for it.
+hosting. The API needs the `API_AUTH_TOKEN` bearer; the hosted UI's Settings tab asks for it.
+
+### Hosted UI
+
+[`public/index.html`](public/index.html) is a single static page (no build step, no framework) that
+talks to the API over SSE and mirrors the Gradio app: same layout, same flat Matrix-green theme, dark
+by default with the same light/dark toggle.
+
+![Hosted UI](docs/hosted-ui.png)
+
+- **Pipeline boxes** show each agent's live status, notes (model being called, sources found, tokens)
+  and hop badges; a JavaScript port of `pipeline_view.py`.
+- **Research tab**: question, max hops, run budget (capped by the server), "Plan the research" with a busy
+  indicator and disabled buttons while a request runs, a collapsed agent activity log, the editable
+  plan table (ID, Question, Source types, Search queries, Depends on; clear a question to drop it, `+`
+  adds a row), "Approve and run", the rendered report and PDF / Markdown / JSON downloads (PDF via
+  `/api/report/pdf`, the others built in the browser).
+- **Settings tab** (`/#settings`): see below.
+- **API guide tab** (`/#api`): the user guide for calling the API from your own code (endpoints, auth,
+  the two-step plan/resume flow, per-run settings, every stream event, curl and Python examples,
+  error codes), rendered from `GET /api/guide`, which fills in this deployment's URL, auth requirement,
+  limits and default models. The same guide is a tab in the Gradio app; all three come from
+  [`api_guide.py`](src/deep_researcher/api_guide.py).
+- Vercel serves `public/` statically; everywhere else the API's `GET /` returns the same file. User
+  input and streamed text are rendered as text nodes; the report Markdown is sanitised with DOMPurify.
+
+#### Settings tab
+
+![Hosted UI settings](docs/hosted-settings.png)
+
+A hosted function has no writable `.env`, so the hosted page cannot edit the server's configuration
+the way the local Gradio Settings tab does. It offers the same choices as **per-run overrides**
+instead:
+
+| Setting | Where | Applies |
+|---|---|---|
+| API token | Settings → API access | Sent as `Authorization: Bearer` with every request; kept in `sessionStorage` for the tab only. The tab opens itself when the server requires a token and none is set. |
+| Heavy / worker / cheap tier model | Settings → Models and run parameters | Planner, analysis, insight, critic / retriever, report / validator, grader. "Load model list from OpenRouter" fills the pickers with ids and prices per million tokens (`GET /api/models`); the placeholder shows the server default. |
+| Reasoning effort | same block | `none`, `minimal`, `low`, `medium`, `high`, or the server default. |
+| Fallback models | same block | Comma-separated ids OpenRouter tries if the chosen model fails. |
+| Run budget | Research → Budget | Seconds per leg before retrieval loops stop; `0` means the server default. The server caps it at its own `RUN_BUDGET_SECONDS`. |
+| Allowed models | server env `ALLOWED_MODELS` | Optional allowlist (`vendor/*` prefixes or ids); the pickers and the catalogue only offer those, and anything else is rejected. |
+| Max follow-up hops | Research → slider | Already per request (`max_hops`). |
+
+Choices are remembered in `localStorage` ("Reset to server defaults" clears them) and sent as a
+`settings` object with both the plan and the resume request, so they apply to that run only and
+never change what other users get. The server validates model ids and tier/role names, builds that
+run's models from the overrides (`src/deep_researcher/run_settings.py`), echoes the resolved values
+in a `settings` stream event (visible in the activity log) and records them in the report's
+methodology section. API keys are deliberately not overridable and stay on the server; the
+**Effective server configuration** panel below the controls shows what the server itself is
+running: models per role, reasoning effort, fallback models, embeddings, vector DB, checkpointer,
+active sources, languages and tracing, all from `/api/health`.
 
 ### What is and is not verified
 
@@ -312,6 +365,7 @@ The research endpoint spends real money per call, so three env vars guard it (al
 | `API_AUTH_TOKEN` | unset (open) | When set, `POST /api/research*` require `Authorization: Bearer <token>` or `X-API-Key`. The hosted UI shows a token field when health reports `auth_required`. |
 | `RATE_LIMIT_PER_MINUTE` | `6` | Sliding window per client IP; `0` disables. Idle keys are evicted so memory stays bounded. |
 | `MAX_CONCURRENT_RUNS` | `3` | Simultaneous research streams per instance; extra requests get `503` with `Retry-After`. Released on every exit path, including client disconnects. |
+| `ALLOWED_MODELS` | unset (any) | Comma-separated model ids or `vendor/*` prefixes a client may choose through per-run `settings`. Overrides outside the list get `422`, `/api/models` only lists allowed ids and the hosted page's pickers follow it. Bounds the cost a token holder can incur. |
 | `TRUST_PROXY_HEADERS` | on when `VERCEL` is set, else off | Use `x-real-ip` / `x-vercel-forwarded-for` / `x-forwarded-for` as the rate-limit key. Off by default locally because those headers are forgeable without a proxy in front. |
 
 Set `API_AUTH_TOKEN` on Vercel before sharing the URL. The limiter is in-process, which bounds
@@ -322,12 +376,17 @@ public and never exposes secrets.
 
 | Method | Path | Purpose |
 |---|---|---|
+| GET | `/` | the hosted UI (`public/index.html`) |
 | GET | `/api/health` | liveness, graph/tracing/llm/embeddings/chunking config, enabled sources |
-| POST | `/api/research` | `{question, max_hops?}` → SSE stream until plan approval |
-| POST | `/api/research/{thread_id}/resume` | `{plan: ResearchPlan}` → SSE stream to final report |
+| GET | `/api/guide` | the API user guide as Markdown, filled in for this deployment |
+| GET | `/api/models` | OpenRouter's live model catalogue (id, context length, prices), cached 10 min; `?prefix=anthropic/` filters |
+| POST | `/api/research` | `{question, max_hops?, settings?}` → SSE stream until plan approval |
+| POST | `/api/research/{thread_id}/resume` | `{plan: ResearchPlan, settings?}` → SSE stream to final report |
 | POST | `/api/report/pdf` | `{markdown, title?}` → `application/pdf`; stateless, so the hosted page can turn the streamed report into a download |
 
-SSE events: `started` (with `trace_url`), `plan` (awaiting approval), one `retrieve` per sub-question (parallel),
+`settings` is optional per-run overrides: `{models: {heavy|worker|cheap|<role>: "vendor/model"}, reasoning_effort, fallback_models, budget_seconds}`; the server validates ids, caps the budget at `RUN_BUDGET_SECONDS`, builds that run's models from it and echoes the resolved values in a `settings` event.
+
+SSE events: `started` (with `trace_url`), `settings` (when overrides were sent), `plan` (awaiting approval), one `retrieve` per sub-question (parallel),
 `validate` (assessed/kept), `analyze` (claims, contradictions, gaps), `route_gaps` (next hop or stop), repeated per
 hop, then `insight` (hypotheses), `critic` (verdict, issues, follow-up; may loop back), `report` (Markdown in
 `report`, structured record in `report_json`, `stats`), `error`, `done`.

@@ -234,7 +234,15 @@ def info() -> dict[str, Any]:
         "models": {role: model_for(role) for role in ROLES},
         "fallback_models": fallback_models(),
         "provider_preferences": provider_preferences(),
+        "reasoning_effort": _safe_reasoning_effort(),
     }
+
+
+def _safe_reasoning_effort() -> str | None:
+    try:
+        return reasoning_effort()
+    except LLMConfigError:
+        return None
 
 
 def _shape_models(rows: list[dict[str, Any]], prefix: str) -> list[dict[str, Any]]:

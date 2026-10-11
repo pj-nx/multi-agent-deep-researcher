@@ -283,6 +283,18 @@ async def get_graph(deps: Deps | None = None):
         return _graph
 
 
+async def graph_for(deps: Deps | None = None):
+    """The shared graph, or (when a run overrides models) a fresh compile over the same checkpointer.
+
+    Compiling is cheap; the checkpointer is the only shared resource, so plan and resume legs with
+    the same overrides see the same thread state.
+    """
+    shared = await get_graph()
+    if deps is None:
+        return shared
+    return build_graph(shared.checkpointer, deps)
+
+
 def reset_graph() -> None:
     global _graph
     _graph = None

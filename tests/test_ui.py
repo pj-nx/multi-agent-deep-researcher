@@ -1,4 +1,5 @@
 """Gradio UI: pure helpers and the two streams, against the fake graph (no browser, no server)."""
+import importlib.util
 import sys
 from pathlib import Path
 
@@ -84,10 +85,11 @@ async def test_plan_then_run_streams(tmp_path, monkeypatch):
     log_text, rows, thread_id, pipe = plan_updates[-1]
     assert "dr-box done" in pipe and "3 sub-questions" in pipe and "awaiting approval" in pipe
     from deep_researcher.theme import CSS, DARK, PALETTE, THEME_INIT_JS, THEME_TOGGLE_JS, build_theme
-    theme = build_theme()
-    assert PALETTE["green"] in CSS and theme is not None
-    assert theme.body_background_fill_dark == DARK["bg"] and ".dark #dr-report" in CSS
+    assert PALETTE["green"] in CSS and ".dark #dr-report" in CSS
     assert "localStorage" in THEME_TOGGLE_JS and "pref !== 'light'" in THEME_INIT_JS   # dark by default
+    if importlib.util.find_spec("gradio"):                   # the theme object needs gradio (the `ui` extra)
+        theme = build_theme()
+        assert theme is not None and theme.body_background_fill_dark == DARK["bg"]
     assert "dr-box active" in plan_updates[0][3]                       # planner box pulses while planning
     assert thread_id and "plan ready: 3 sub-questions" in log_text
     assert [r[0] for r in rows] == ["sq1", "sq2", "sq3"]
