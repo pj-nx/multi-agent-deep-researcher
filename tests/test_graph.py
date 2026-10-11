@@ -21,7 +21,7 @@ from deep_researcher.schemas import (
     ReasoningStep,
     SubQuestion,
 )
-from deep_researcher.state import merge_dicts
+from deep_researcher.state import merge_assessments, merge_dicts
 from deep_researcher.tools.base import SearchResult
 from fakes import FakeTool, _plan, make_deps
 
@@ -50,6 +50,21 @@ def test_relevance_gate_drops_offtopic_results():
 def test_reducer_merge_dicts():
     assert merge_dicts({"a": 1, "b": 1}, {"b": 2, "c": 3}) == {"a": 1, "b": 2, "c": 3}
     assert merge_dicts(None, {"x": 1}) == {"x": 1}
+
+
+def test_reducer_merge_assessments_keeps_a_source_any_branch_kept():
+    """A source graded relevant for sq1 and later irrelevant for a gap question stays kept (its hop-0
+    citations must not be orphaned); scores take the max and issues are unioned."""
+    first = {"E-1": {"evidence_id": "E-1", "keep": True, "relevance": 0.9, "credibility": 0.7, "issues": []}}
+    later = {"E-1": {"evidence_id": "E-1", "keep": False, "relevance": 0.3, "credibility": 0.8,
+                     "issues": ["off-topic"]},
+             "E-2": {"evidence_id": "E-2", "keep": False, "relevance": 0.1, "credibility": 0.5, "issues": ["x"]}}
+    out = merge_assessments(first, later)
+    assert out["E-1"]["keep"] is True and out["E-1"]["relevance"] == 0.9 and out["E-1"]["credibility"] == 0.8
+    assert out["E-1"]["issues"] == ["off-topic"]
+    assert out["E-2"]["keep"] is False                                   # new ids pass through unchanged
+    assert merge_assessments(later, first)["E-1"]["keep"] is True       # order does not matter
+    assert merge_assessments(None, later) == later
 
 
 def test_normalise_plan_reassigns_ids_and_fixes_dependencies():

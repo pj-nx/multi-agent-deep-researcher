@@ -17,6 +17,31 @@ def merge_dicts(left: dict[str, Any] | None, right: dict[str, Any] | None) -> di
     return out
 
 
+def merge_assessments(left: dict[str, Any] | None, right: dict[str, Any] | None) -> dict[str, Any]:
+    """Merge validator verdicts per evidence id.
+
+    The same source is often retrieved by several sub-questions (and again by gap follow-ups), and each
+    retrieve branch grades it against its own question. A source that is relevant to *any* sub-question
+    must stay in the bibliography, otherwise claims that cited it legitimately end up pointing at a
+    dropped source. So on conflict ``keep`` is OR-ed, scores take the maximum and issues are unioned.
+    """
+    out = dict(left or {})
+    for eid, new in (right or {}).items():
+        old = out.get(eid)
+        if not old:
+            out[eid] = new
+            continue
+        merged = {**old, **new}
+        merged["keep"] = bool(old.get("keep", True) or new.get("keep", True))
+        for key in ("relevance", "credibility"):
+            vals = [v for v in (old.get(key), new.get(key)) if isinstance(v, int | float)]
+            if vals:
+                merged[key] = max(vals)
+        merged["issues"] = list(dict.fromkeys([*(old.get("issues") or []), *(new.get("issues") or [])]))
+        out[eid] = merged
+    return out
+
+
 class ResearchState(TypedDict, total=False):
     # inputs
     question: str
@@ -29,7 +54,7 @@ class ResearchState(TypedDict, total=False):
     evidence: Annotated[list[dict[str, Any]], operator.add]        # Evidence.model_dump() per source
     retrieval_log: Annotated[list[dict[str, Any]], operator.add]   # one row per (sub-question, hop)
     # validation
-    assessments: Annotated[dict[str, dict[str, Any]], merge_dicts]  # evidence_id -> SourceAssessment dump
+    assessments: Annotated[dict[str, dict[str, Any]], merge_assessments]  # evidence_id -> verdict; keep ORs
     validation: dict[str, int]                                      # hop summary from the validate step
     # analysis
     extra_sub_questions: Annotated[list[dict[str, Any]], operator.add]  # gap-derived SubQuestion dumps
