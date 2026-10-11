@@ -22,7 +22,16 @@ def llm(monkeypatch):
 def test_defaults_per_role(llm):
     assert llm.model_for("planner") == "anthropic/claude-opus-5.5"
     assert llm.model_for("retriever") == "anthropic/claude-sonnet-5"
-    assert llm.model_for("grader") == "anthropic/claude-haiku-4.5"
+    assert llm.model_for("validator") == "anthropic/claude-haiku-4.5"
+    assert llm.model_for("grader") == "openai/gpt-5-mini"
+    assert llm.model_for("grader") != llm.model_for("validator")  # judge independent of the pipeline
+
+
+def test_judge_tier_override_leaves_validator_alone(llm, monkeypatch):
+    monkeypatch.setenv("OPENROUTER_MODEL_JUDGE", "google/gemini-3-flash-preview")
+    monkeypatch.setenv("OPENROUTER_MODEL_CHEAP", "openai/gpt-5-mini")
+    assert llm.model_for("grader") == "google/gemini-3-flash-preview"
+    assert llm.model_for("validator") == "openai/gpt-5-mini"
     assert set(llm.info()["models"]) == set(llm.ROLES)
 
 

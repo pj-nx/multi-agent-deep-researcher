@@ -181,7 +181,7 @@ def keyword_coverage(text: str, facet: str, threshold: float = 0.5) -> tuple[boo
 
 
 def grader_llm() -> Any | None:
-    """The cheap ``grader`` model when a key is configured, else None (judges fall back)."""
+    """The ``grader`` model (judge tier) when a key is configured, else None (judges fall back)."""
     from deep_researcher import llm
 
     if not llm.enabled():

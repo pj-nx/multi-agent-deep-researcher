@@ -275,7 +275,7 @@ async def test_openrouter() -> str:
     try:
         from langchain_core.messages import HumanMessage
 
-        model = llm.make_llm("grader", max_tokens=10)
+        model = llm.make_llm("validator", max_tokens=10)
         t = time.time()
         r = await model.ainvoke([HumanMessage("Reply with the single word: pong")])
         return f"OpenRouter OK: {model.model_name} answered {r.content!r} in {time.time() - t:.1f}s"
@@ -336,12 +336,13 @@ def _build_settings_tab(gr: Any) -> None:
 
     async def on_models():
         choices = await fetch_model_choices()
-        return [gr.update(choices=choices) for _ in range(3)] + [f"Loaded {len(choices)} models."]
+        return [gr.update(choices=choices) for _ in range(4)] + [f"Loaded {len(choices)} models."]
 
     save_btn.click(on_save, [inputs[k] for k in keys], [status, effective])
     test_btn.click(test_openrouter, None, status)
     models_btn.click(on_models, None, [inputs["OPENROUTER_MODEL_HEAVY"], inputs["OPENROUTER_MODEL_WORKER"],
-                                       inputs["OPENROUTER_MODEL_CHEAP"], status])
+                                       inputs["OPENROUTER_MODEL_CHEAP"], inputs["OPENROUTER_MODEL_JUDGE"],
+                                       status])
 
 
 # ----------------------------------------------------------------------------- Gradio app

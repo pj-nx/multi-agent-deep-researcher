@@ -161,7 +161,11 @@ OPENROUTER_API_KEY=sk-or-...
 |---|---|---|---|
 | heavy | planner, analysis, insight, critic | `anthropic/claude-opus-5.5` | `OPENROUTER_MODEL_HEAVY` |
 | worker | retriever, report | `anthropic/claude-sonnet-5` | `OPENROUTER_MODEL_WORKER` |
-| cheap | validator, grader | `anthropic/claude-haiku-4.5` | `OPENROUTER_MODEL_CHEAP` |
+| cheap | validator | `anthropic/claude-haiku-4.5` | `OPENROUTER_MODEL_CHEAP` |
+| judge | grader (eval judges only) | `openai/gpt-5-mini` | `OPENROUTER_MODEL_JUDGE` |
+
+The judge tier is deliberately a different vendor from the pipeline, so the evals are not graded by
+the same model that validated the sources; `evals run` warns if the grader resolves to a pipeline model.
 
 Any single role can be pinned with `OPENROUTER_MODEL_<ROLE>`, e.g.
 `OPENROUTER_MODEL_INSIGHT=openai/gpt-5.1`. `OPENROUTER_FALLBACK_MODELS` lists backups tried in
@@ -285,8 +289,8 @@ uv run python -m deep_researcher.evals langsmith upload          # cases -> Lang
 uv run python -m deep_researcher.evals langsmith experiment      # aevaluate with the judges as evaluators
 ```
 
-Judges (all read the report only; the model-judged halves use the cheap `grader` role and fall back
-to deterministic checks when no key is set):
+Judges (all read the report only; the model-judged halves use the `grader` role, on its own judge tier,
+and fall back to deterministic checks when no key is set):
 
 | Judge | What it measures | How |
 |---|---|---|
