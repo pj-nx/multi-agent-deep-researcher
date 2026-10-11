@@ -309,7 +309,14 @@ Each phase ends with something runnable. Estimated effort assumes evenings/weeke
 
 ---
 
-### Phase 8 — Uploaded documents as a research source (planned, ~2.5 days)
+### Phase 8 — Uploaded documents as a research source (in progress on branch `phase-8-documents`)
+
+Status 2026-10-11: step (a) done — `documents.py` (parse PDF/TXT/MD/HTML/DOCX, sniffing, caps, page-aligned
+sections, `ingest`, `bind_documents`), `store/uploads.py` (Chroma `uploads` collection: manifest, search per
+set, delete, expiry), `tools/documents.py` (`DocumentsTool`), the `documents` source type, planner awareness,
+bibliography rendering, CLI `--doc`, and the analysis query now scoped by each sub-question's own evidence ids
+(closes the single-`sub_question_id` gap below). Remaining: (b) API endpoints, Gradio and hosted page; (c) evals
+case, prune `--documents`, README and API guide.
 
 **Goal.** A user attaches their own files (PDF first; TXT/MD, HTML and DOCX after) and the pipeline
 treats them as one more source type: the planner can target them, retrievers pull the relevant

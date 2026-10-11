@@ -20,10 +20,22 @@ async def _main(args: argparse.Namespace) -> int:
     tracing.configure()
     thread_id = str(uuid.uuid4())
     cfg = tracing.run_config(thread_id, args.question, tags=["cli"])
+    graph = None
+    documents = None
+    if args.doc:
+        from deep_researcher.documents import bind_documents, ingest
+
+        files = [(Path(p).name, Path(p).read_bytes()) for p in args.doc]
+        set_id, manifest = ingest(files)
+        documents = {"set_id": set_id, "documents": [d.model_dump() for d in manifest]}
+        for d in manifest:
+            flag = "  (no extractable text)" if d.no_text else ""
+            print(f"[documents] {d.filename}: {d.pages} page(s), {d.sections} section(s){flag}")
+        graph = await G.graph_for(bind_documents(G.Deps(), set_id))
     plan = None
     async for event, data in G.stream_until_interrupt(question=args.question, thread_id=thread_id,
                                                       max_hops=args.max_hops, budget_seconds=args.budget,
-                                                      config=cfg):
+                                                      config=cfg, graph=graph, documents=documents):
         _print(event, data)
         if event == "plan" and data.get("status") == "awaiting_approval":
             plan = data["plan"]
@@ -42,7 +54,7 @@ async def _main(args: argparse.Namespace) -> int:
     report = None
     report_json = None
     async for event, data in G.resume_with_plan(thread_id=thread_id, plan=plan, budget_seconds=args.budget,
-                                                config=cfg):
+                                                config=cfg, graph=graph):
         _print(event, data)
         if event == "report":
             report = data.get("report")
@@ -72,6 +84,8 @@ def main() -> None:
     p.add_argument("--budget", type=int, default=None, help="seconds before retrieval loops stop")
     p.add_argument("--auto-approve", action="store_true")
     p.add_argument("--out", default="reports")
+    p.add_argument("--doc", action="append", default=[], metavar="FILE",
+                   help="attach a document (pdf, txt, md, html, docx) as a research source; repeatable")
     from deep_researcher.guardrails import GuardrailViolation
 
     try:

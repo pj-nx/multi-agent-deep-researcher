@@ -46,11 +46,20 @@ def _children(sq_id: str, extra: list[dict[str, Any]]) -> list[str]:
     return [e["id"] for e in extra if e.get("parent_sub_question_id") == sq_id]
 
 
-def _kept_ids(state: dict[str, Any]) -> set[str] | None:
+def _kept_ids(state: dict[str, Any], sub_question_ids: list[str] | None = None) -> set[str] | None:
+    """Evidence ids the analysis may read: kept by the validator and (when given) retrieved for one of
+    ``sub_question_ids``. Scoping by evidence id rather than by the chunk's stored sub-question keeps a
+    source visible to every sub-question that retrieved it (chunk metadata holds only one id)."""
     assessments = state.get("assessments") or {}
+    if sub_question_ids is None:
+        if not assessments:
+            return None                               # nothing validated yet: use everything
+        return {eid for eid, a in assessments.items() if a.get("keep", True)}
+    wanted = set(sub_question_ids)
+    ids = {ev["id"] for ev in state.get("evidence", []) if ev.get("sub_question_id") in wanted}
     if not assessments:
-        return None                                   # nothing validated yet: use everything
-    return {eid for eid, a in assessments.items() if a.get("keep", True)}
+        return ids or None
+    return {eid for eid in ids if (assessments.get(eid) or {}).get("keep", True)}
 
 
 def rerank(hits: list[Any], assessments: dict[str, dict[str, Any]]) -> list[Any]:
@@ -109,10 +118,11 @@ async def _analyse_one(sq: dict[str, Any], state: dict[str, Any], deps: Deps, ll
     sq_id = sq["id"]
     extra = state.get("extra_sub_questions", [])
     ids = [sq_id, *_children(sq_id, extra)]
-    kept = _kept_ids(state)
+    kept = _kept_ids(state, ids)
     store = deps.store()
     hits = await asyncio.to_thread(
-        store.query, sq["question"], k=deps.analysis_k * 2, sub_question_ids=ids,
+        store.query, sq["question"], k=deps.analysis_k * 2,
+        sub_question_ids=None if kept is not None else ids,     # ids alone scope the query once known
         evidence_ids=None if kept is None else sorted(kept),
     )
     hits = rerank(hits, state.get("assessments") or {})[: deps.analysis_k]

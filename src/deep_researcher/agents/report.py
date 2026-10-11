@@ -19,6 +19,7 @@ from deep_researcher.agents.common import (
     summaries_text,
 )
 from deep_researcher.agents.deps import Deps
+from deep_researcher.documents import display_source
 from deep_researcher.health import degrade, health_md, summarise
 from deep_researcher.schemas import ReportOutput
 from deep_researcher.skills import skill_prompt
@@ -101,7 +102,7 @@ def _bibliography_md(state: dict[str, Any]) -> list[str]:
         flags = f" | {', '.join(a['issues'])}" if a.get("issues") else ""
         lines.append(
             f"- [{e['id']}] **{e.get('title') or e['url']}**{date} | {e['source_type']}{kind} "
-            f"| credibility {cred:.2f}{flags} | {e['url']}"
+            f"| credibility {cred:.2f}{flags} | {display_source(e.get('title') or '', e['url'])}"
         )
     return [*lines, ""]
 

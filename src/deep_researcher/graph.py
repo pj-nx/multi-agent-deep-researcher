@@ -401,11 +401,12 @@ async def _await_checkpoint(graph: Any, cfg: dict[str, Any], key: str, timeout: 
 
 async def stream_until_interrupt(*, question: str, thread_id: str, max_hops: int = DEFAULT_MAX_HOPS,
                                  budget_seconds: int | None = None, config: dict[str, Any] | None = None,
-                                 graph: Any = None) -> AsyncIterator[tuple[str, dict[str, Any]]]:
+                                 graph: Any = None, documents: dict[str, Any] | None = None,
+                                 ) -> AsyncIterator[tuple[str, dict[str, Any]]]:
     graph = graph or await get_graph()
     deadline = time.time() + budget_seconds if budget_seconds else 0.0
     state: dict[str, Any] = {"question": question, "max_hops": max_hops, "deadline": deadline,
-                             "evidence": [], "retrieval_log": [], "notes": []}
+                             "evidence": [], "retrieval_log": [], "notes": [], "documents": documents}
     cfg = _config(thread_id, config)
     async for ev in _stream(graph, state, cfg):
         yield ev
