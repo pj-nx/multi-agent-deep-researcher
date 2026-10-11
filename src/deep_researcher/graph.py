@@ -21,6 +21,7 @@ from typing import Any
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import Command, Send, interrupt
 
+from deep_researcher import skills
 from deep_researcher.agents.analysis import analyze_node
 from deep_researcher.agents.critic import critic_node
 from deep_researcher.agents.deps import Deps
@@ -182,6 +183,8 @@ def after_critic(state: ResearchState) -> str:
 
 def build_graph(checkpointer: Any = None, deps: Deps | None = None):
     deps = deps or Deps()
+    for problem in skills.validate_skills():       # a broken skills.md weakens prompts; say so at build time
+        log.error("skills.md: %s", problem)
     g = StateGraph(ResearchState)
     g.add_node("plan", _mk_plan(deps))
     g.add_node("approve", approve)
