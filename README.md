@@ -154,6 +154,11 @@ by default with the same light/dark toggle.
   adds a row), "Approve and run", the rendered report and PDF / Markdown / JSON downloads (PDF via
   `/api/report/pdf`, the others built in the browser).
 - **Settings tab** (`/#settings`): see below.
+- **API guide tab** (`/#api`): the user guide for calling the API from your own code (endpoints, auth,
+  the two-step plan/resume flow, per-run settings, every stream event, curl and Python examples,
+  error codes), rendered from `GET /api/guide`, which fills in this deployment's URL, auth requirement,
+  limits and default models. The same guide is a tab in the Gradio app; all three come from
+  [`api_guide.py`](src/deep_researcher/api_guide.py).
 - Vercel serves `public/` statically; everywhere else the API's `GET /` returns the same file. User
   input and streamed text are rendered as text nodes; the report Markdown is sanitised with DOMPurify.
 
@@ -310,6 +315,7 @@ public and never exposes secrets.
 |---|---|---|
 | GET | `/` | the hosted UI (`public/index.html`) |
 | GET | `/api/health` | liveness, graph/tracing/llm/embeddings/chunking config, enabled sources |
+| GET | `/api/guide` | the API user guide as Markdown, filled in for this deployment |
 | GET | `/api/models` | OpenRouter's live model catalogue (id, context length, prices), cached 10 min; `?prefix=anthropic/` filters |
 | POST | `/api/research` | `{question, max_hops?, settings?}` → SSE stream until plan approval |
 | POST | `/api/research/{thread_id}/resume` | `{plan: ResearchPlan, settings?}` → SSE stream to final report |

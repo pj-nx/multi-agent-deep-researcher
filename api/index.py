@@ -53,7 +53,7 @@ from pydantic import BaseModel, Field
 from starlette.concurrency import iterate_in_threadpool
 from starlette.types import Receive, Scope, Send
 
-from deep_researcher import embeddings, llm, tracing
+from deep_researcher import api_guide, embeddings, llm, tracing
 from deep_researcher.reports import markdown_to_pdf
 from deep_researcher.run_settings import RunSettings, allowed_models, effective_budget, is_allowed, make_deps
 from deep_researcher.schemas import ResearchPlan
@@ -271,6 +271,16 @@ async def index() -> FileResponse:
     return FileResponse(page, media_type="text/html")
 
 
+@app.get("/api/guide", include_in_schema=False)
+async def guide(request: Request) -> Response:
+    """The API user guide as Markdown, filled in with this deployment's URL, auth and limits. Public, like
+    health: it reveals nothing the health payload does not."""
+    proto = request.headers.get("x-forwarded-proto") or request.url.scheme
+    host = request.headers.get("x-forwarded-host") or request.headers.get("host") or request.url.netloc
+    text = api_guide.guide_from_health(await health(), f"{proto}://{host}")
+    return Response(content=text, media_type="text/markdown; charset=utf-8")
+
+
 @app.get("/api/health")
 async def health() -> dict:
     return {
@@ -280,6 +290,7 @@ async def health() -> dict:
         "run_budget_seconds": RUN_BUDGET_SECONDS,
         "auth_required": API_AUTH_TOKEN is not None,
         "rate_limit_per_minute": RATE_LIMIT_PER_MINUTE,
+        "max_concurrent_runs": MAX_CONCURRENT_RUNS,
         "run_settings": {"overridable": ["models", "reasoning_effort", "fallback_models", "budget_seconds"],
                          "budget_cap_seconds": RUN_BUDGET_SECONDS or None, "max_hops_limit": 5,
                          "allowed_models": allowed_models() or None},

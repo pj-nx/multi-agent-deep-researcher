@@ -366,7 +366,34 @@ def build_app(graph: Any = None):
                 _build_research_tab(gr, demo, graph, pipeline)
             with gr.Tab("Settings"):
                 _build_settings_tab(gr)
+            with gr.Tab("API guide"):
+                gr.Markdown(api_guide_md(), elem_id="dr-report")
     return demo
+
+
+def api_guide_md() -> str:
+    """The API user guide for the local HTTP API (this Gradio app runs the graph in-process)."""
+    import os
+
+    from deep_researcher import llm
+    from deep_researcher.api_guide import guide_markdown
+
+    try:
+        models = llm.info()["models"]
+    except Exception:  # noqa: BLE001 - a bad model env var must not break the UI
+        models = None
+    intro = ("_This app runs the graph in-process. The same pipeline is available over HTTP: start the API "
+             "with `uv run uvicorn api.index:app --port 8000` (or use the hosted deployment) and call it as "
+             "below._\n\n")
+    try:
+        max_hops = int(os.getenv("MAX_HOPS") or 1)
+        budget = int(os.getenv("RUN_BUDGET_SECONDS") or 240)
+    except ValueError:
+        max_hops, budget = 1, 240
+    return intro + guide_markdown("http://localhost:8000", auth_required=bool(os.getenv("API_AUTH_TOKEN")),
+                                  rate_limit_per_minute=int(os.getenv("RATE_LIMIT_PER_MINUTE") or 6),
+                                  max_concurrent_runs=int(os.getenv("MAX_CONCURRENT_RUNS") or 3),
+                                  max_hops=max_hops, budget_cap_seconds=budget, models=models)
 
 
 def _build_research_tab(gr: Any, demo: Any, graph: Any, pipeline: Any) -> None:

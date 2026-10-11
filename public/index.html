@@ -133,6 +133,17 @@
   #dr-downloads { display:none; }
   #dr-downloads.show { display:flex; }
 
+  /* api guide (same typography as the report) */
+  #dr-guide { padding:18px 22px; font-size:14.5px; overflow:auto; }
+  #dr-guide h1 { font-size:22px; letter-spacing:-0.02em; margin-top:0; }
+  #dr-guide h2 { font-size:16px; margin-top:22px; padding-bottom:4px; border-bottom:1px solid var(--line); }
+  #dr-guide table { font-size:12.5px; margin:8px 0; border-collapse:collapse; }
+  #dr-guide th, #dr-guide td { border:1px solid var(--line); padding:5px 8px; vertical-align:top; }
+  #dr-guide pre { background:var(--surface); border:1px solid var(--line-2); border-radius:8px; padding:10px 12px;
+                  overflow:auto; font:12.5px/1.5 "JetBrains Mono", ui-monospace, monospace; }
+  #dr-guide code { font-family:"JetBrains Mono", ui-monospace, monospace; font-size:12.5px; }
+  #dr-guide blockquote { margin:10px 0; padding:6px 12px; border-left:3px solid var(--green); color:var(--ink-2); }
+
   /* settings */
   .kv { display:grid; grid-template-columns:200px 1fr; gap:6px 14px; font-size:13px; }
   .kv dt { color:var(--ink-3); } .kv dd { margin:0; white-space:pre-line; font-family:"JetBrains Mono", ui-monospace, monospace; font-size:12.5px; overflow-wrap:anywhere; }
@@ -152,6 +163,7 @@
   <div class="tabs" role="tablist">
     <button role="tab" class="selected" data-tab="research">Research</button>
     <button role="tab" data-tab="settings">Settings</button>
+    <button role="tab" data-tab="api">API guide</button>
   </div>
 
   <section class="tab-panel selected" id="tab-research">
@@ -230,6 +242,10 @@
     <p class="hint">Keys, models and limits are set through environment variables on the server (see the README); the
       local Gradio app edits them in place.</p>
   </section>
+  <section class="tab-panel" id="tab-api">
+    <div class="dr-step">Using the API from your own code</div>
+    <div id="dr-guide" class="block">Loading the guide…</div>
+  </section>
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/marked@15/marked.min.js"></script>
@@ -266,7 +282,24 @@
   for (const b of document.querySelectorAll('.tabs button')) {
     b.addEventListener('click', () => { showTab(b.dataset.tab); history.replaceState(null, '', '#' + b.dataset.tab); });
   }
-  if (location.hash === '#settings') showTab('settings');     // deep link, e.g. from the README
+  if (location.hash === '#settings' || location.hash === '#api') showTab(location.hash.slice(1));   // deep links
+
+  // ---------------------------------------------------------------- API guide (Markdown from /api/guide)
+  let guideLoaded = false;
+  async function loadGuide() {
+    if (guideLoaded) return;
+    const box = $('dr-guide');
+    try {
+      const res = await fetch('/api/guide');
+      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+      const md = await res.text();
+      if (window.DOMPurify && window.marked) box.innerHTML = DOMPurify.sanitize(marked.parse(md));
+      else { box.textContent = md; box.style.whiteSpace = 'pre-wrap'; }
+      guideLoaded = true;
+    } catch (err) { box.textContent = `Could not load the guide: ${err.message || err}`; }
+  }
+  document.querySelector('[data-tab="api"]').addEventListener('click', loadGuide);
+  if (location.hash === '#api') loadGuide();
 
   // ---------------------------------------------------------------- pipeline boxes (port of pipeline_view.PipelineProgress)
   const pipe = { stages: {}, expected: 0, doneInHop: 0, hop: 0 };
