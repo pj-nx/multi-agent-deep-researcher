@@ -48,6 +48,7 @@ class ResearchState(TypedDict, total=False):
     report: str | None
     report_json: dict[str, Any] | None
     # bookkeeping
+    degradations: Annotated[list[dict[str, Any]], operator.add]   # health.degrade() records, whole run
     notes: Annotated[list[str], operator.add]                      # human-readable progress lines
 
 

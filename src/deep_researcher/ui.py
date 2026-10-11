@@ -98,7 +98,9 @@ def format_event(event: str, data: dict[str, Any]) -> str:
             line += " - requesting: " + "; ".join(data["follow_up"])[:200]
         return line
     if event == "report":
-        return f"[{stamp}] report ready: {json.dumps(data.get('stats') or {}, default=str)}"
+        n = len(data.get("degradations") or [])
+        warn = f" - {n} run-health issue(s), see the report's Run health section" if n else ""
+        return f"[{stamp}] report ready: {json.dumps(data.get('stats') or {}, default=str)}{warn}"
     if event == "activity":
         return format_activity(data, stamp)
     if event == "error":
@@ -133,6 +135,11 @@ def format_activity(data: dict[str, Any], stamp: str) -> str:
     if kind == "tool_timeout":
         return (f"[{stamp}]     {sq}: {data.get('tool')} timed out after {data.get('elapsed_s')}s "
                 f"({data.get('results')} kept)")
+    if kind == "degraded":
+        times = f" x{data['count']}" if data.get("count", 1) > 1 else ""
+        sq = f"{data['sub_question_id']}: " if data.get("sub_question_id") else ""
+        return (f"[{stamp}]     DEGRADED ({data.get('severity')}) {sq}{data.get('component')} "
+                f"{data.get('error_kind')}{times}: {data.get('detail')}")
     if kind == "embed_start":
         return f"[{stamp}]     {sq}: embedding {data.get('sources')} sources ..."
     if kind == "embed_end":

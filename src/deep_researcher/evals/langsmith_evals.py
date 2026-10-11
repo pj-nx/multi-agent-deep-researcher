@@ -40,9 +40,11 @@ def _client():
 def upload_dataset(cases: list[EvalCase], *, name: str = DATASET_NAME) -> dict[str, Any]:
     """Create the dataset if needed and add any case not yet present (matched on ``case_id`` metadata)."""
     client = _client()
+    from langsmith.utils import LangSmithNotFoundError
+
     try:
         dataset = client.read_dataset(dataset_name=name)
-    except Exception:  # noqa: BLE001 - not found is the usual reason
+    except LangSmithNotFoundError:     # auth / network errors must surface, not turn into a create attempt
         dataset = client.create_dataset(
             dataset_name=name, description="Seeded deep-research questions with expected facets"
         )

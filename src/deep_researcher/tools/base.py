@@ -16,6 +16,7 @@ from typing import Any, ClassVar
 
 import httpx
 
+from deep_researcher.health import record_tool_error
 from deep_researcher.schemas import SourceType
 
 log = logging.getLogger(__name__)
@@ -114,10 +115,14 @@ class RetrievalTool:
         try:
             results = await self._search(query, limit)
         except httpx.HTTPStatusError as exc:
-            log.warning("%s: HTTP %s for %r", self.name, exc.response.status_code, query[:80])
+            code = exc.response.status_code
+            log.warning("%s: HTTP %s for %r", self.name, code, query[:80])
+            record_tool_error(self.name, "rate_limited" if code == 429 else f"http_{code}",
+                              f"HTTP {code} for {query[:60]!r}")
             return []
         except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
             log.warning("%s: failed for %r: %s", self.name, query[:80], str(exc)[:160])
+            record_tool_error(self.name, "request_failed", f"{type(exc).__name__}: {str(exc)[:120]}")
             return []
         return [r for r in results if r.usable()][:limit]
 

@@ -13,11 +13,13 @@ file is unavailable (offline first run), a 4-characters-per-token heuristic is u
 from __future__ import annotations
 
 import functools
+import logging
 import os
 from collections.abc import Callable
 
 _BREAKS = ("\n\n", "\n", ". ", "? ", "! ", "; ", ", ", " ")
 CHARS_PER_TOKEN_FALLBACK = 4.0
+log = logging.getLogger(__name__)
 
 
 def _env_int(name: str, default: int) -> int:
@@ -47,7 +49,8 @@ def _token_counter() -> Callable[[str], int]:
 
         enc = tiktoken.get_encoding("cl100k_base")
         return lambda text: len(enc.encode(text, disallowed_special=()))
-    except Exception:  # noqa: BLE001 - offline or tiktoken missing: degrade to a heuristic
+    except Exception as exc:  # noqa: BLE001 - offline or tiktoken missing: degrade to a heuristic
+        log.warning("tiktoken unavailable (%s); estimating tokens as chars/%s", exc, CHARS_PER_TOKEN_FALLBACK)
         return lambda text: max(1, round(len(text) / CHARS_PER_TOKEN_FALLBACK))
 
 
@@ -117,6 +120,7 @@ def _hard_split(chunk: str, size: int) -> list[str]:
         enc = tiktoken.get_encoding("cl100k_base")
         toks = enc.encode(chunk, disallowed_special=())
         return [enc.decode(toks[i:i + size]) for i in range(0, len(toks), size)]
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001
+        log.warning("token-based splitting failed (%s); falling back to character windows", exc)
         step = int(size * CHARS_PER_TOKEN_FALLBACK)
         return [chunk[i:i + step] for i in range(0, len(chunk), step)]

@@ -17,6 +17,7 @@ from urllib.parse import urlsplit, urlunsplit
 
 from deep_researcher.agents.common import emit
 from deep_researcher.agents.deps import Deps
+from deep_researcher.health import degrade, tool_errors
 from deep_researcher.schemas import Evidence, SubQuestion
 from deep_researcher.tools import language as lang
 from deep_researcher.tools.base import SearchResult
@@ -113,8 +114,14 @@ def search_queries(sq: SubQuestion) -> list[str]:
     return [" ".join(w for w in words if w)[:120]]
 
 
-async def _search_tool(tool: Any, queries: list[str], deps: Deps, sq_id: str = "") -> list[SearchResult]:
-    """Run every query against one tool, bounded by a per-tool timeout; partial results survive."""
+async def _search_tool(tool: Any, queries: list[str], deps: Deps, sq_id: str = "",
+                       errors: list[dict[str, Any]] | None = None) -> list[SearchResult]:
+    """Run every query against one tool, bounded by a per-tool timeout; partial results survive.
+
+    Failures the tool swallows (HTTP errors, bad payloads) and timeouts are appended to ``errors``.
+    """
+    errors = errors if errors is not None else []
+    token = tool_errors.set(errors)
     out: list[SearchResult] = []
     seen: set[str] = set()
     started = time.monotonic()
@@ -132,9 +139,13 @@ async def _search_tool(tool: Any, queries: list[str], deps: Deps, sq_id: str = "
         await asyncio.wait_for(run(), timeout=deps.tool_timeout_s)
     except TimeoutError:
         log.warning("%s: timed out after %ss (%d results kept)", tool.name, deps.tool_timeout_s, len(out))
+        errors.append({"tool": tool.name, "kind": "timeout",
+                       "detail": f"timed out after {deps.tool_timeout_s:g}s ({len(out)} results kept)"})
         emit("tool_timeout", tool=tool.name, sub_question_id=sq_id, results=len(out),
              elapsed_s=round(time.monotonic() - started, 1))
         return out
+    finally:
+        tool_errors.reset(token)
     emit("tool_end", tool=tool.name, sub_question_id=sq_id, results=len(out),
          elapsed_s=round(time.monotonic() - started, 1))
     return out
@@ -151,20 +162,25 @@ async def retrieve_node(payload: dict[str, Any], deps: Deps) -> dict[str, Any]:
 
     tools = deps.tools_for(list(sq.source_types))
     if not tools:
-        return {"retrieval_log": [{"sub_question_id": sq.id, "hop": hop, "tools": {}, "stored": 0,
+        return {"degradations": [degrade("retriever", "no_tools", f"no enabled tools for {sq.source_types}",
+                                         sub_question_id=sq.id)],
+                "retrieval_log": [{"sub_question_id": sq.id, "hop": hop, "tools": {}, "stored": 0,
                                    "warning": f"no enabled tools for {sq.source_types}"}],
                 "notes": [f"{sq.id}: no enabled tools for {sq.source_types}"]}
 
     queries = search_queries(sq)
-    batches = await asyncio.gather(*(_search_tool(t, queries, deps, sq.id) for t in tools),
+    tool_errs: dict[str, list[dict[str, Any]]] = {t.name: [] for t in tools}
+    batches = await asyncio.gather(*(_search_tool(t, queries, deps, sq.id, tool_errs[t.name]) for t in tools),
                                    return_exceptions=True)
+    degradations: list[dict[str, Any]] = []
     per_tool: dict[str, int] = {}
     seen: set[str] = set()
     results: list[SearchResult] = []
     for tool, batch in zip(tools, batches, strict=True):
         if isinstance(batch, BaseException):
-            log.warning("%s raised for %s: %s", tool.name, sq.id, batch)
             per_tool[tool.name] = -1
+            degradations.append(degrade(f"tool:{tool.name}", "exception", f"{type(batch).__name__}: {batch}",
+                                        sub_question_id=sq.id))
             continue
         per_tool[tool.name] = len(batch)
         for r in batch:
@@ -173,6 +189,11 @@ async def retrieve_node(payload: dict[str, Any], deps: Deps) -> dict[str, Any]:
                 continue
             seen.add(key)
             results.append(r)
+    for name, errs in tool_errs.items():
+        for kind in dict.fromkeys(e["kind"] for e in errs):
+            same = [e for e in errs if e["kind"] == kind]
+            degradations.append(degrade(f"tool:{name}", kind, same[0]["detail"], count=len(same),
+                                        sub_question_id=sq.id))
     # Language gate first: only articles in RETRIEVAL_LANGUAGES (default English) become evidence.
     results, dropped_lang = language_gate(results)
     if dropped_lang:
@@ -198,6 +219,7 @@ async def retrieve_node(payload: dict[str, Any], deps: Deps) -> dict[str, Any]:
 
     elapsed = round(time.monotonic() - started, 1)
     return {
+        "degradations": degradations,
         "evidence": [e.model_dump() for e in evidence],
         "retrieval_log": [{"sub_question_id": sq.id, "hop": hop, "tools": per_tool, "sources": len(evidence),
                            "chunks_stored": stored, "elapsed_s": elapsed, "queries": queries,

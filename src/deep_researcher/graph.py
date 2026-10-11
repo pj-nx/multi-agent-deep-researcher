@@ -337,6 +337,7 @@ def _event_for(node: str, update: dict[str, Any] | None) -> tuple[str, dict[str,
         data["report"] = update.get("report")
         data["report_json"] = update.get("report_json")
         data["stats"] = (update.get("report_json") or {}).get("stats")
+        data["degradations"] = (update.get("report_json") or {}).get("degradations") or []
     elif node == "plan":
         data["plan"] = update.get("plan")
     return node, data

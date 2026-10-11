@@ -215,6 +215,7 @@ def summary_rows(runs: list[CaseRun]) -> list[dict[str, Any]]:
             "ok": r.ok,
             "sub_questions": r.sub_questions,
             "sources_kept": r.stats.get("kept"),
+            "degradations": r.stats.get("degradations"),
             "claims": r.stats.get("claims"),
             "contradictions": r.stats.get("contradictions"),
             "hops": r.stats.get("hops"),

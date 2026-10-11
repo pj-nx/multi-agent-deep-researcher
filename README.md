@@ -179,6 +179,15 @@ from deep_researcher.llm import get_llm
 get_llm("planner").invoke("...")           # ChatOpenRouter, traced by LangSmith automatically
 ```
 
+## Run health
+
+When part of a run fails but the pipeline carries on (a rate-limited source, a validator / critic /
+insight / report model error, a missing key), the agent calls `health.degrade(...)` instead of only
+logging. The record is logged in one format (with the thread id), streamed as a `degraded` activity
+event, saved in the graph state (`degradations`) and summarised in the report's **Run health** section,
+in `report_json["degradations"]`, and as `stats.degradations` (also in the eval summary rows).
+Severity is `critical` (a stage's output is missing or unreviewed), `warn` (partial loss) or `info`.
+
 ## Pruning old runs
 
 Every question leaves a thread of checkpoints in the checkpoint store (`.checkpoints.sqlite` or

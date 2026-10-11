@@ -16,6 +16,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 
 from deep_researcher.agents.common import call_structured, emit
 from deep_researcher.agents.deps import Deps
+from deep_researcher.health import degrade
 from deep_researcher.schemas import AnalysisOutput, Claim, Contradiction, Gap, Summary
 
 log = logging.getLogger(__name__)
@@ -136,11 +137,14 @@ async def _analyse_one(sq: dict[str, Any], state: dict[str, Any], deps: Deps, ll
             out: AnalysisOutput = await call_structured(llm, AnalysisOutput, messages, role="analysis",
                                                         label=f"{sq_id} ({len(hits)} chunks)")
         except Exception as exc:  # noqa: BLE001 - degrade: keep the evidence list, lose the analysis
-            log.warning("analysis failed for %s: %s", sq_id, str(exc)[:300])
+            failure = degrade("analysis", "model_error", f"{type(exc).__name__}: {str(exc)[:140]}; "
+                              f"{len(hits)} evidence chunks were not analysed", "critical",
+                              sub_question_id=sq_id)
             summary = Summary(sub_question_id=sq_id, evidence_ids=sorted(shown),
                               summary=f"Analysis failed ({type(exc).__name__}); {len(hits)} evidence chunks "
                                       "were retrieved but not analysed.")
-            return {"summary": summary, "contradictions": [], "gaps": [], "dropped": 0, "chunks": len(hits)}
+            return {"summary": summary, "contradictions": [], "gaps": [], "dropped": 0, "chunks": len(hits),
+                    "degraded": failure}
     summary, contradictions, gaps, dropped = ground(out, shown, sq_id)
     return {"summary": summary, "contradictions": contradictions, "gaps": gaps, "dropped": dropped,
             "chunks": len(hits), "confidence": out.confidence, "input_hash": input_hash}
@@ -190,6 +194,7 @@ async def analyze_node(state: dict[str, Any], deps: Deps) -> dict[str, Any]:
     n_claims = sum(len(r["summary"].claims) for r in results)
     return {
         "summaries": summaries,
+        "degradations": [r["degraded"] for r in results if r.get("degraded")],
         "analysis_inputs": {r["summary"].sub_question_id: r["input_hash"]
                             for r in results if "input_hash" in r},
         "contradictions": contradictions,

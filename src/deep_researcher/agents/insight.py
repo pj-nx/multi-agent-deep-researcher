@@ -9,6 +9,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 
 from deep_researcher.agents.common import bibliography, call_structured, contradictions_text, summaries_text
 from deep_researcher.agents.deps import Deps
+from deep_researcher.health import degrade
 from deep_researcher.schemas import Insight, InsightOutput, ReasoningStep
 
 log = logging.getLogger(__name__)
@@ -77,8 +78,10 @@ async def insight_node(state: dict[str, Any], deps: Deps) -> dict[str, Any]:
             role="insight", label="hypotheses"
         )
     except Exception as exc:  # noqa: BLE001 - degrade: a report without insights beats no report
-        log.warning("insight generation failed: %s", str(exc)[:300])
-        return {"insights": [], "notes": [f"insight: failed ({type(exc).__name__}); none produced"]}
+        failure = degrade("insight", "model_error", f"{type(exc).__name__}: {str(exc)[:160]}; no insights "
+                          "were produced", "critical")
+        return {"insights": [], "degradations": [failure],
+                "notes": [f"insight: failed ({type(exc).__name__}); none produced"]}
     insights, stripped, dropped = ground_insights(out, allowed)
     return {
         "insights": [i.model_dump() for i in insights],
