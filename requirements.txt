@@ -18,3 +18,4 @@ xhtml2pdf>=0.2.16
 langgraph-checkpoint-postgres>=3.0
 psycopg[binary]>=3.2
 chromadb>=1.0
+guardrails-ai-profanity-free>=0.1.0

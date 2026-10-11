@@ -17,6 +17,7 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any
 
+from deep_researcher.guardrails import GuardrailViolation
 from deep_researcher.pipeline_view import PipelineProgress
 from deep_researcher.reports import write_report
 from deep_researcher.schemas import ResearchPlan, SourceType
@@ -174,6 +175,10 @@ async def plan_stream(question: str, max_hops: int, budget: int | None, *, graph
             if event == "plan" and data.get("status") == "awaiting_approval":
                 rows = plan_to_rows(data["plan"])
             yield "\n".join(lines), rows, thread_id, progress.render()
+    except GuardrailViolation as exc:
+        lines.append(f"[{time.strftime('%H:%M:%S')}] REJECTED ({exc.rule}): {exc}")
+        progress.update("error", {"message": str(exc)[:80]})
+        yield "\n".join(lines), rows, thread_id, progress.render()
     except Exception as exc:
         log.exception("plan stream failed")
         lines.append(f"[{time.strftime('%H:%M:%S')}] ERROR: {type(exc).__name__}: {str(exc)[:300]}")

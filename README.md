@@ -179,6 +179,21 @@ from deep_researcher.llm import get_llm
 get_llm("planner").invoke("...")           # ChatOpenRouter, traced by LangSmith automatically
 ```
 
+## Guardrails
+
+Every question is checked before the planner runs ([guardrails.py](src/deep_researcher/guardrails.py)):
+
+1. **Profanity** is rejected by the Guardrails Hub `ProfanityFree` validator
+   (`guardrails-ai-profanity-free`; an offline classifier, no model call). It loads lazily: the first check
+   after start-up takes a few seconds.
+2. **At most 2 subject categories** per question (`GUARDRAIL_MAX_CATEGORIES`, default 2).
+3. **Two categories must be related.** A question that bundles unrelated topics is rejected.
+
+Rules 2 and 3 use one cheap-model classification. Rejections show as `REJECTED (<rule>)` in the UI, an
+`error` event with `code: "guardrail"` on the API stream, and a one-line message on the CLI. If the
+classifier is unavailable the question is let through and the report's **Run health** says so.
+`GUARDRAILS=off` disables everything.
+
 ## Run health
 
 When part of a run fails but the pipeline carries on (a rate-limited source, a validator / critic /
