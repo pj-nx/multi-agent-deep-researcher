@@ -21,6 +21,7 @@ from deep_researcher.agents.common import (
 from deep_researcher.agents.deps import Deps
 from deep_researcher.health import degrade, health_md, summarise
 from deep_researcher.schemas import ReportOutput
+from deep_researcher.skills import skill_prompt
 from deep_researcher.tools.language import allowed_languages
 
 log = logging.getLogger(__name__)
@@ -131,7 +132,8 @@ async def report_node(state: dict[str, Any], deps: Deps) -> dict[str, Any]:
     try:
         llm = deps.llm("report")
         out: ReportOutput = await call_structured(
-            llm, ReportOutput, [SystemMessage(SYSTEM), HumanMessage(prompt)], role="report", label="narrative"
+            llm, ReportOutput, [SystemMessage(SYSTEM + skill_prompt("report")), HumanMessage(prompt)],
+            role="report", label="narrative"
         )
     except Exception as exc:  # noqa: BLE001 - degrade: assemble the report from state without the narrative
         degradations.append(degrade("report", "model_error", f"{type(exc).__name__}: {str(exc)[:160]}; the "

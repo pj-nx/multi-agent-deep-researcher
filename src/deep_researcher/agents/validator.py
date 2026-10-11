@@ -17,6 +17,7 @@ from deep_researcher.agents.common import call_structured
 from deep_researcher.agents.deps import Deps
 from deep_researcher.health import degrade
 from deep_researcher.schemas import SourceAssessment, SourceAssessments
+from deep_researcher.skills import skill_prompt
 
 log = logging.getLogger(__name__)
 
@@ -55,7 +56,8 @@ async def _grade_batch(llm: Any, sub_question: str, batch: list[dict[str, Any]],
     async with sem:
         try:
             out: SourceAssessments = await call_structured(
-                llm, SourceAssessments, [SystemMessage(SYSTEM), HumanMessage(prompt)],
+                llm, SourceAssessments,
+                [SystemMessage(SYSTEM + skill_prompt("validator")), HumanMessage(prompt)],
                 role="validator", label=f"grade {len(batch)} sources")
         except Exception as exc:  # noqa: BLE001 - grading must never sink the run
             log.warning("validator batch failed (%d sources): %s", len(batch), str(exc)[:200])

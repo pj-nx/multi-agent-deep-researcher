@@ -11,6 +11,7 @@ from deep_researcher.agents.common import bibliography, call_structured, contrad
 from deep_researcher.agents.deps import Deps
 from deep_researcher.health import degrade
 from deep_researcher.schemas import Insight, InsightOutput, ReasoningStep
+from deep_researcher.skills import skill_prompt
 
 log = logging.getLogger(__name__)
 
@@ -74,7 +75,7 @@ async def insight_node(state: dict[str, Any], deps: Deps) -> dict[str, Any]:
     try:
         llm = deps.llm("insight")
         out: InsightOutput = await call_structured(
-            llm, InsightOutput, [SystemMessage(SYSTEM), HumanMessage(prompt)],
+            llm, InsightOutput, [SystemMessage(SYSTEM + skill_prompt("insight")), HumanMessage(prompt)],
             role="insight", label="hypotheses"
         )
     except Exception as exc:  # noqa: BLE001 - degrade: a report without insights beats no report

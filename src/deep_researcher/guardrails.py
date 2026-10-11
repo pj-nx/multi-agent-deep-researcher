@@ -22,6 +22,7 @@ from typing import Any
 from deep_researcher.agents.common import call_structured
 from deep_researcher.health import degrade
 from deep_researcher.schemas import ScopeVerdict
+from deep_researcher.skills import skill_prompt
 
 CATEGORIES = (
     "health_medicine", "science", "technology_ai", "economics_finance", "business_work",
@@ -93,8 +94,8 @@ async def check_question(question: str, llm_for: Callable[[str], Any]) -> list[d
     try:
         llm = llm_for("validator")
         verdict: ScopeVerdict = await call_structured(
-            llm, ScopeVerdict, [SystemMessage(SYSTEM), HumanMessage(question)], role="validator",
-            label="scope check")
+            llm, ScopeVerdict, [SystemMessage(SYSTEM + skill_prompt("guardrails")), HumanMessage(question)],
+            role="validator", label="scope check")
     except Exception as exc:  # noqa: BLE001 - fail open, but loudly (shown in the report's Run health)
         return [*degradations, degrade("guardrails", "classifier_unavailable",
                                        f"{type(exc).__name__}: {str(exc)[:140]}; scope checks were skipped",

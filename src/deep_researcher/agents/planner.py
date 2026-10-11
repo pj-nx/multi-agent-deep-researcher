@@ -10,6 +10,7 @@ from deep_researcher.agents.common import call_structured
 from deep_researcher.agents.deps import Deps
 from deep_researcher.guardrails import check_question
 from deep_researcher.schemas import ResearchPlan, SubQuestion
+from deep_researcher.skills import skill_prompt
 
 log = logging.getLogger(__name__)
 
@@ -31,7 +32,7 @@ async def plan_node(state: dict[str, Any], deps: Deps) -> dict[str, Any]:
     question = state["question"]
     degradations = await check_question(question, deps.llm)    # raises GuardrailViolation to reject
     llm = deps.llm("planner")
-    messages = [SystemMessage(SYSTEM), HumanMessage(question)]
+    messages = [SystemMessage(SYSTEM + skill_prompt("planner")), HumanMessage(question)]
     plan: ResearchPlan = await call_structured(llm, ResearchPlan, messages, role="planner", label="plan")
     plan = normalise_plan(plan, question)
     return {"plan": plan.model_dump(), "degradations": degradations,

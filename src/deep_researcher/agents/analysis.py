@@ -18,6 +18,7 @@ from deep_researcher.agents.common import call_structured, emit
 from deep_researcher.agents.deps import Deps
 from deep_researcher.health import degrade
 from deep_researcher.schemas import AnalysisOutput, Claim, Contradiction, Gap, Summary
+from deep_researcher.skills import skill_prompt
 
 log = logging.getLogger(__name__)
 
@@ -132,7 +133,7 @@ async def _analyse_one(sq: dict[str, Any], state: dict[str, Any], deps: Deps, ll
         emit("retrieval", label=f"{sq_id}: evidence unchanged, keeping the earlier analysis")
         return {"skipped": True}
     async with sem:
-        messages = [SystemMessage(SYSTEM), HumanMessage(prompt)]
+        messages = [SystemMessage(SYSTEM + skill_prompt("analysis")), HumanMessage(prompt)]
         try:
             out: AnalysisOutput = await call_structured(llm, AnalysisOutput, messages, role="analysis",
                                                         label=f"{sq_id} ({len(hits)} chunks)")
