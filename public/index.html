@@ -130,6 +130,9 @@
   #dr-report table { font-size:12.5px; margin:8px 0; }
   #dr-report th, #dr-report td { border:1px solid var(--line); padding:5px 8px; }
   #dr-report code { font-family:"JetBrains Mono", ui-monospace, monospace; font-size:12.5px; }
+  #dr-summary table, #dr-runs table { width:100%; border-collapse:collapse; font-size:12.5px; }
+  #dr-summary th, #dr-summary td, #dr-runs th, #dr-runs td { border:1px solid var(--line); padding:5px 8px; text-align:left; vertical-align:top; }
+  #dr-summary td:first-child { white-space:nowrap; font-weight:600; color:var(--ink-2); }
   #dr-downloads { display:none; }
   #dr-downloads.show { display:flex; }
 
@@ -209,6 +212,12 @@
       <button id="dl-md" class="btn" type="button">Download Markdown</button>
       <button id="dl-json" class="btn" type="button">Download JSON</button>
     </div>
+    <div class="dr-step">Run summary</div>
+    <div id="dr-summary" class="block"><span class="hint">Appears when a run finishes.</span></div>
+    <details class="block" style="margin-top:12px">
+      <summary>Runs this session</summary>
+      <div id="dr-runs" style="padding:0 14px 12px"><span class="hint">No runs yet.</span></div>
+    </details>
   </section>
 
   <section class="tab-panel" id="tab-settings">
@@ -599,6 +608,85 @@
   }).catch(() => { $('health').textContent = 'unreachable'; });
   $('hops').addEventListener('input', () => { $('hops-out').value = $('hops').value; });
 
+  // ---------------------------------------------------------------- run statistics (per run + session table)
+  const sessionRuns = [];
+  let runStats = null;
+  function newRunStats(question) {
+    runStats = { question, started: Date.now(), planMs: 0, runMs: 0, models: {}, roles: {}, tools: {}, stats: {}, degradations: [], subQuestions: 0, criticRounds: 0, error: null, cost: null };
+    return runStats;
+  }
+  function statsEvent(event, d) {
+    if (!runStats) return;
+    if (event === 'activity') {
+      if (d.kind === 'llm_end') {
+        const m = runStats.models[d.model || 'unknown'] ||= { calls: 0, input: 0, output: 0 };
+        m.calls++; m.input += Number(d.input_tokens || 0); m.output += Number(d.output_tokens || 0);
+        const r = runStats.roles[d.role || 'unknown'] ||= { calls: 0, seconds: 0 };
+        r.calls++; r.seconds += Number(d.elapsed_s || 0);
+      } else if (d.kind === 'tool_end') runStats.tools[d.tool || 'tool'] = (runStats.tools[d.tool || 'tool'] || 0) + Number(d.results || 0);
+      else if (d.kind === 'degraded') runStats.degradations.push(d);
+      return;
+    }
+    if (event === 'plan' && d.status === 'awaiting_approval') runStats.subQuestions = ((d.plan || {}).sub_questions || []).length;
+    else if (event === 'critic') runStats.criticRounds = Math.max(runStats.criticRounds, Number(d.round || 0));
+    else if (event === 'report') { runStats.stats = d.stats || {}; if (d.degradations && d.degradations.length && !runStats.degradations.length) runStats.degradations = d.degradations; }
+    else if (event === 'error') runStats.error = d.message || 'failed';
+  }
+  const totalTokens = (s) => Object.values(s.models).reduce((a, m) => a + m.input + m.output, 0);
+  const totalCalls = (s) => Object.values(s.models).reduce((a, m) => a + m.calls, 0);
+  let priceCache = null;
+  async function estimateCost(s) {
+    try {
+      if (!priceCache) {
+        const res = await fetch('/api/models', { headers: authHeaders() });
+        if (!res.ok) return null;
+        priceCache = {}; for (const m of (await res.json()).models) priceCache[m.id] = [Number(m.prompt_price || 0), Number(m.completion_price || 0)];
+      }
+      let total = 0;
+      for (const [id, m] of Object.entries(s.models)) { const p = priceCache[id]; if (!p) return null; total += m.input * p[0] + m.output * p[1]; }
+      return total;
+    } catch (_) { return null; }
+  }
+  function kvTable(rows) {
+    const table = document.createElement('table'); const tb = document.createElement('tbody');
+    for (const [k, v] of rows) { const tr = document.createElement('tr'); const a = document.createElement('td'); a.textContent = k; const b = document.createElement('td'); b.textContent = v; tr.append(a, b); tb.appendChild(tr); }
+    table.appendChild(tb); return table;
+  }
+  function renderSummary(s) {
+    const st = s.stats; const secs = (ms) => `${Math.round(ms / 1000)} s`;
+    const cost = s.cost == null ? 'n/a' : `$${s.cost.toFixed(3)}`;
+    const toolHits = Object.values(s.tools).reduce((a, b) => a + b, 0);
+    const rows = [
+      ['Time', `${secs(s.planMs + s.runMs)} (plan ${secs(s.planMs)}, research ${secs(s.runMs)})`],
+      ['Model calls', `${totalCalls(s)} · ${totalTokens(s).toLocaleString()} tokens · est. ${cost}`],
+      ['Sources', `${st.retrieved ?? 0} retrieved, ${st.kept ?? 0} kept, ${st.dropped ?? 0} dropped` + (toolHits ? ` · ${toolHits} results from ${Object.keys(s.tools).length} tools` : '')],
+      ['Analysis', `${st.claims ?? 0} claims · ${st.contradictions ?? 0} contradictions · ${st.gaps ?? 0} gaps raised, ${st.gaps_pursued ?? 0} pursued · ${st.hops ?? 0} hop(s)`],
+      ['Synthesis', `${s.subQuestions} sub-questions · critic rounds ${s.criticRounds} · ${st.citations_verified ?? 0} citations verified, ${st.citations_removed ?? 0} removed`],
+      ['Run health', s.degradations.length ? `${s.degradations.length} issue(s): ${[...new Set(s.degradations.map(d => `${d.component}/${d.error_kind || d.kind}`))].join(', ')}` : 'no issues'],
+      ['Models', Object.entries(s.models).sort((a, b) => b[1].calls - a[1].calls).map(([m, v]) => `${m.split('/').pop()} ×${v.calls} (${(v.input + v.output).toLocaleString()} tok)`).join(', ') || 'none'],
+      ['Model time by role', Object.entries(s.roles).sort((a, b) => b[1].seconds - a[1].seconds).map(([r, v]) => `${r} ${Math.round(v.seconds)}s`).join(', ') || 'n/a'],
+    ];
+    if (s.error) rows.push(['Error', s.error]);
+    const box = $('dr-summary'); box.textContent = ''; box.appendChild(kvTable(rows));
+  }
+  function renderSession() {
+    const box = $('dr-runs'); box.textContent = '';
+    if (!sessionRuns.length) { box.textContent = 'No runs yet.'; return; }
+    const table = document.createElement('table'); const thead = document.createElement('thead'); const hr = document.createElement('tr');
+    for (const h of ['Time', 'Question', 'Duration', 'Tokens', 'Cost', 'Kept', 'Claims', 'Contra.', 'Hops', 'Issues', 'Status']) { const th = document.createElement('th'); th.textContent = h; hr.appendChild(th); }
+    thead.appendChild(hr); table.appendChild(thead);
+    const tb = document.createElement('tbody');
+    for (const s of [...sessionRuns].reverse()) {
+      const st = s.stats; const tr = document.createElement('tr');
+      for (const c of [new Date(s.started).toTimeString().slice(0, 5), s.question.slice(0, 60), `${Math.round((s.planMs + s.runMs) / 1000)} s`, totalTokens(s).toLocaleString(),
+                       s.cost == null ? 'n/a' : `$${s.cost.toFixed(3)}`, st.kept ?? 0, st.claims ?? 0, st.contradictions ?? 0, st.hops ?? 0, s.degradations.length, s.error ? 'error' : 'ok']) {
+        const td = document.createElement('td'); td.textContent = String(c); tr.appendChild(td);
+      }
+      tb.appendChild(tr);
+    }
+    table.appendChild(tb); box.appendChild(table);
+  }
+
   // ---------------------------------------------------------------- run control
   const planBtn = $('plan-btn'), runBtn = $('run-btn'), busy = $('dr-busy'), report = $('dr-report');
   let threadId = null, question = '', lastReport = null;
@@ -609,6 +697,8 @@
     if (question.length < 5) { busy.textContent = 'Enter a question first.'; return; }
     threadId = null; lastReport = null; report.textContent = ''; $('dr-downloads').classList.remove('show');
     tbody.textContent = ''; activity.textContent = ''; resetPipeline();
+    newRunStats(question); $('dr-summary').textContent = 'Appears when a run finishes.';
+    const planStart = Date.now();
     setBusy('Planning...');
     try {
       const body = { question, max_hops: Number($('hops').value) };
@@ -616,6 +706,7 @@
       for await (const { event, data } of sse('/api/research', body)) {
         if (event === 'started') threadId = data.thread_id;
         if (event !== 'settings') pipelineEvent(event, data);
+        statsEvent(event, data); if (runStats) runStats.planMs = Date.now() - planStart;
         logLine(formatEvent(event, data), event === 'error');
         if (event === 'plan' && data.status === 'awaiting_approval') { planToRows(data.plan || { sub_questions: [] }); setBusy('Review the plan below, then approve.'); }
         if (event === 'error') threadId = null;
@@ -629,6 +720,9 @@
     const plan = rowsToPlan(question);
     if (!plan.sub_questions.length) { busy.textContent = 'The plan needs at least one sub-question.'; return; }
     setBusy('Researching...');
+    if (!runStats) newRunStats(question);
+    runStats.subQuestions = plan.sub_questions.length;
+    const runStart = Date.now();
     pipe.expected = plan.sub_questions.length;            // the approved (possibly edited) plan
     set('plan', 'done', `${pipe.expected} sub-questions`); renderPipeline();
     try {
@@ -636,6 +730,7 @@
       const settings = runSettings(); if (settings) body.settings = settings;
       for await (const { event, data } of sse(`/api/research/${threadId}/resume`, body)) {
         if (event !== 'started' && event !== 'settings') pipelineEvent(event, data);   // plan box already set
+        statsEvent(event, data); runStats.runMs = Date.now() - runStart;
         logLine(formatEvent(event, data), event === 'error');
         if (event === 'report' && data.report) {
           lastReport = { markdown: data.report, json: data.report_json, title: (data.report_json || {}).title };
@@ -645,8 +740,11 @@
         }
         if (event === 'done') threadId = null;
       }
-    } catch (err) { logLine(`[${stamp()}] ERROR: ${err.message || err}`, true); pipelineEvent('error', { message: err.message }); }
-    finally { setBusy('Ready'); if (lastReport) busy.textContent = 'Report ready.'; }
+    } catch (err) { logLine(`[${stamp()}] ERROR: ${err.message || err}`, true); pipelineEvent('error', { message: err.message }); if (runStats) runStats.error = err.message || String(err); }
+    finally {
+      setBusy('Ready'); if (lastReport) busy.textContent = 'Report ready.';
+      if (runStats) { runStats.cost = await estimateCost(runStats); renderSummary(runStats); sessionRuns.push(runStats); renderSession(); runStats = null; }
+    }
   });
 
   // ---------------------------------------------------------------- downloads

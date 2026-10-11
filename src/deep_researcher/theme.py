@@ -145,6 +145,8 @@ CSS = f"""
 #dr-report h3 {{ font-size: 14px; }}
 #dr-report table {{ font-size: 12.5px; }}
 #dr-report a {{ color: {PALETTE['green_dark']}; }}
+#dr-summary table, #dr-runs table {{ font-size: 12.5px; }}
+#dr-summary td:first-child {{ white-space: nowrap; }}
 #dr-downloads button {{ border: 1.5px solid var(--dr-green) !important; color: {PALETTE['ink']} !important;
                          background: var(--dr-green) !important; }}
 #dr-downloads button:hover {{ background: {PALETTE['green_dark']} !important; }}

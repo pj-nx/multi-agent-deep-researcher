@@ -97,7 +97,9 @@ async def test_plan_then_run_streams(tmp_path, monkeypatch):
     rows = rows[:2]                                          # user drops the third sub-question
     run_updates = [u async for u in ui.run_stream(thread_id, rows, "Does remote work raise productivity?", 0,
                                                   log_text, graph=graph, out_dir=tmp_path / "out")]
-    log_text, report, md_path, json_path, pdf_path, pipe = run_updates[-1]
+    log_text, report, md_path, json_path, pdf_path, pipe, summary = run_updates[-1]
+    assert "| **Model calls** |" in summary and "| **Sources** |" in summary and "tokens" in summary
+    assert ui.run_stats_for(thread_id).calls >= 5 and ui.run_stats_for(thread_id).plan_seconds >= 0
     assert pipe.count("dr-box done") == 7 and "dr-box active" not in pipe   # every stage finished
     assert "hop 1" in pipe                                               # the gap hop was shown
     assert "approved 2 sub-questions" in log_text and "report ready" in log_text and "saved" in log_text
