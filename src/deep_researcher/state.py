@@ -33,6 +33,7 @@ class ResearchState(TypedDict, total=False):
     # analysis
     extra_sub_questions: Annotated[list[dict[str, Any]], operator.add]  # gap-derived SubQuestion dumps
     summaries: Annotated[dict[str, dict[str, Any]], merge_dicts]   # sub_question_id -> Summary dump
+    analysis_inputs: Annotated[dict[str, str], merge_dicts]        # sub_question_id -> prompt hash
     contradictions: Annotated[list[dict[str, Any]], operator.add]
     gaps: Annotated[list[dict[str, Any]], operator.add]            # history of every gap raised
     pending_gaps: list[dict[str, Any]]                             # gaps raised in the latest round

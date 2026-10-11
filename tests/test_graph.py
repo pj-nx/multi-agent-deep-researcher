@@ -444,3 +444,32 @@ async def test_memory_checkpointer_selectable(monkeypatch):
     monkeypatch.setenv("CHECKPOINTER", "redis")
     with pytest.raises(ValueError):
         await G.get_checkpointer()
+
+
+@pytest.mark.anyio
+async def test_analysis_skipped_when_the_chunks_shown_are_unchanged(tmp_path):
+    from types import SimpleNamespace
+
+    from deep_researcher.agents.analysis import analyze_node
+
+    deps = make_deps(tmp_path)
+    deps.fake_llm.gap_rounds = 0
+    chunks = [SimpleNamespace(evidence_id="E-0000000001", source_type="papers", credibility=0.8,
+                              published_at="2024", title="Trial", text="Productivity rose.")]
+    store = SimpleNamespace(query=lambda *a, **k: [SimpleNamespace(chunk=c, score=0.9) for c in chunks])
+    deps.store = lambda: store
+    state = {"plan": {"sub_questions": [{"id": "sq1", "question": "Does it work?", "source_types": ["papers"]}]},
+             "hop": 0}
+
+    first = await analyze_node(state, deps)
+    assert deps.fake_llm.analysis_calls == 1 and "sq1" in first["analysis_inputs"]
+
+    state = {**state, "summaries": first["summaries"], "analysis_inputs": first["analysis_inputs"]}
+    again = await analyze_node(state, deps)
+    assert deps.fake_llm.analysis_calls == 1                                 # unchanged -> no model call
+    assert again["summaries"] == {} and again["contradictions"] == []        # earlier summary stays in state
+    assert "1 unchanged, skipped" in again["notes"][0]
+
+    chunks[0].text = "Productivity fell."                                    # evidence changed -> re-analysed
+    await analyze_node(state, deps)
+    assert deps.fake_llm.analysis_calls == 2

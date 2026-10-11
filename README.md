@@ -179,6 +179,29 @@ from deep_researcher.llm import get_llm
 get_llm("planner").invoke("...")           # ChatOpenRouter, traced by LangSmith automatically
 ```
 
+## Pruning old runs
+
+Every question leaves a thread of checkpoints in the checkpoint store (`.checkpoints.sqlite` or
+Postgres). Completed runs are only needed to re-open their state, so delete them after a few days:
+
+```bash
+uv run python -m deep_researcher.prune --days 4 --dry-run   # list what would go
+uv run python -m deep_researcher.prune --days 4             # delete completed runs older than 4 days
+```
+
+A run is "completed" when its latest checkpoint holds a report; runs awaiting plan approval or that
+failed are kept unless you pass `--include-unfinished`. Age comes from a `created_at` column that the app adds to the `checkpoints` table on startup (sqlite:
+nullable column + insert trigger; Postgres: `timestamptz DEFAULT now()`). Existing rows are dated at the
+first start after upgrading, or run `python scripts/add_checkpoint_created_at.py` (`--postgres` for
+`DATABASE_URL`) beforehand to date them from their checkpoint ids. The sqlite file is vacuumed afterwards. The Chroma evidence store is not touched. Daily cron:
+
+```cron
+15 3 * * * cd /path/to/multi-agent-deep-researcher && /path/to/uv run python -m deep_researcher.prune --days 4
+```
+
+For a hosted Postgres, run the same command from any scheduler with `CHECKPOINTER=postgres` and
+`DATABASE_URL` set (a GitHub Actions `schedule:` workflow works).
+
 ## Embeddings and the vector DB
 
 Evidence is chunked into **512-token** pieces (64-token overlap, sentence/paragraph boundaries,

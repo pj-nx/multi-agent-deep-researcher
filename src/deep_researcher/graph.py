@@ -214,6 +214,28 @@ def checkpointer_kind() -> str:
     return (os.getenv("CHECKPOINTER") or "sqlite").lower()
 
 
+_SQLITE_NOW = "strftime('%Y-%m-%dT%H:%M:%SZ', 'now')"
+
+
+async def _sqlite_add_created_at(conn: Any) -> None:
+    """Give LangGraph's ``checkpoints`` table a ``created_at`` date (UTC, set on insert by a trigger).
+
+    SQLite cannot add a column with a non-constant default, hence nullable column + backfill + trigger.
+    Rows that predate the column are dated "now", so their age counts from the first start after upgrade.
+    """
+    cols = [row[1] for row in await (await conn.execute("PRAGMA table_info(checkpoints)")).fetchall()]
+    if "created_at" not in cols:
+        await conn.execute("ALTER TABLE checkpoints ADD COLUMN created_at TEXT")
+        await conn.execute(f"UPDATE checkpoints SET created_at = {_SQLITE_NOW}")
+    await conn.execute(
+        "CREATE TRIGGER IF NOT EXISTS checkpoints_created_at AFTER INSERT ON checkpoints "
+        "WHEN NEW.created_at IS NULL BEGIN "
+        f"UPDATE checkpoints SET created_at = {_SQLITE_NOW} WHERE thread_id = NEW.thread_id "
+        "AND checkpoint_ns = NEW.checkpoint_ns AND checkpoint_id = NEW.checkpoint_id; END"
+    )
+    await conn.commit()
+
+
 async def get_checkpointer():
     """memory (tests) | sqlite (local, CHECKPOINT_DB) | postgres (hosted, DATABASE_URL)."""
     kind = checkpointer_kind()
@@ -228,6 +250,7 @@ async def get_checkpointer():
         conn = await aiosqlite.connect(os.getenv("CHECKPOINT_DB") or ".checkpoints.sqlite")
         saver = AsyncSqliteSaver(conn)
         await saver.setup()
+        await _sqlite_add_created_at(conn)
         return saver
     if kind == "postgres":
         url = os.getenv("DATABASE_URL")
@@ -242,6 +265,8 @@ async def get_checkpointer():
         conn = await AsyncConnection.connect(url, autocommit=True, prepare_threshold=0, row_factory=dict_row)
         saver = AsyncPostgresSaver(conn)
         await saver.setup()
+        await conn.execute("ALTER TABLE checkpoints ADD COLUMN IF NOT EXISTS "
+                           "created_at timestamptz NOT NULL DEFAULT now()")
         return saver
     raise ValueError(f"CHECKPOINTER={kind!r}; expected memory, sqlite or postgres")
 
