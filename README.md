@@ -55,7 +55,7 @@ shows the planner's sub-questions and asks before retrieving. The same graph ser
 
 ```bash
 uv run python -m deep_researcher.ui        # Gradio UI at http://127.0.0.1:7860 (uv sync --extra ui)
-uv run uvicorn api.index:app --reload      # HTTP API at http://localhost:8000/api/health, UI at public/index.html
+uv run uvicorn api.index:app --reload      # HTTP API at http://localhost:8000; the hosted UI (public/index.html) at /
 ```
 
 The Gradio UI (flat, minimalist; Matrix-green accent on white, dark by default, with a toggle that remembers your
@@ -94,7 +94,8 @@ only the keyless sources, `papers` means arXiv, which is thin outside maths/phys
 
 ## Deployment
 
-The same FastAPI app runs locally, in a container, on AWS Lambda and on Vercel. Hosted runs need
+The same FastAPI app runs locally, in a container, on AWS Lambda and on Vercel, and serves the
+hosted UI at `/` (see [Hosted UI](#hosted-ui) below). Hosted runs need
 three things the local defaults do not: `CHECKPOINTER=postgres` with `DATABASE_URL` (plan approval
 resumes from the database), `CHROMA_MODE=http` or `cloud` (the evidence store cannot live on an
 ephemeral disk), and `EMBEDDINGS_PROVIDER=openrouter` (no local model in the image). The container
@@ -135,7 +136,30 @@ path before FastAPI sees it. Deploy with `npx vercel login`, `npx vercel link`, 
 `EMBEDDINGS_PROVIDER=openrouter`, `MAX_HOPS=0`, `RUN_BUDGET_SECONDS=240`, Sonnet as the heavy tier
 and SQLite + embedded Chroma under `/tmp`: fine for a demo, but plan approval only resumes while the
 same function instance is warm. Switch to `CHECKPOINTER=postgres` + `CHROMA_MODE=cloud` for durable
-hosting. The API needs the `API_AUTH_TOKEN` bearer; the hosted page at `/` asks for it.
+hosting. The API needs the `API_AUTH_TOKEN` bearer; the hosted UI's Settings tab asks for it.
+
+### Hosted UI
+
+[`public/index.html`](public/index.html) is a single static page (no build step, no framework) that
+talks to the API over SSE and mirrors the Gradio app: same layout, same flat Matrix-green theme, dark
+by default with the same light/dark toggle.
+
+![Hosted UI](docs/hosted-ui.png)
+
+- **Pipeline boxes** show each agent's live status, notes (model being called, sources found, tokens)
+  and hop badges; a JavaScript port of `pipeline_view.py`.
+- **Research tab**: question, max hops, the server's run budget, "Plan the research" with a busy
+  indicator and disabled buttons while a request runs, a collapsed agent activity log, the editable
+  plan table (ID, Question, Source types, Search queries, Depends on; clear a question to drop it, `+`
+  adds a row), "Approve and run", the rendered report and PDF / Markdown / JSON downloads (PDF via
+  `/api/report/pdf`, the others built in the browser).
+- **Settings tab**: the API bearer token (kept in `sessionStorage` for the tab only; the tab opens
+  itself when the server requires a token and none is set) and the server's effective configuration
+  from `/api/health`: models per role, embeddings, vector DB, checkpointer, active sources,
+  languages, tracing. Keys and models are set through environment variables on the host; only the
+  local Gradio app edits them in place.
+- Vercel serves `public/` statically; everywhere else the API's `GET /` returns the same file. User
+  input and streamed text are rendered as text nodes; the report Markdown is sanitised with DOMPurify.
 
 ### What is and is not verified
 
@@ -259,6 +283,7 @@ public and never exposes secrets.
 
 | Method | Path | Purpose |
 |---|---|---|
+| GET | `/` | the hosted UI (`public/index.html`) |
 | GET | `/api/health` | liveness, graph/tracing/llm/embeddings/chunking config, enabled sources |
 | POST | `/api/research` | `{question, max_hops?}` → SSE stream until plan approval |
 | POST | `/api/research/{thread_id}/resume` | `{plan: ResearchPlan}` → SSE stream to final report |
