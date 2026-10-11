@@ -14,8 +14,8 @@ Anthropic route rejected the ``function_calling`` method for Opus with a provide
 
 Roles map to cost tiers; each can be overridden by environment variable:
 
-    OPENROUTER_MODEL_HEAVY   planner, analysis, insight, critic   (default anthropic/claude-haiku-4.5)
-    OPENROUTER_MODEL_WORKER  retriever, report                    (default anthropic/claude-haiku-4.5)
+    OPENROUTER_MODEL_HEAVY   planner, analysis, insight, critic   (default anthropic/claude-opus-5.5)
+    OPENROUTER_MODEL_WORKER  retriever, report                    (default anthropic/claude-sonnet-5)
     OPENROUTER_MODEL_CHEAP   validator                            (default anthropic/claude-haiku-4.5)
     OPENROUTER_MODEL_JUDGE   grader (eval judges)                 (default openai/gpt-5-mini)
     OPENROUTER_MODEL_<ROLE>  e.g. OPENROUTER_MODEL_INSIGHT=openai/gpt-5.1  (beats the tier)
@@ -53,8 +53,8 @@ DEFAULT_APP_URL = "https://github.com/pj-nx/multi-agent-deep-researcher"
 DEFAULT_APP_TITLE = "Multi-Agent Deep Researcher"
 
 TIER_DEFAULTS: dict[str, str] = {
-    "heavy": "anthropic/claude-haiku-4.5",
-    "worker": "anthropic/claude-haiku-4.5",
+    "heavy": "anthropic/claude-opus-5.5",
+    "worker": "anthropic/claude-sonnet-5",
     "cheap": "anthropic/claude-haiku-4.5",
     # Eval judges get their own tier, from a different vendor than the pipeline: a judge that shares
     # the validator's model inherits its blind spots and tends to approve its own family's output.

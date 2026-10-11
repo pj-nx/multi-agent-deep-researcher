@@ -65,7 +65,7 @@ def test_save_applies_to_process_and_resets_caches(env_file, monkeypatch):
     from deep_researcher import llm
 
     monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-old")
-    assert llm.model_for("planner") == "anthropic/claude-haiku-4.5"
+    assert llm.model_for("planner") == "anthropic/claude-opus-5.5"
     before = llm.get_llm("grader")
     updates, path = S.save({"OPENROUTER_API_KEY": "sk-or-new-key-value", "OPENROUTER_MODEL_HEAVY": "openai/gpt-5.1",
                             "LANGSMITH_TRACING": False})
