@@ -53,7 +53,6 @@ from pydantic import BaseModel, Field
 from starlette.concurrency import iterate_in_threadpool
 from starlette.types import Receive, Scope, Send
 
-from deep_researcher import embeddings, llm, tracing
 from deep_researcher import api_guide, embeddings, llm, tracing
 from deep_researcher.guardrails import GuardrailViolation
 from deep_researcher.reports import markdown_to_pdf
