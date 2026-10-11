@@ -6,13 +6,16 @@ server's configuration the way the Gradio Settings tab does. Instead each reques
 budget. The API turns it into a :class:`Deps` for that run only (:func:`make_deps`); nothing is
 persisted and the server's env stays the default for everyone else.
 
-API keys are deliberately not part of this: they stay on the server.
+API keys are deliberately not part of this: they stay on the server. ``ALLOWED_MODELS`` (comma
+separated ids or ``vendor/*`` prefixes) bounds which models a client may pick; empty = any.
 """
 from __future__ import annotations
 
+import os
+import re
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from deep_researcher.agents.deps import Deps
 from deep_researcher.llm import ROLE_TIER, ROLES, TIER_DEFAULTS, model_for
@@ -20,6 +23,18 @@ from deep_researcher.llm import ROLE_TIER, ROLES, TIER_DEFAULTS, model_for
 TIERS: tuple[str, ...] = tuple(TIER_DEFAULTS)
 MODEL_ID = r"^[a-z0-9][a-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._:-]*$"   # vendor/model[:variant]
 Effort = Literal["none", "minimal", "low", "medium", "high"]
+
+
+def allowed_models() -> list[str]:
+    """``ALLOWED_MODELS`` entries: exact ids or ``vendor/*`` prefixes. Empty list = no restriction."""
+    return [m.strip() for m in (os.getenv("ALLOWED_MODELS") or "").split(",") if m.strip()]
+
+
+def is_allowed(model: str, allowed: list[str] | None = None) -> bool:
+    allowed = allowed_models() if allowed is None else allowed
+    if not allowed:
+        return True
+    return any(model == a or (a.endswith("/*") and model.startswith(a[:-1])) for a in allowed)
 
 
 class RunSettings(BaseModel):
@@ -33,8 +48,6 @@ class RunSettings(BaseModel):
     @field_validator("models")
     @classmethod
     def _check_models(cls, v: dict[str, str]) -> dict[str, str]:
-        import re
-
         for key, model in v.items():
             if key not in TIERS and key not in ROLES:
                 raise ValueError(f"unknown tier/role {key!r}; expected one of {TIERS + ROLES}")
@@ -45,12 +58,20 @@ class RunSettings(BaseModel):
     @field_validator("fallback_models")
     @classmethod
     def _check_fallbacks(cls, v: list[str]) -> list[str]:
-        import re
-
         for model in v:
             if not re.match(MODEL_ID, model):
                 raise ValueError(f"{model!r} is not an OpenRouter model id (vendor/model)")
         return v
+
+    @model_validator(mode="after")
+    def _check_allowlist(self) -> RunSettings:
+        allowed = allowed_models()
+        if allowed:
+            candidates = [*self.models.values(), *self.fallback_models]
+            blocked = sorted({m for m in candidates if not is_allowed(m, allowed)})
+            if blocked:
+                raise ValueError(f"model(s) not allowed on this server: {blocked}; allowed: {allowed}")
+        return self
 
     def is_empty(self) -> bool:
         return not (self.models or self.reasoning_effort or self.fallback_models)
@@ -75,12 +96,16 @@ class RunSettings(BaseModel):
 
 
 def effective_budget(settings: RunSettings | None, server_budget: int) -> int | None:
-    """The client may shorten the run but never exceed the server's budget (``0`` = no server cap)."""
-    if settings is None or settings.budget_seconds is None:
+    """The client may shorten the run but never exceed the server's budget.
+
+    ``settings.budget_seconds`` of ``None`` or ``0`` means "the server default"; a server budget of
+    ``0`` means the server imposes no cap, so the client's value (if any) is used as is.
+    """
+    if settings is None or not settings.budget_seconds:
         return server_budget or None
     if server_budget:
-        return min(settings.budget_seconds, server_budget) or None
-    return settings.budget_seconds or None
+        return min(settings.budget_seconds, server_budget)
+    return settings.budget_seconds
 
 
 def _llm_overrides(settings: RunSettings, role: str) -> dict[str, Any]:

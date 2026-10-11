@@ -40,10 +40,12 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 # Local runs (uvicorn, the container) read the git-ignored .env; hosted runs get real env vars and
-# have no file, so this is a no-op there. Existing variables are never overridden.
+# have no file, so this is a no-op there. Existing variables are never overridden. The test suite
+# sets DR_LOAD_DOTENV=0 so a developer's .env never shapes test results.
 from dotenv import load_dotenv
 
-load_dotenv(Path(__file__).resolve().parents[1] / ".env")
+if (os.getenv("DR_LOAD_DOTENV") or "1").strip().lower() not in {"0", "false", "no", "off"}:
+    load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, Response, StreamingResponse
@@ -53,7 +55,7 @@ from starlette.types import Receive, Scope, Send
 
 from deep_researcher import embeddings, llm, tracing
 from deep_researcher.reports import markdown_to_pdf
-from deep_researcher.run_settings import RunSettings, effective_budget, make_deps
+from deep_researcher.run_settings import RunSettings, allowed_models, effective_budget, is_allowed, make_deps
 from deep_researcher.schemas import ResearchPlan
 from deep_researcher.store import chunking, store_info
 from deep_researcher.tools import language as tool_language
@@ -279,7 +281,8 @@ async def health() -> dict:
         "auth_required": API_AUTH_TOKEN is not None,
         "rate_limit_per_minute": RATE_LIMIT_PER_MINUTE,
         "run_settings": {"overridable": ["models", "reasoning_effort", "fallback_models", "budget_seconds"],
-                         "budget_cap_seconds": RUN_BUDGET_SECONDS or None, "max_hops_limit": 5},
+                         "budget_cap_seconds": RUN_BUDGET_SECONDS or None, "max_hops_limit": 5,
+                         "allowed_models": allowed_models() or None},
         "tracing": tracing.info(),
         "llm": llm.info(),
         "embeddings": embeddings.info(),
@@ -396,8 +399,10 @@ async def models(prefix: str = "") -> dict:
             if not _models_cache["rows"]:
                 raise HTTPException(status_code=502,
                                     detail="Could not fetch the OpenRouter model list.") from exc
-    rows = [r for r in _models_cache["rows"] if r["id"].startswith(prefix)]
-    return {"models": rows, "count": len(rows), "defaults": llm.info()["models"]}
+    allowed = allowed_models()
+    rows = [r for r in _models_cache["rows"] if r["id"].startswith(prefix) and is_allowed(r["id"], allowed)]
+    return {"models": rows, "count": len(rows), "defaults": llm.info()["models"],
+            "allowed_models": allowed or None}
 
 
 @app.post("/api/report/pdf", dependencies=[Depends(guard)])

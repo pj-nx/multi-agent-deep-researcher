@@ -12,10 +12,12 @@ def anyio_backend():
 
 
 @pytest.fixture(autouse=True)
-def no_tracing(monkeypatch):
-    """Tests never trace: the API loads the developer's .env, which may switch LangSmith on, and a live
-    tracer's background threads would upload test runs and hold the interpreter open at exit."""
+def isolated_env(monkeypatch):
+    """Tests never read the developer's .env (the API loads it unless told not to) and never trace: a
+    live tracer's background threads would upload test runs and hold the interpreter open at exit."""
+    monkeypatch.setenv("DR_LOAD_DOTENV", "0")
     monkeypatch.setenv("LANGSMITH_TRACING", "false")
+    monkeypatch.delenv("ALLOWED_MODELS", raising=False)
 
 
 @pytest.fixture(autouse=True)

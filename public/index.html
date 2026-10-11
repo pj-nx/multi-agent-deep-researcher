@@ -546,6 +546,9 @@
     const models = h.llm && h.llm.models ? h.llm.models : (h.llm || {});
     row('models', typeof models === 'object' ? Object.entries(models).map(([k, v]) => `${k}: ${v}`).join('\n') : String(models));
     row('reasoning effort', (h.llm && h.llm.reasoning_effort) || 'model default');
+    const allowed = h.run_settings && h.run_settings.allowed_models;
+    row('allowed models', allowed ? allowed.join(', ') : 'any');
+    if (allowed) $('settings-status').textContent = `Only these models may be chosen here: ${allowed.join(', ')}. Sent with each run; remembered in this browser.`;
     row('fallback models', (h.llm && h.llm.fallback_models && h.llm.fallback_models.length) ? h.llm.fallback_models.join(', ') : 'none');
     $('m-heavy').placeholder = `server default: ${models.planner || ''}`;
     $('m-worker').placeholder = `server default: ${models.report || ''}`;
@@ -603,7 +606,8 @@
         logLine(formatEvent(event, data), event === 'error');
         if (event === 'report' && data.report) {
           lastReport = { markdown: data.report, json: data.report_json, title: (data.report_json || {}).title };
-          report.innerHTML = DOMPurify.sanitize(marked.parse(data.report));
+          if (window.DOMPurify && window.marked) report.innerHTML = DOMPurify.sanitize(marked.parse(data.report));
+          else { report.textContent = data.report; report.style.whiteSpace = 'pre-wrap'; }   // CDN unreachable: raw Markdown
           $('dr-downloads').classList.add('show');
         }
         if (event === 'done') threadId = null;

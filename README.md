@@ -172,6 +172,7 @@ instead:
 | Reasoning effort | same block | `none`, `minimal`, `low`, `medium`, `high`, or the server default. |
 | Fallback models | same block | Comma-separated ids OpenRouter tries if the chosen model fails. |
 | Run budget | Research → Budget | Seconds per leg before retrieval loops stop; `0` means the server default. The server caps it at its own `RUN_BUDGET_SECONDS`. |
+| Allowed models | server env `ALLOWED_MODELS` | Optional allowlist (`vendor/*` prefixes or ids); the pickers and the catalogue only offer those, and anything else is rejected. |
 | Max follow-up hops | Research → slider | Already per request (`max_hops`). |
 
 Choices are remembered in `localStorage` ("Reset to server defaults" clears them) and sent as a
@@ -296,6 +297,7 @@ The research endpoint spends real money per call, so three env vars guard it (al
 | `API_AUTH_TOKEN` | unset (open) | When set, `POST /api/research*` require `Authorization: Bearer <token>` or `X-API-Key`. The hosted UI shows a token field when health reports `auth_required`. |
 | `RATE_LIMIT_PER_MINUTE` | `6` | Sliding window per client IP; `0` disables. Idle keys are evicted so memory stays bounded. |
 | `MAX_CONCURRENT_RUNS` | `3` | Simultaneous research streams per instance; extra requests get `503` with `Retry-After`. Released on every exit path, including client disconnects. |
+| `ALLOWED_MODELS` | unset (any) | Comma-separated model ids or `vendor/*` prefixes a client may choose through per-run `settings`. Overrides outside the list get `422`, `/api/models` only lists allowed ids and the hosted page's pickers follow it. Bounds the cost a token holder can incur. |
 | `TRUST_PROXY_HEADERS` | on when `VERCEL` is set, else off | Use `x-real-ip` / `x-vercel-forwarded-for` / `x-forwarded-for` as the rate-limit key. Off by default locally because those headers are forgeable without a proxy in front. |
 
 Set `API_AUTH_TOKEN` on Vercel before sharing the URL. The limiter is in-process, which bounds

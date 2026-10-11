@@ -43,7 +43,22 @@ def test_effective_budget_never_exceeds_the_server():
     assert RS.effective_budget(RS.RunSettings(budget_seconds=60), 240) == 60
     assert RS.effective_budget(RS.RunSettings(budget_seconds=900), 240) == 240
     assert RS.effective_budget(RS.RunSettings(budget_seconds=900), 0) == 900
-    assert RS.effective_budget(RS.RunSettings(budget_seconds=0), 240) is None
+    assert RS.effective_budget(RS.RunSettings(budget_seconds=0), 240) == 240   # 0 = server default, not "no cap"
+    assert RS.effective_budget(RS.RunSettings(budget_seconds=0), 0) is None
+
+
+def test_allowlist_bounds_overrides(monkeypatch):
+    monkeypatch.setenv("ALLOWED_MODELS", "anthropic/*, openai/gpt-5.1")
+    assert RS.allowed_models() == ["anthropic/*", "openai/gpt-5.1"]
+    assert RS.is_allowed("anthropic/claude-haiku-4.5") and RS.is_allowed("openai/gpt-5.1")
+    assert not RS.is_allowed("openai/o1-pro") and not RS.is_allowed("anthropicx/foo")
+    RS.RunSettings(models={"heavy": "anthropic/claude-sonnet-5"}, fallback_models=["openai/gpt-5.1"])
+    with pytest.raises(ValidationError, match="not allowed on this server"):
+        RS.RunSettings(models={"heavy": "openai/o1-pro"})
+    with pytest.raises(ValidationError, match="not allowed on this server"):
+        RS.RunSettings(fallback_models=["google/gemini-3-pro"])
+    monkeypatch.delenv("ALLOWED_MODELS")
+    assert RS.is_allowed("openai/o1-pro")                                    # empty allowlist = anything
 
 
 def test_make_deps_builds_models_with_overrides(monkeypatch):
@@ -102,7 +117,37 @@ async def test_api_accepts_settings_and_rejects_bad_ones(monkeypatch):
         assert r.status_code == 422
         h = (await c.get("/api/health")).json()
         assert h["run_settings"]["budget_cap_seconds"] == 240 and "models" in h["run_settings"]["overridable"]
-        assert "reasoning_effort" in h["llm"]
+        assert h["run_settings"]["allowed_models"] is None and "reasoning_effort" in h["llm"]
+
+
+@pytest.mark.anyio
+async def test_api_enforces_the_allowlist_and_filters_the_catalogue(monkeypatch):
+    mod = _load_api(monkeypatch, ALLOWED_MODELS="anthropic/*")
+
+    async def fake_list(prefix="", *, timeout=15.0):
+        return [{"id": "openai/gpt-5.1", "context_length": 1, "prompt_price": "0", "completion_price": "0"},
+                {"id": "anthropic/claude-sonnet-5", "context_length": 1, "prompt_price": "0", "completion_price": "0"}]
+
+    monkeypatch.setattr(mod.llm, "alist_models", fake_list)
+    async with _client(mod) as c:
+        r = await c.post("/api/research", json={"question": "Does remote work help?",
+                                                "settings": {"models": {"heavy": "openai/gpt-5.1"}}})
+        assert r.status_code == 422 and "not allowed on this server" in r.text
+        r = await c.get("/api/models")
+        assert [m["id"] for m in r.json()["models"]] == ["anthropic/claude-sonnet-5"]
+        assert r.json()["allowed_models"] == ["anthropic/*"]
+        assert (await c.get("/api/health")).json()["run_settings"]["allowed_models"] == ["anthropic/*"]
+
+
+def test_api_skips_dotenv_when_told(monkeypatch):
+    import dotenv
+
+    calls = []
+    monkeypatch.setattr(dotenv, "load_dotenv", lambda *a, **k: calls.append(a) or False)
+    _load_api(monkeypatch)                                   # conftest sets DR_LOAD_DOTENV=0
+    assert calls == []
+    _load_api(monkeypatch, DR_LOAD_DOTENV="1")
+    assert len(calls) == 1 and str(calls[0][0]).endswith(".env")
 
 
 @pytest.mark.anyio
