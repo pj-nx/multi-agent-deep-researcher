@@ -54,6 +54,7 @@ from starlette.concurrency import iterate_in_threadpool
 from starlette.types import Receive, Scope, Send
 
 from deep_researcher import api_guide, embeddings, llm, tracing
+from deep_researcher.guardrails import GuardrailViolation
 from deep_researcher.reports import markdown_to_pdf
 from deep_researcher.run_settings import RunSettings, allowed_models, effective_budget, is_allowed, make_deps
 from deep_researcher.schemas import ResearchPlan
@@ -346,6 +347,12 @@ async def _run_stream(name: str, thread_id: str, inputs: dict, stage: str, slot:
                 async for event, data in _aiter(events_factory()):
                     last_event = {"event": event, **data}
                     yield _sse(event, data)
+            except GuardrailViolation as exc:      # a rejected question, not a failure
+                yield _sse("error", {"thread_id": thread_id, "code": "guardrail", "rule": exc.rule,
+                                     "message": str(exc)})
+                if run is not None:
+                    run.end(error=f"rejected: {exc.rule}")
+                return
             except Exception:  # must reach the client as an event, not a dropped socket
                 log.exception("research stream failed thread_id=%s", thread_id)
                 yield _sse("error", {"thread_id": thread_id,

@@ -72,7 +72,12 @@ def main() -> None:
     p.add_argument("--budget", type=int, default=None, help="seconds before retrieval loops stop")
     p.add_argument("--auto-approve", action="store_true")
     p.add_argument("--out", default="reports")
-    sys.exit(asyncio.run(_main(p.parse_args())))
+    from deep_researcher.guardrails import GuardrailViolation
+
+    try:
+        sys.exit(asyncio.run(_main(p.parse_args())))
+    except GuardrailViolation as exc:
+        sys.exit(f"{exc}")
 
 
 if __name__ == "__main__":

@@ -15,7 +15,9 @@ from langchain_core.messages import HumanMessage, SystemMessage
 
 from deep_researcher.agents.common import bibliography, call_structured, contradictions_text, summaries_text
 from deep_researcher.agents.deps import Deps
+from deep_researcher.health import degrade
 from deep_researcher.schemas import Critique, CritiqueOut, Gap
+from deep_researcher.skills import skill_prompt
 
 log = logging.getLogger(__name__)
 
@@ -58,14 +60,16 @@ async def critic_node(state: dict[str, Any], deps: Deps) -> dict[str, Any]:
         f"## Contradictions\n{contradictions_text(state)}"
         f"\n\n## Bibliography\n{bib}"
     )
+    degraded = None
     try:
         llm = deps.llm("critic")
         out: CritiqueOut = await call_structured(
-            llm, CritiqueOut, [SystemMessage(SYSTEM), HumanMessage(prompt)], role="critic",
-            label=f"round {revisions + 1}"
+            llm, CritiqueOut, [SystemMessage(SYSTEM + skill_prompt("critic")), HumanMessage(prompt)],
+            role="critic", label=f"round {revisions + 1}"
         )
     except Exception as exc:  # noqa: BLE001 - degrade: unreviewed insights are reported as such
-        log.warning("critic failed: %s", str(exc)[:300])
+        degraded = degrade("critic", "model_error", f"{type(exc).__name__}: {str(exc)[:160]}; insights were "
+                           "accepted without adversarial review", "critical")
         out = CritiqueOut(verdict="accept", issues=[f"critic unavailable ({type(exc).__name__}); "
                                                     "insights were not adversarially reviewed"])
 
@@ -102,6 +106,7 @@ async def critic_node(state: dict[str, Any], deps: Deps) -> dict[str, Any]:
         "model_verdict": out.verdict,
     }
     update: dict[str, Any] = {
+        "degradations": [degraded] if degraded else [],
         "critique": critique.model_dump(),
         "critiques": [record],
         "revisions": revisions + 1,

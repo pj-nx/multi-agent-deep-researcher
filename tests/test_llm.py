@@ -22,7 +22,16 @@ def llm(monkeypatch):
 def test_defaults_per_role(llm):
     assert llm.model_for("planner") == "anthropic/claude-opus-5.5"
     assert llm.model_for("retriever") == "anthropic/claude-sonnet-5"
-    assert llm.model_for("grader") == "anthropic/claude-haiku-4.5"
+    assert llm.model_for("validator") == "anthropic/claude-haiku-4.5"
+    assert llm.model_for("grader") == "openai/gpt-5-mini"
+    assert llm.model_for("grader") != llm.model_for("validator")  # judge independent of the pipeline
+
+
+def test_judge_tier_override_leaves_validator_alone(llm, monkeypatch):
+    monkeypatch.setenv("OPENROUTER_MODEL_JUDGE", "google/gemini-3-flash-preview")
+    monkeypatch.setenv("OPENROUTER_MODEL_CHEAP", "openai/gpt-5-mini")
+    assert llm.model_for("grader") == "google/gemini-3-flash-preview"
+    assert llm.model_for("validator") == "openai/gpt-5-mini"
     assert set(llm.info()["models"]) == set(llm.ROLES)
 
 
@@ -97,6 +106,9 @@ def test_reasoning_effort_env(llm, monkeypatch):
     with pytest.raises(llm.LLMConfigError):
         llm.build_kwargs("critic")
     assert llm.ROLE_MAX_TOKENS["critic"] >= 8_000      # reasoning tokens count against the budget
+    monkeypatch.delenv("OPENROUTER_REASONING_EFFORT")
+    monkeypatch.setenv("OPENROUTER_MAX_TOKENS", "300")  # opt-in cap to fit low OpenRouter credit
+    assert llm.build_kwargs("critic")["max_tokens"] == 300
 
 
 def test_get_llm_caches_without_overrides(llm, monkeypatch):
@@ -104,3 +116,13 @@ def test_get_llm_caches_without_overrides(llm, monkeypatch):
     a, b = llm.get_llm("grader"), llm.get_llm("grader")
     assert a is b
     assert llm.get_llm("grader", temperature=0.5) is not a
+
+
+def test_reasoning_effort_per_role_override(llm, monkeypatch):
+    monkeypatch.setenv("OPENROUTER_REASONING_EFFORT", "high")
+    monkeypatch.setenv("OPENROUTER_REASONING_EFFORT_ANALYSIS", "low")
+    assert llm.build_kwargs("analysis")["extra_body"]["reasoning"] == {"effort": "low"}
+    assert llm.build_kwargs("critic")["extra_body"]["reasoning"] == {"effort": "high"}      # global kept
+    monkeypatch.setenv("OPENROUTER_REASONING_EFFORT_CRITIC", "turbo")
+    with pytest.raises(llm.LLMConfigError):
+        llm.build_kwargs("critic")

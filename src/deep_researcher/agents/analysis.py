@@ -8,6 +8,7 @@ evidence id is checked against the chunks that were actually shown; anything els
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 from typing import Any
 
@@ -15,7 +16,9 @@ from langchain_core.messages import HumanMessage, SystemMessage
 
 from deep_researcher.agents.common import call_structured, emit
 from deep_researcher.agents.deps import Deps
+from deep_researcher.health import degrade
 from deep_researcher.schemas import AnalysisOutput, Claim, Contradiction, Gap, Summary
+from deep_researcher.skills import skill_prompt
 
 log = logging.getLogger(__name__)
 
@@ -124,20 +127,28 @@ async def _analyse_one(sq: dict[str, Any], state: dict[str, Any], deps: Deps, ll
 
     chunks_text, shown = _render_chunks(hits, deps.analysis_chunk_chars)
     prompt = f"Sub-question ({sq_id}): {sq['question']}\n\nEvidence chunks:\n\n{chunks_text}"
+    input_hash = hashlib.sha256(prompt.encode()).hexdigest()
+    unchanged = (state.get("analysis_inputs") or {}).get(sq_id) == input_hash
+    if unchanged and sq_id in (state.get("summaries") or {}):
+        emit("retrieval", label=f"{sq_id}: evidence unchanged, keeping the earlier analysis")
+        return {"skipped": True}
     async with sem:
-        messages = [SystemMessage(SYSTEM), HumanMessage(prompt)]
+        messages = [SystemMessage(SYSTEM + skill_prompt("analysis")), HumanMessage(prompt)]
         try:
             out: AnalysisOutput = await call_structured(llm, AnalysisOutput, messages, role="analysis",
                                                         label=f"{sq_id} ({len(hits)} chunks)")
         except Exception as exc:  # noqa: BLE001 - degrade: keep the evidence list, lose the analysis
-            log.warning("analysis failed for %s: %s", sq_id, str(exc)[:300])
+            failure = degrade("analysis", "model_error", f"{type(exc).__name__}: {str(exc)[:140]}; "
+                              f"{len(hits)} evidence chunks were not analysed", "critical",
+                              sub_question_id=sq_id)
             summary = Summary(sub_question_id=sq_id, evidence_ids=sorted(shown),
                               summary=f"Analysis failed ({type(exc).__name__}); {len(hits)} evidence chunks "
                                       "were retrieved but not analysed.")
-            return {"summary": summary, "contradictions": [], "gaps": [], "dropped": 0, "chunks": len(hits)}
+            return {"summary": summary, "contradictions": [], "gaps": [], "dropped": 0, "chunks": len(hits),
+                    "degraded": failure}
     summary, contradictions, gaps, dropped = ground(out, shown, sq_id)
     return {"summary": summary, "contradictions": contradictions, "gaps": gaps, "dropped": dropped,
-            "chunks": len(hits), "confidence": out.confidence}
+            "chunks": len(hits), "confidence": out.confidence, "input_hash": input_hash}
 
 
 def _touched_this_hop(state: dict[str, Any]) -> set[str] | None:
@@ -171,7 +182,9 @@ async def analyze_node(state: dict[str, Any], deps: Deps) -> dict[str, Any]:
         subs = [sq for sq in subs if sq["id"] in touched]
         if not subs:
             return {"pending_gaps": [], "notes": ["analysis: no new evidence this hop; summaries unchanged"]}
-    results = await asyncio.gather(*(_analyse_one(sq, state, deps, llm, sem) for sq in subs))
+    outcomes = await asyncio.gather(*(_analyse_one(sq, state, deps, llm, sem) for sq in subs))
+    results = [r for r in outcomes if not r.get("skipped")]
+    skipped = len(outcomes) - len(results)
 
     summaries = {r["summary"].sub_question_id: r["summary"].model_dump() for r in results}
     contradictions = [c.model_dump() for r in results for c in r["contradictions"]]
@@ -182,11 +195,16 @@ async def analyze_node(state: dict[str, Any], deps: Deps) -> dict[str, Any]:
     n_claims = sum(len(r["summary"].claims) for r in results)
     return {
         "summaries": summaries,
+        "degradations": [r["degraded"] for r in results if r.get("degraded")],
+        "analysis_inputs": {r["summary"].sub_question_id: r["input_hash"]
+                            for r in results if "input_hash" in r},
         "contradictions": contradictions,
         "gaps": new_gaps,
         "pending_gaps": new_gaps,
         "gap_source": "analysis",
-        "notes": [f"analysis: {len(subs)} sub-questions{' (incremental)' if touched is not None else ''}, "
+        "notes": [f"analysis: {len(results)} of {len(subs)} sub-questions analysed"
+                  f"{f' ({skipped} unchanged, skipped)' if skipped else ''}"
+                  f"{' (incremental)' if touched is not None else ''}, "
                   f"{n_claims} claims, {len(contradictions)} contradictions, {len(new_gaps)} gaps; "
                   f"{dropped} ungrounded citations dropped"],
     }

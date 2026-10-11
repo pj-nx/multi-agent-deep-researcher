@@ -49,6 +49,10 @@ async def _run(args: argparse.Namespace) -> int:
     prices = await fetch_prices()
     judge_llm = None if args.no_judge else grader_llm()
     settings = _settings(args)
+    pipeline_models = {settings["heavy"], settings["worker"], settings["cheap"]}
+    if judge_llm is not None and settings["grader"] in pipeline_models:
+        print(f"warning: grader model {settings['grader']} also runs in the pipeline; set "
+              "OPENROUTER_MODEL_JUDGE to a different model for an independent judge", file=sys.stderr)
     print(f"{len(cases)} case(s) -> {out}  [{', '.join(f'{k}={v}' for k, v in settings.items())}]")
 
     def on_done(r):

@@ -16,7 +16,8 @@ Roles map to cost tiers; each can be overridden by environment variable:
 
     OPENROUTER_MODEL_HEAVY   planner, analysis, insight, critic   (default anthropic/claude-opus-5.5)
     OPENROUTER_MODEL_WORKER  retriever, report                    (default anthropic/claude-sonnet-5)
-    OPENROUTER_MODEL_CHEAP   validator, grader                    (default anthropic/claude-haiku-4.5)
+    OPENROUTER_MODEL_CHEAP   validator                            (default anthropic/claude-haiku-4.5)
+    OPENROUTER_MODEL_JUDGE   grader (eval judges)                 (default openai/gpt-5-mini)
     OPENROUTER_MODEL_<ROLE>  e.g. OPENROUTER_MODEL_INSIGHT=openai/gpt-5.1  (beats the tier)
 
 Routing knobs (all optional):
@@ -27,6 +28,8 @@ Routing knobs (all optional):
     OPENROUTER_ZDR               true → only zero-data-retention endpoints
     OPENROUTER_SORT              price|throughput|latency
     OPENROUTER_REASONING_EFFORT  none|minimal|low|medium|high  (`reasoning.effort`; "none" disables)
+    OPENROUTER_REASONING_EFFORT_<ROLE>  same values, one role only (beats the global value), e.g.
+                                 OPENROUTER_REASONING_EFFORT_ANALYSIS=low  (unset roles keep the global value)
     OPENROUTER_APP_URL / OPENROUTER_APP_TITLE   attribution headers shown on openrouter.ai
 
 Usage::
@@ -53,6 +56,9 @@ TIER_DEFAULTS: dict[str, str] = {
     "heavy": "anthropic/claude-opus-5.5",
     "worker": "anthropic/claude-sonnet-5",
     "cheap": "anthropic/claude-haiku-4.5",
+    # Eval judges get their own tier, from a different vendor than the pipeline: a judge that shares
+    # the validator's model inherits its blind spots and tends to approve its own family's output.
+    "judge": "openai/gpt-5-mini",
 }
 ROLE_TIER: dict[str, str] = {
     "planner": "heavy",
@@ -62,7 +68,7 @@ ROLE_TIER: dict[str, str] = {
     "retriever": "worker",
     "report": "worker",
     "validator": "cheap",
-    "grader": "cheap",
+    "grader": "judge",
 }
 # Deterministic where we parse structured output; a little warmth where we want hypotheses.
 ROLE_TEMPERATURE: dict[str, float] = {
@@ -131,12 +137,16 @@ def provider_preferences() -> dict[str, Any] | None:
     return prefs or None
 
 
-def reasoning_effort() -> str | None:
-    v = (os.getenv("OPENROUTER_REASONING_EFFORT") or "").strip().lower()
+def reasoning_effort(role: str | None = None) -> str | None:
+    """Effort for ``role``: its ``OPENROUTER_REASONING_EFFORT_<ROLE>``, else the global value, else None."""
+    name = "OPENROUTER_REASONING_EFFORT"
+    if role and os.getenv(f"{name}_{role.upper()}"):
+        name = f"{name}_{role.upper()}"
+    v = (os.getenv(name) or "").strip().lower()
     if not v:
         return None
     if v not in {"none", "minimal", "low", "medium", "high"}:
-        raise LLMConfigError(f"OPENROUTER_REASONING_EFFORT={v!r}; expected none|minimal|low|medium|high")
+        raise LLMConfigError(f"{name}={v!r}; expected none|minimal|low|medium|high")
     return v
 
 
@@ -145,6 +155,18 @@ def fallback_models() -> list[str]:
 
 
 STRUCTURED_OUTPUT_METHOD = "json_schema"
+
+
+def max_tokens(role: str) -> int:
+    """Completion budget for ``role``; ``OPENROUTER_MAX_TOKENS`` caps every role (e.g. 300 for low credit)."""
+    default = ROLE_MAX_TOKENS[role]
+    raw = os.getenv("OPENROUTER_MAX_TOKENS", "").strip()
+    if not raw:
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        raise LLMConfigError(f"OPENROUTER_MAX_TOKENS={raw!r}; expected an integer") from None
 
 
 def attribution_headers() -> dict[str, str]:
@@ -164,12 +186,12 @@ def build_kwargs(role: str, **overrides: Any) -> dict[str, Any]:
         extra_body["models"] = [model, *[m for m in fb if m != model]]
     if (prefs := provider_preferences()) and "provider" not in extra_body:
         extra_body["provider"] = prefs
-    if (effort := reasoning_effort()) and "reasoning" not in extra_body:
+    if (effort := reasoning_effort(role)) and "reasoning" not in extra_body:
         extra_body["reasoning"] = {"enabled": False} if effort == "none" else {"effort": effort}
     kwargs: dict[str, Any] = {
         "model": model,
         "temperature": ROLE_TEMPERATURE[role],
-        "max_tokens": ROLE_MAX_TOKENS[role],
+        "max_tokens": max_tokens(role),
         "max_retries": 2,
         "timeout": 120,
         "default_headers": attribution_headers(),

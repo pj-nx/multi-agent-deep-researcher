@@ -242,3 +242,12 @@ async def test_judge_existing_matches_case_by_question(tmp_path):
     assert runs[0].case_id == "remote-work" and set(runs[0].judges) == set(J.JUDGE_NAMES)
     unmatched = await R.judge_existing([p], [])
     assert unmatched[0].case_id == "r" and set(unmatched[0].judges) == {"citation_integrity", "groundedness"}
+
+
+def test_usage_records_call_time_per_role():
+    from deep_researcher.evals.runner import Usage
+
+    u = Usage()
+    for role, secs in [("analysis", 40.0), ("analysis", 35.5), ("critic", 20.0)]:
+        u.add({"model": "m", "role": role, "elapsed_s": secs, "input_tokens": 1, "output_tokens": 1})
+    assert u.roles == {"analysis": {"calls": 2, "seconds": 75.5}, "critic": {"calls": 1, "seconds": 20.0}}

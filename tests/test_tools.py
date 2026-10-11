@@ -286,3 +286,40 @@ async def test_fetch_text_pdf_and_html_and_failure():
 def test_search_result_usable():
     assert not SearchResult(title="t", url="", text="x", source_type="web").usable()
     assert not SearchResult(title="t", url="u", text="  ", source_type="web").usable()
+
+
+def test_identical_searches_are_answered_once_even_in_parallel():
+    import asyncio
+
+    calls = []
+
+    def handler(request):
+        calls.append(str(request.url))
+        return httpx.Response(200, text="<feed xmlns='http://www.w3.org/2005/Atom'></feed>")
+
+    async def go():
+        tool = ArxivTool(httpx.AsyncClient(transport=httpx.MockTransport(handler)))
+        tool.min_interval_s = 0
+        await asyncio.gather(*(tool.search("four-day week") for _ in range(4)))
+        await tool.search("four-day week")                 # later, same run: still cached
+        await tool.search("something else")
+    asyncio.run(go())
+    assert len(calls) == 2
+
+
+def test_failed_searches_are_not_cached():
+    import asyncio
+
+    calls = []
+
+    def handler(request):
+        calls.append(1)
+        return httpx.Response(429)
+
+    async def go():
+        tool = ArxivTool(httpx.AsyncClient(transport=httpx.MockTransport(handler)))
+        tool.min_interval_s = 0
+        tool.max_retries = 0
+        assert await tool.search("x") == [] and await tool.search("x") == []
+    asyncio.run(go())
+    assert len(calls) == 2

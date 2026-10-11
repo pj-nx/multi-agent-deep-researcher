@@ -19,7 +19,9 @@ from deep_researcher.agents.common import (
     summaries_text,
 )
 from deep_researcher.agents.deps import Deps
+from deep_researcher.health import degrade, health_md, summarise
 from deep_researcher.schemas import ReportOutput
+from deep_researcher.skills import skill_prompt
 from deep_researcher.tools.language import allowed_languages
 
 log = logging.getLogger(__name__)
@@ -126,13 +128,16 @@ async def report_node(state: dict[str, Any], deps: Deps) -> dict[str, Any]:
         + "\n".join(f"- {i['hypothesis']} (confidence {i['confidence']:.2f})" for i in insights)
         + f"\n\n## Critic notes\n{crit_text or '(none)'}\n\n## Bibliography\n{bib}"
     )
+    degradations = list(state.get("degradations") or [])
     try:
         llm = deps.llm("report")
         out: ReportOutput = await call_structured(
-            llm, ReportOutput, [SystemMessage(SYSTEM), HumanMessage(prompt)], role="report", label="narrative"
+            llm, ReportOutput, [SystemMessage(SYSTEM + skill_prompt("report")), HumanMessage(prompt)],
+            role="report", label="narrative"
         )
     except Exception as exc:  # noqa: BLE001 - degrade: assemble the report from state without the narrative
-        log.warning("report narrative failed: %s", str(exc)[:300])
+        degradations.append(degrade("report", "model_error", f"{type(exc).__name__}: {str(exc)[:160]}; the "
+                                    "executive summary and key findings were not generated", "critical"))
         out = ReportOutput(
             title=f"Research digest: {state['question'][:150]}",
             executive_summary="_The narrative summary could not be generated "
@@ -154,7 +159,9 @@ async def report_node(state: dict[str, Any], deps: Deps) -> dict[str, Any]:
     kept = kept_evidence(state)
     summaries = state.get("summaries") or {}
     gaps = state.get("gaps", [])
+    health = summarise(degradations)
     stats = {
+        "degradations": len(health),
         "retrieved": len(evidence),
         "kept": len(kept),
         "dropped": len(evidence) - len(kept),
@@ -181,6 +188,7 @@ async def report_node(state: dict[str, Any], deps: Deps) -> dict[str, Any]:
         f"{stats['kept']} sources, {stats['claims']} claims, {stats['contradictions']} contradictions, "
         f"{len(insights)} insights._",
         "",
+        *health_md(health),
         "## Executive summary",
         "",
         exec_summary,
@@ -243,6 +251,7 @@ async def report_node(state: dict[str, Any], deps: Deps) -> dict[str, Any]:
         "dropped_sources": [e for e in evidence if e not in kept],
         "assessments": state.get("assessments") or {},
         "retrieval_log": state.get("retrieval_log", []),
+        "degradations": health,
         "stats": stats,
     }
     return {

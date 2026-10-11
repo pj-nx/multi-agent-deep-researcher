@@ -426,8 +426,67 @@ async def test_validator_degrades_without_model(deps, monkeypatch):
     out = await validate_node(state, deps)
     a = out["assessments"]["E-aaaaaaaaaa"]
     assert a["keep"] is True and a["credibility"] == 0.8 and a["issues"] == ["unvalidated"]
-    assert await validate_node({**state, "assessments": out["assessments"]}, deps) == {
-        "notes": ["validator: nothing new to assess"]}
+    again = await validate_node({**state, "assessments": out["assessments"]}, deps)
+    assert again["notes"] == ["validator: all sources were graded during retrieval"]
+    assert "assessments" not in again                       # nothing left to grade
+
+
+@pytest.mark.anyio
+async def test_fast_branch_is_graded_while_a_slow_branch_is_still_searching(deps):
+    """Validation happens inside the retrieve branch, so a slow sibling cannot delay it."""
+    import asyncio
+
+    from deep_researcher.agents.retriever import retrieve_node
+
+    order = []
+    slow_gate = asyncio.Event()
+    real_llm = deps.llm
+
+    def llm(role):
+        model = real_llm(role)
+        if role != "validator":
+            return model
+        orig = model.with_structured_output
+
+        def wrapped(schema, **kw):
+            runnable = orig(schema, **kw)
+            inner = runnable.ainvoke
+
+            async def ainvoke(msgs):
+                order.append("graded " + msgs[-1].content.split("Sources:")[0].strip()[-12:])
+                slow_gate.set()                                  # first grading frees the slow branch
+                return await inner(msgs)
+            runnable.ainvoke = ainvoke
+            return runnable
+        model.with_structured_output = wrapped
+        return model
+
+    deps.llm = llm
+    real_tools_for = deps.tools_for
+
+    def tools_for(types):
+        tools = real_tools_for(types)
+        for t in tools:
+            orig_search = t.search
+
+            async def search(query, limit=5, _orig=orig_search):
+                if "slow" in query:
+                    await slow_gate.wait()                       # blocks until another branch has been graded
+                    order.append("slow branch finished searching")
+                return await _orig(query, limit)
+            t.search = search
+        return tools
+
+    deps.tools_for = tools_for
+
+    def payload(sq_id, query):
+        return {"sub_question": {"id": sq_id, "question": f"Does {query} matter?", "source_types": ["papers"],
+                                 "search_queries": [query]}, "hop": 0, "deadline": 0}
+
+    slow, fast = await asyncio.wait_for(asyncio.gather(
+        retrieve_node(payload("sq1", "slow topic"), deps), retrieve_node(payload("sq2", "fast topic"), deps)), 20)
+    assert order[0].startswith("graded") and "slow branch finished searching" in order[1:]
+    assert fast["assessments"] and slow["assessments"]          # both branches carry their own verdicts
 
 
 @pytest.mark.anyio
@@ -444,3 +503,32 @@ async def test_memory_checkpointer_selectable(monkeypatch):
     monkeypatch.setenv("CHECKPOINTER", "redis")
     with pytest.raises(ValueError):
         await G.get_checkpointer()
+
+
+@pytest.mark.anyio
+async def test_analysis_skipped_when_the_chunks_shown_are_unchanged(tmp_path):
+    from types import SimpleNamespace
+
+    from deep_researcher.agents.analysis import analyze_node
+
+    deps = make_deps(tmp_path)
+    deps.fake_llm.gap_rounds = 0
+    chunks = [SimpleNamespace(evidence_id="E-0000000001", source_type="papers", credibility=0.8,
+                              published_at="2024", title="Trial", text="Productivity rose.")]
+    store = SimpleNamespace(query=lambda *a, **k: [SimpleNamespace(chunk=c, score=0.9) for c in chunks])
+    deps.store = lambda: store
+    state = {"plan": {"sub_questions": [{"id": "sq1", "question": "Does it work?", "source_types": ["papers"]}]},
+             "hop": 0}
+
+    first = await analyze_node(state, deps)
+    assert deps.fake_llm.analysis_calls == 1 and "sq1" in first["analysis_inputs"]
+
+    state = {**state, "summaries": first["summaries"], "analysis_inputs": first["analysis_inputs"]}
+    again = await analyze_node(state, deps)
+    assert deps.fake_llm.analysis_calls == 1                                 # unchanged -> no model call
+    assert again["summaries"] == {} and again["contradictions"] == []        # earlier summary stays in state
+    assert "1 unchanged, skipped" in again["notes"][0]
+
+    chunks[0].text = "Productivity fell."                                    # evidence changed -> re-analysed
+    await analyze_node(state, deps)
+    assert deps.fake_llm.analysis_calls == 2

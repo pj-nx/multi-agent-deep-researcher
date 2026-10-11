@@ -15,7 +15,9 @@ from langchain_core.messages import HumanMessage, SystemMessage
 
 from deep_researcher.agents.common import call_structured
 from deep_researcher.agents.deps import Deps
+from deep_researcher.health import degrade
 from deep_researcher.schemas import SourceAssessment, SourceAssessments
+from deep_researcher.skills import skill_prompt
 
 log = logging.getLogger(__name__)
 
@@ -48,57 +50,96 @@ def _fallback(ev: dict[str, Any]) -> SourceAssessment:
 
 
 async def _grade_batch(llm: Any, sub_question: str, batch: list[dict[str, Any]], sem: asyncio.Semaphore,
-                       ) -> list[SourceAssessment]:
+                       failures: list[tuple[int, Exception]]) -> list[SourceAssessment]:
     ids = {ev["id"] for ev in batch}
     prompt = f"Sub-question: {sub_question}\n\nSources:\n" + "\n\n".join(_render(ev) for ev in batch)
     async with sem:
         try:
             out: SourceAssessments = await call_structured(
-                llm, SourceAssessments, [SystemMessage(SYSTEM), HumanMessage(prompt)],
+                llm, SourceAssessments,
+                [SystemMessage(SYSTEM + skill_prompt("validator")), HumanMessage(prompt)],
                 role="validator", label=f"grade {len(batch)} sources")
         except Exception as exc:  # noqa: BLE001 - grading must never sink the run
             log.warning("validator batch failed (%d sources): %s", len(batch), str(exc)[:200])
+            failures.append((len(batch), exc))
             return [_fallback(ev) for ev in batch]
     by_id = {a.evidence_id: a for a in out.items if a.evidence_id in ids}
     return [by_id.get(ev["id"]) or _fallback(ev) for ev in batch]
 
 
-async def validate_node(state: dict[str, Any], deps: Deps) -> dict[str, Any]:
-    assessed = set(state.get("assessments") or {})
-    pending = [ev for ev in state.get("evidence", []) if ev["id"] not in assessed]
-    if not pending:
-        return {"notes": ["validator: nothing new to assess"]}
+async def assess(evidence: list[dict[str, Any]], questions: dict[str, str], deps: Deps,
+                 ) -> tuple[dict[str, dict[str, Any]], list[dict[str, Any]]]:
+    """Grade ``evidence`` (grouped per sub-question), write verdicts to the store, and return
+    ``(assessments by evidence id, degradation records)``. Never raises: grading failures fall back to priors.
 
-    questions = {sq["id"]: sq["question"] for sq in state["plan"]["sub_questions"]}
-    questions.update({sq["id"]: sq["question"] for sq in state.get("extra_sub_questions", [])})
+    Called from each retrieve branch (so grading overlaps with slower branches) and from ``validate_node``
+    for anything still unassessed.
+    """
     by_sq: dict[str, list[dict[str, Any]]] = {}
-    for ev in pending:
+    for ev in evidence:
         by_sq.setdefault(ev["sub_question_id"], []).append(ev)
 
+    degradations: list[dict[str, Any]] = []
     try:
         llm = deps.llm("validator")
     except Exception as exc:  # noqa: BLE001 - no key: degrade to priors
-        log.warning("validator model unavailable (%s); keeping all sources with prior credibility", exc)
+        degradations.append(degrade(
+            "validator", "unavailable", f"{type(exc).__name__}: {str(exc)[:160]}; kept all {len(evidence)} "
+            "sources with their prior credibility", "critical"))
         llm = None
 
     results: list[SourceAssessment] = []
     if llm is None:
-        results = [_fallback(ev) for ev in pending]
+        results = [_fallback(ev) for ev in evidence]
     else:
         sem = asyncio.Semaphore(deps.llm_concurrency)
-        jobs = [_grade_batch(llm, questions.get(sq_id, sq_id), evs[i:i + BATCH], sem)
+        failures: list[tuple[int, Exception]] = []
+        jobs = [_grade_batch(llm, questions.get(sq_id, sq_id), evs[i:i + BATCH], sem, failures)
                 for sq_id, evs in by_sq.items() for i in range(0, len(evs), BATCH)]
         for batch in await asyncio.gather(*jobs):
             results.extend(batch)
+        if failures:
+            unvalidated = sum(n for n, _ in failures)
+            severity = "critical" if unvalidated == len(evidence) else "warn"
+            degradations.append(degrade(
+                "validator", "model_error",
+                f"{type(failures[0][1]).__name__}: {str(failures[0][1])[:140]}; {unvalidated} of "
+                f"{len(evidence)} sources kept unvalidated", severity, count=len(failures)))
 
     assessments = {a.evidence_id: a.model_dump() for a in results}
-    kept = sum(1 for a in assessments.values() if a["keep"])
     try:
         await asyncio.to_thread(deps.store().update_assessments, assessments)
     except Exception as exc:  # noqa: BLE001 - metadata refresh is best effort
         log.warning("store.update_assessments failed: %s", exc)
+    return assessments, degradations
+
+
+def _hop_summary(state: dict[str, Any], assessments: dict[str, dict[str, Any]]) -> dict[str, int]:
+    """Assessed / kept counts for the evidence retrieved in the current hop (for the stream event)."""
+    hop = state.get("hop", 0)
+    sq_ids = {row["sub_question_id"] for row in state.get("retrieval_log", []) if row.get("hop", 0) == hop}
+    ids = [ev["id"] for ev in state.get("evidence", []) if ev["sub_question_id"] in sq_ids]
+    scored = [assessments[i] for i in dict.fromkeys(ids) if i in assessments]
+    return {"assessed": len(scored), "kept": sum(1 for a in scored if a.get("keep", True))}
+
+
+async def validate_node(state: dict[str, Any], deps: Deps) -> dict[str, Any]:
+    """Barrier step after all retrievals: grades whatever the branches did not (normally nothing) and
+    summarises the hop's validation for the stream."""
+    done = state.get("assessments") or {}
+    pending = [ev for ev in state.get("evidence", []) if ev["id"] not in done]
+    if not pending:
+        return {"validation": _hop_summary(state, done),
+                "notes": ["validator: all sources were graded during retrieval"]}
+
+    questions = {sq["id"]: sq["question"] for sq in state["plan"]["sub_questions"]}
+    questions.update({sq["id"]: sq["question"] for sq in state.get("extra_sub_questions", [])})
+    assessments, degradations = await assess(pending, questions, deps)
+    kept = sum(1 for a in assessments.values() if a["keep"])
     return {
+        "degradations": degradations,
         "assessments": assessments,
+        "validation": _hop_summary(state, {**done, **assessments}),
         "notes": [f"validator: assessed {len(assessments)} sources, kept {kept}, "
                   f"dropped {len(assessments) - kept}"],
     }

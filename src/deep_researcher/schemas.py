@@ -54,6 +54,14 @@ class EvidenceChunk(BaseModel):
     language: str | None = None
 
 
+class ScopeVerdict(BaseModel):
+    """Guardrail classification of a user question (see guardrails.py)."""
+
+    categories: list[str] = Field(min_length=1, max_length=12)
+    correlated: bool = True
+    reason: str = Field(default="", max_length=500)
+
+
 class ResearchPlan(BaseModel):
     question: str = Field(min_length=5, max_length=2000)
     sub_questions: list[SubQuestion] = Field(min_length=1, max_length=12)

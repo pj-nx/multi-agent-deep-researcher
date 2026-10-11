@@ -214,7 +214,11 @@ OPENROUTER_API_KEY=sk-or-...
 |---|---|---|---|
 | heavy | planner, analysis, insight, critic | `anthropic/claude-opus-5.5` | `OPENROUTER_MODEL_HEAVY` |
 | worker | retriever, report | `anthropic/claude-sonnet-5` | `OPENROUTER_MODEL_WORKER` |
-| cheap | validator, grader | `anthropic/claude-haiku-4.5` | `OPENROUTER_MODEL_CHEAP` |
+| cheap | validator | `anthropic/claude-haiku-4.5` | `OPENROUTER_MODEL_CHEAP` |
+| judge | grader (eval judges only) | `openai/gpt-5-mini` | `OPENROUTER_MODEL_JUDGE` |
+
+The judge tier is deliberately a different vendor from the pipeline, so the evals are not graded by
+the same model that validated the sources; `evals run` warns if the grader resolves to a pipeline model.
 
 Any single role can be pinned with `OPENROUTER_MODEL_<ROLE>`, e.g.
 `OPENROUTER_MODEL_INSIGHT=openai/gpt-5.1`. `OPENROUTER_FALLBACK_MODELS` lists backups tried in
@@ -227,6 +231,65 @@ tokens count against each role's `max_tokens`, which are set generously for that
 from deep_researcher.llm import get_llm
 get_llm("planner").invoke("...")           # ChatOpenRouter, traced by LangSmith automatically
 ```
+
+## Skills
+
+[`skills.md`](src/deep_researcher/skills.md) holds reusable instruction blocks (one `## name` section each)
+that are appended to an agent's system prompt on every model call. [`skills.py`](src/deep_researcher/skills.py)
+maps agents to skills (`AGENT_SKILLS`). Skills: `adaptive-research-planning` (the research-supervisor
+prompt), `autonomous-decision-making`, `academic-paper-search`, `heavy-document-retrieval`, `search-quality`,
+`context-window-management`, `citation-verification`, `factual-correctness`, `research-depth-completeness`,
+`hallucination-prevention`, `tool-call-efficiency`, `content-safety-guardrails`. Skills add about
+110 to 590 tokens per call depending on the agent (planner largest, analysis about 270). `SKILLS=off` disables injection. The file is validated against
+the mapping when the graph is built, and a broken file never crashes an agent: the skill is skipped and the
+report's Run health says so.
+
+## Guardrails
+
+Every question is checked before the planner runs ([guardrails.py](src/deep_researcher/guardrails.py)):
+
+1. **Profanity** is rejected by a dependency-free bag-of-words word list
+   ([profanity.py](src/deep_researcher/profanity.py); no model call, whole-word matching, simple
+   obfuscations like `f*ck` normalised).
+2. **At most 2 subject categories** per question (`GUARDRAIL_MAX_CATEGORIES`, default 2).
+3. **Two categories must be related.** A question that bundles unrelated topics is rejected.
+
+Rules 2 and 3 use one cheap-model classification. Rejections show as `REJECTED (<rule>)` in the UI, an
+`error` event with `code: "guardrail"` on the API stream, and a one-line message on the CLI. If the
+classifier is unavailable the question is let through and the report's **Run health** says so.
+`GUARDRAILS=off` disables everything.
+
+## Run health
+
+When part of a run fails but the pipeline carries on (a rate-limited source, a validator / critic /
+insight / report model error, a missing key), the agent calls `health.degrade(...)` instead of only
+logging. The record is logged in one format (with the thread id), streamed as a `degraded` activity
+event, saved in the graph state (`degradations`) and summarised in the report's **Run health** section,
+in `report_json["degradations"]`, and as `stats.degradations` (also in the eval summary rows).
+Severity is `critical` (a stage's output is missing or unreviewed), `warn` (partial loss) or `info`.
+
+## Pruning old runs
+
+Every question leaves a thread of checkpoints in the checkpoint store (`.checkpoints.sqlite` or
+Postgres). Completed runs are only needed to re-open their state, so delete them after a few days:
+
+```bash
+uv run python -m deep_researcher.prune --days 4 --dry-run   # list what would go
+uv run python -m deep_researcher.prune --days 4             # delete completed runs older than 4 days
+```
+
+A run is "completed" when its latest checkpoint holds a report; runs awaiting plan approval or that
+failed are kept unless you pass `--include-unfinished`. Age comes from a `created_at` column that the app adds to the `checkpoints` table on startup (sqlite:
+nullable column + insert trigger; Postgres: `timestamptz DEFAULT now()`). Existing rows are dated at the
+first start after upgrading, or run `python scripts/add_checkpoint_created_at.py` (`--postgres` for
+`DATABASE_URL`) beforehand to date them from their checkpoint ids. The sqlite file is vacuumed afterwards. The Chroma evidence store is not touched. Daily cron:
+
+```cron
+15 3 * * * cd /path/to/multi-agent-deep-researcher && /path/to/uv run python -m deep_researcher.prune --days 4
+```
+
+For a hosted Postgres, run the same command from any scheduler with `CHECKPOINTER=postgres` and
+`DATABASE_URL` set (a GitHub Actions `schedule:` workflow works).
 
 ## Embeddings and the vector DB
 
@@ -344,8 +407,8 @@ uv run python -m deep_researcher.evals langsmith upload          # cases -> Lang
 uv run python -m deep_researcher.evals langsmith experiment      # aevaluate with the judges as evaluators
 ```
 
-Judges (all read the report only; the model-judged halves use the cheap `grader` role and fall back
-to deterministic checks when no key is set):
+Judges (all read the report only; the model-judged halves use the `grader` role, on its own judge tier,
+and fall back to deterministic checks when no key is set):
 
 | Judge | What it measures | How |
 |---|---|---|

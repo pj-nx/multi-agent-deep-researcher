@@ -40,6 +40,15 @@ def _default_model_names() -> str:
     return "; ".join(f"{m}: {', '.join(r)}" for m, r in by_model.items())
 
 
+def _env_int(name: str, default: int) -> int:
+    import os
+
+    try:
+        return max(1, int(os.getenv(name) or default))
+    except ValueError:
+        return default
+
+
 @dataclass
 class Deps:
     llm: Callable[[str], Any] = field(default=_default_llm)
@@ -50,7 +59,8 @@ class Deps:
     max_per_sub_question: int = 12
     tool_timeout_s: float = 45.0           # one slow/rate-limited API must not hold a branch hostage
     min_relevance: float = 0.2             # share of sub-question keywords a result must mention
-    llm_concurrency: int = 4               # parallel model calls inside validator / analysis
+    # parallel model calls inside validator / analysis (LLM_CONCURRENCY)
+    llm_concurrency: int = field(default_factory=lambda: _env_int("LLM_CONCURRENCY", 8))
     analysis_k: int = 12                   # chunks shown to the analysis model per sub-question
     analysis_chunk_chars: int = 1600
     max_gap_branches: int = 4              # follow-up sub-questions pursued per hop (after de-duplication)

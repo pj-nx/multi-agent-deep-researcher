@@ -16,6 +16,7 @@ from deep_researcher.schemas import (
     ReasoningStep,
     ReportOutput,
     ResearchPlan,
+    ScopeVerdict,
     SourceAssessment,
     SourceAssessments,
     SubQuestion,
@@ -55,6 +56,13 @@ class FakeLLM:
     def _answer(self, schema, msgs):
         prompt = msgs[-1].content
         self.prompts.append((schema.__name__, prompt))
+        if schema is ScopeVerdict:       # tests steer the guardrail with marker words in the question
+            cats = ["technology_ai"]
+            if "ZZTHREE" in prompt:
+                cats = ["technology_ai", "health_medicine", "economics_finance"]
+            elif "ZZUNRELATED" in prompt or "ZZRELATED" in prompt:
+                cats = ["technology_ai", "health_medicine"]
+            return ScopeVerdict(categories=cats, correlated="ZZUNRELATED" not in prompt, reason="fake verdict")
         if schema is ResearchPlan:
             return self.plan
         if schema is SourceAssessments:

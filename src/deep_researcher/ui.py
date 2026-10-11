@@ -17,6 +17,7 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any
 
+from deep_researcher.guardrails import GuardrailViolation
 from deep_researcher.pipeline_view import PipelineProgress
 from deep_researcher.reports import write_report
 from deep_researcher.schemas import ResearchPlan, SourceType
@@ -98,7 +99,9 @@ def format_event(event: str, data: dict[str, Any]) -> str:
             line += " - requesting: " + "; ".join(data["follow_up"])[:200]
         return line
     if event == "report":
-        return f"[{stamp}] report ready: {json.dumps(data.get('stats') or {}, default=str)}"
+        n = len(data.get("degradations") or [])
+        warn = f" - {n} run-health issue(s), see the report's Run health section" if n else ""
+        return f"[{stamp}] report ready: {json.dumps(data.get('stats') or {}, default=str)}{warn}"
     if event == "activity":
         return format_activity(data, stamp)
     if event == "error":
@@ -133,6 +136,11 @@ def format_activity(data: dict[str, Any], stamp: str) -> str:
     if kind == "tool_timeout":
         return (f"[{stamp}]     {sq}: {data.get('tool')} timed out after {data.get('elapsed_s')}s "
                 f"({data.get('results')} kept)")
+    if kind == "degraded":
+        times = f" x{data['count']}" if data.get("count", 1) > 1 else ""
+        sq = f"{data['sub_question_id']}: " if data.get("sub_question_id") else ""
+        return (f"[{stamp}]     DEGRADED ({data.get('severity')}) {sq}{data.get('component')} "
+                f"{data.get('error_kind')}{times}: {data.get('detail')}")
     if kind == "embed_start":
         return f"[{stamp}]     {sq}: embedding {data.get('sources')} sources ..."
     if kind == "embed_end":
@@ -167,6 +175,10 @@ async def plan_stream(question: str, max_hops: int, budget: int | None, *, graph
             if event == "plan" and data.get("status") == "awaiting_approval":
                 rows = plan_to_rows(data["plan"])
             yield "\n".join(lines), rows, thread_id, progress.render()
+    except GuardrailViolation as exc:
+        lines.append(f"[{time.strftime('%H:%M:%S')}] REJECTED ({exc.rule}): {exc}")
+        progress.update("error", {"message": str(exc)[:80]})
+        yield "\n".join(lines), rows, thread_id, progress.render()
     except Exception as exc:
         log.exception("plan stream failed")
         lines.append(f"[{time.strftime('%H:%M:%S')}] ERROR: {type(exc).__name__}: {str(exc)[:300]}")
@@ -275,7 +287,7 @@ async def test_openrouter() -> str:
     try:
         from langchain_core.messages import HumanMessage
 
-        model = llm.make_llm("grader", max_tokens=10)
+        model = llm.make_llm("validator", max_tokens=10)
         t = time.time()
         r = await model.ainvoke([HumanMessage("Reply with the single word: pong")])
         return f"OpenRouter OK: {model.model_name} answered {r.content!r} in {time.time() - t:.1f}s"
@@ -336,12 +348,13 @@ def _build_settings_tab(gr: Any) -> None:
 
     async def on_models():
         choices = await fetch_model_choices()
-        return [gr.update(choices=choices) for _ in range(3)] + [f"Loaded {len(choices)} models."]
+        return [gr.update(choices=choices) for _ in range(4)] + [f"Loaded {len(choices)} models."]
 
     save_btn.click(on_save, [inputs[k] for k in keys], [status, effective])
     test_btn.click(test_openrouter, None, status)
     models_btn.click(on_models, None, [inputs["OPENROUTER_MODEL_HEAVY"], inputs["OPENROUTER_MODEL_WORKER"],
-                                       inputs["OPENROUTER_MODEL_CHEAP"], status])
+                                       inputs["OPENROUTER_MODEL_CHEAP"], inputs["OPENROUTER_MODEL_JUDGE"],
+                                       status])
 
 
 # ----------------------------------------------------------------------------- Gradio app
