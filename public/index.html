@@ -4,138 +4,545 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Deep Researcher</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-  :root { --bg:#f7f7f8; --card:#fff; --ink:#1a1d23; --muted:#6b7280; --accent:#2f45c6; --rule:#e5e7eb; --bad:#b42318; }
-  @media (prefers-color-scheme: dark) { :root { --bg:#0f1218; --card:#171b23; --ink:#e7ebf2; --muted:#9aa3b5; --accent:#93a3ff; --rule:#2a3140; --bad:#ff7f70; } }
-  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.5 system-ui, sans-serif; }
-  main { max-width:860px; margin:0 auto; padding:32px 16px; }
-  h1 { font-size:1.6rem; margin:0 0 4px; } p.sub { color:var(--muted); margin:0 0 24px; }
-  form { display:flex; flex-wrap:wrap; gap:8px; }
-  input { flex:1; min-width:200px; padding:12px; border:1px solid var(--rule); border-radius:8px; background:var(--card); color:var(--ink); }
-  #token { flex:0 1 220px; display:none; }
-  button { padding:12px 18px; border:0; border-radius:8px; background:var(--accent); color:#fff; font-weight:600; cursor:pointer; }
-  button:disabled { opacity:.5; cursor:default; }
-  #log { margin-top:24px; background:var(--card); border:1px solid var(--rule); border-radius:8px; padding:16px; min-height:160px; font:13px/1.5 ui-monospace, monospace; white-space:pre-wrap; overflow-wrap:anywhere; }
-  .ev { color:var(--accent); } .err { color:var(--bad); }
+  /* Same palette as src/deep_researcher/theme.py: flat, Matrix green, dark by default. */
+  :root {
+    --bg:#FFFFFF; --surface:#FAFAFA; --panel:#FFFFFF; --ink:#0A0A0A; --ink-2:#3F3F46; --ink-3:#71717A;
+    --line:#E4E4E7; --line-2:#D4D4D8; --green:#00CC00; --green-hover:#88FF88; --green-soft:#E6FFE6;
+    --green-ink:#006600; --red:#DC2626; --red-soft:#FEE2E2; --btn-ink:#0A0A0A;
+    --box-active-bg:#0A0A0A; --box-active-ink:#FFFFFF; --box-active-note:#88FF88; --box-active-line:#0A0A0A;
+    --box-wait-line:#0A0A0A; --hop-bg:#E6FFE6; --hop-ink:#006600; --check:#00AA00;
+  }
+  .dark {
+    --bg:#0C0C0C; --surface:#080808; --panel:#000000; --ink:#DDFFDD; --ink-2:#BBFFBB; --ink-3:#88FF88;
+    --line:#003300; --line-2:#006600; --green:#00CC00; --green-hover:#88FF88; --green-soft:#003300;
+    --green-ink:#88FF88; --red:#B40000; --red-soft:#2A0000; --btn-ink:#0A0A0A;
+    --box-active-bg:#00CC00; --box-active-ink:#000000; --box-active-note:#003300; --box-active-line:#00CC00;
+    --box-wait-line:#88FF88; --hop-bg:#003300; --hop-ink:#88FF88; --check:#00AA00;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin:0; background:var(--bg); color:var(--ink); }
+  body { font: 15px/1.5 Inter, ui-sans-serif, system-ui, sans-serif; }
+  main { max-width:1180px; margin:0 auto; padding:18px 16px 48px; }
+  a { color:var(--green-ink); }
+
+  /* header */
+  #dr-header { display:flex; align-items:center; gap:12px; margin:6px 0 2px; }
+  #dr-header h1 { font-size:24px; font-weight:700; letter-spacing:-0.02em; margin:0; }
+  #dr-header h1::before { content:""; display:inline-block; width:12px; height:12px; border-radius:50%;
+                          background:var(--green); margin-right:10px; vertical-align:1px; }
+  #dr-theme-toggle { margin-left:auto; max-width:150px; padding:6px 14px; font-size:13px; }
+  #dr-sub { color:var(--ink-3); font-size:13.5px; margin:0 0 10px; }
+
+  /* pipeline boxes (pipeline_view.CSS) */
+  .dr-pipe { display:flex; flex-wrap:wrap; align-items:stretch; gap:8px; margin:2px 0 14px; font-size:12px; }
+  .dr-box { flex:1 1 120px; min-width:120px; border:1.5px solid var(--line-2); border-radius:10px; padding:8px 10px;
+            background:var(--surface); color:var(--ink); position:relative; transition:background .2s, border-color .2s; }
+  .dr-box .t { font-weight:600; font-size:13px; letter-spacing:-0.01em; }
+  .dr-box .n { color:var(--ink-3); margin-top:3px; min-height:15px; white-space:nowrap; overflow:hidden;
+               text-overflow:ellipsis; font-size:11.5px; }
+  .dr-box.done { border-color:var(--green); background:var(--green-soft); }
+  .dr-box.done .n { color:var(--green-ink); }
+  .dark .dr-box.done .n { color:#BBFFBB; }
+  .dr-box.done .t::before { content:"\2713  "; color:var(--check); }
+  .dr-box.active { border-color:var(--box-active-line); background:var(--box-active-bg); color:var(--box-active-ink);
+                   animation:dr-pulse 1.4s ease-in-out infinite; }
+  .dr-box.active .n { color:var(--box-active-note); }
+  .dr-box.active .t::before { content:"\25B6  "; color:var(--green); }
+  .dark .dr-box.active .t::before { color:#003300; }
+  .dr-box.waiting { border-color:var(--box-wait-line); border-style:dashed; }
+  .dr-box.waiting .t::before { content:"\23F8  "; color:var(--box-wait-line); }
+  .dr-box.error { border-color:var(--red); background:var(--red-soft); }
+  .dr-box.error .t::before { content:"\2716  "; color:var(--red); }
+  .dr-hop { position:absolute; top:6px; right:8px; font-size:10px; font-weight:600; color:var(--hop-ink);
+            background:var(--hop-bg); border-radius:999px; padding:1px 6px; }
+  @keyframes dr-pulse { 0%,100% { box-shadow:0 0 0 0 rgba(0,204,0,.6); } 50% { box-shadow:0 0 0 6px rgba(0,204,0,0); } }
+
+  /* tabs */
+  .tabs { display:flex; gap:4px; border-bottom:1px solid var(--line); margin:8px 0 14px; }
+  .tabs button { background:none; border:0; padding:10px 16px; font:inherit; font-weight:600; color:var(--ink-3);
+                 cursor:pointer; border-radius:0; }
+  .tabs button.selected { color:var(--ink); box-shadow:inset 0 -2px 0 var(--green); }
+  .tab-panel { display:none; } .tab-panel.selected { display:block; }
+
+  /* blocks and inputs */
+  .dr-step { font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-3);
+             margin:14px 0 6px; }
+  .row { display:flex; gap:12px; flex-wrap:wrap; }
+  .block { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px 14px; }
+  .block label, .field > label { display:block; font-size:13px; font-weight:600; color:var(--ink-2); margin-bottom:6px; }
+  .grow4 { flex:4 1 420px; } .grow1 { flex:1 1 240px; }
+  textarea, input[type=text], input[type=password], input[type=number] {
+    width:100%; font:inherit; padding:9px 11px; border:1px solid var(--line-2); border-radius:8px;
+    background:var(--bg); color:var(--ink); outline:none; }
+  textarea:focus, input:focus { border-color:var(--green); box-shadow:0 0 0 3px rgba(0,204,0,.3); }
+  textarea { resize:vertical; min-height:64px; }
+  input[type=range] { width:100%; accent-color:var(--green); }
+  .range-row { display:flex; align-items:center; gap:10px; font-size:13px; color:var(--ink-3); }
+  .range-row output { min-width:40px; padding:3px 8px; border:1px solid var(--line-2); border-radius:6px;
+                      color:var(--ink); text-align:center; }
+  .hint { color:var(--ink-3); font-size:12px; margin-top:4px; }
+
+  button.btn { font:inherit; font-weight:600; padding:11px 18px; border:1.5px solid var(--green); border-radius:8px;
+               background:var(--green); color:var(--btn-ink); cursor:pointer; }
+  button.btn:hover { background:var(--green-hover); border-color:var(--green-hover); }
+  button.btn:disabled { opacity:.45; cursor:default; }
+  .actions { display:flex; gap:12px; align-items:center; margin:12px 0; flex-wrap:wrap; }
+  .actions .btn.wide { flex:4 1 320px; }
+  #dr-busy { display:flex; align-items:center; gap:8px; min-height:44px; font-size:13px; color:var(--ink-3); flex:1 1 200px; }
+  #dr-busy.busy::before { content:""; width:10px; height:10px; border-radius:50%; background:var(--green);
+                          animation:dr-pulse 1.4s ease-in-out infinite; }
+
+  details.block { padding:0; }
+  details.block summary { cursor:pointer; padding:11px 14px; font-weight:600; font-size:14px; list-style:none;
+                          display:flex; align-items:center; }
+  details.block summary::after { content:"\25C0"; margin-left:auto; font-size:10px; color:var(--ink-3); }
+  details.block[open] summary::after { content:"\25BC"; }
+  #dr-activity { display:block; margin:0 14px 12px; height:260px; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere;
+                 font:12px/1.5 "JetBrains Mono", ui-monospace, monospace; color:var(--ink-2); background:var(--surface);
+                 border:1px solid var(--line-2); border-radius:8px; padding:10px; }
+
+  /* plan table */
+  .table-wrap { border:1px solid var(--line); border-radius:10px; overflow:auto; background:var(--panel); }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th { text-align:left; font:600 13px "JetBrains Mono", ui-monospace, monospace; padding:10px 12px;
+       border-bottom:1px solid var(--line); border-right:1px solid var(--line); color:var(--ink); background:var(--surface); }
+  td { padding:8px 12px; border-bottom:1px solid var(--line); border-right:1px solid var(--line); vertical-align:top; }
+  th:last-child, td:last-child { border-right:0; }
+  tbody tr:nth-child(odd) { background:var(--surface); }
+  td[contenteditable] { outline:none; min-width:60px; }
+  td[contenteditable]:focus { box-shadow:inset 0 0 0 2px var(--green); }
+  td.id { color:var(--ink-3); font-family:"JetBrains Mono", ui-monospace, monospace; }
+  #add-row { width:100%; border:1px dashed var(--line-2); border-top:0; background:none; color:var(--ink-3);
+             padding:6px; cursor:pointer; font:inherit; border-radius:0 0 10px 10px; }
+  #add-row:hover { color:var(--ink); border-color:var(--green); }
+
+  /* report */
+  #dr-report { border:1px solid var(--line); border-radius:10px; padding:18px 22px; background:var(--panel);
+               max-height:760px; overflow:auto; font-size:14.5px; }
+  #dr-report:empty::before { content:"The report appears here."; color:var(--ink-3); }
+  #dr-report h1 { font-size:22px; letter-spacing:-0.02em; margin-top:0; }
+  #dr-report h2 { font-size:16px; margin-top:22px; padding-bottom:4px; border-bottom:1px solid var(--line); }
+  #dr-report h3 { font-size:14px; }
+  #dr-report table { font-size:12.5px; margin:8px 0; }
+  #dr-report th, #dr-report td { border:1px solid var(--line); padding:5px 8px; }
+  #dr-report code { font-family:"JetBrains Mono", ui-monospace, monospace; font-size:12.5px; }
+  #dr-downloads { display:none; }
+  #dr-downloads.show { display:flex; }
+
+  /* settings */
+  .kv { display:grid; grid-template-columns:200px 1fr; gap:6px 14px; font-size:13px; }
+  .kv dt { color:var(--ink-3); } .kv dd { margin:0; white-space:pre-line; font-family:"JetBrains Mono", ui-monospace, monospace; font-size:12.5px; overflow-wrap:anywhere; }
+  .err { color:var(--red); }
 </style>
 </head>
 <body>
 <main>
-  <h1>Multi-Agent Deep Researcher</h1>
-  <p class="sub">Planner → parallel retrievers → critical analysis → insights → red-team → report. Streams agent events live.</p>
-  <form id="f">
-    <input id="q" placeholder="Ask a hard, multi-source question…" required minlength="5" maxlength="2000">
-    <input id="token" type="password" placeholder="API token" autocomplete="off">
-    <button id="go">Research</button>
-  </form>
-  <div id="log">Ready. Health: <span id="health">checking…</span></div>
-  <button id="pdf" type="button" style="display:none;margin-top:12px">Download report (.pdf)</button>
-</main>
-<script>
-  const log = document.getElementById('log');
-  const tokenInput = document.getElementById('token');
-  const pdfBtn = document.getElementById('pdf');
-  let lastReport = null;
+  <div id="dr-header">
+    <h1>Deep Researcher</h1>
+    <button id="dr-theme-toggle" class="btn" type="button">☀ Light mode</button>
+  </div>
+  <p id="dr-sub">Multi-agent research: plan, retrieve, validate, analyse, synthesise, critique, report. Every claim cites stored evidence.</p>
 
-  pdfBtn.addEventListener('click', async () => {
-    if (!lastReport) return;
-    pdfBtn.disabled = true;
-    try {
-      const res = await fetch('/api/report/pdf', {
-        method: 'POST', headers: { 'content-type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({ markdown: lastReport.markdown, title: lastReport.title })
-      });
-      if (!res.ok) { line('error', `PDF failed: ${res.status}`, 'err'); return; }
-      const blob = await res.blob();
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = `${(lastReport.title || 'research-report').slice(0, 60)}.pdf`;
-      a.click();
-      URL.revokeObjectURL(a.href);
-    } finally { pdfBtn.disabled = false; }
+  <div class="dr-pipe" id="pipeline"></div>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" class="selected" data-tab="research">Research</button>
+    <button role="tab" data-tab="settings">Settings</button>
+  </div>
+
+  <section class="tab-panel selected" id="tab-research">
+    <div class="dr-step">Step 1 · Ask</div>
+    <div class="row">
+      <div class="block grow4">
+        <label for="q">Research question</label>
+        <textarea id="q" rows="2" placeholder="Does the four-day work week raise productivity, and where do studies disagree?" maxlength="2000"></textarea>
+      </div>
+      <div class="block grow1">
+        <label for="hops">Max follow-up hops</label>
+        <div class="range-row"><span>0</span><input id="hops" type="range" min="0" max="3" step="1" value="1"><span>3</span><output id="hops-out">1</output></div>
+        <label for="budget" style="margin-top:12px">Budget (seconds, server-set)</label>
+        <input id="budget" type="number" value="0" disabled>
+        <div class="hint">Set by <code>RUN_BUDGET_SECONDS</code> on the server.</div>
+      </div>
+    </div>
+    <div class="actions">
+      <button id="plan-btn" class="btn wide" type="button">Plan the research</button>
+      <div id="dr-busy">Ready</div>
+    </div>
+    <details class="block">
+      <summary>Agent activity log</summary>
+      <div id="dr-activity"></div>
+    </details>
+
+    <div class="dr-step">Step 2 · Review the plan (edit cells; clear a question to drop it)</div>
+    <div class="table-wrap">
+      <table id="plan">
+        <thead><tr><th style="width:7%">ID</th><th style="width:43%">Question</th><th style="width:15%">Source types</th><th style="width:25%">Search queries</th><th style="width:10%">Depends on</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <button id="add-row" type="button">+</button>
+    </div>
+    <div class="actions">
+      <button id="run-btn" class="btn wide" type="button" disabled>Approve and run</button>
+    </div>
+
+    <div class="dr-step">Step 3 · Report</div>
+    <div id="dr-report"></div>
+    <div class="actions" id="dr-downloads">
+      <button id="dl-pdf" class="btn" type="button">Download PDF</button>
+      <button id="dl-md" class="btn" type="button">Download Markdown</button>
+      <button id="dl-json" class="btn" type="button">Download JSON</button>
+    </div>
+  </section>
+
+  <section class="tab-panel" id="tab-settings">
+    <div class="dr-step">API access</div>
+    <div class="block">
+      <label for="token">API token</label>
+      <input id="token" type="password" placeholder="Bearer token (only needed when the server requires one)" autocomplete="off">
+      <div class="hint" id="auth-hint">Kept in this browser tab only (sessionStorage).</div>
+    </div>
+    <div class="dr-step">Effective server configuration</div>
+    <div class="block"><dl class="kv" id="config"><dt>status</dt><dd id="health">checking…</dd></dl></div>
+    <p class="hint">Keys, models and limits are set through environment variables on the server (see the README); the
+      local Gradio app edits them in place.</p>
+  </section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/marked@15/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const SOURCE_TYPES = ['papers', 'news', 'web', 'reports', 'api', 'wikipedia'];
+  const STAGES = [['plan', 'Planner'], ['retrieve', 'Retrievers'], ['validate', 'Validator'], ['analyze', 'Analysis'],
+                  ['insight', 'Insights'], ['critic', 'Critic'], ['report', 'Report']];
+  const ORDER = STAGES.map(([k]) => k);
+  const ROLE_STAGE = { planner: 'plan', validator: 'validate', analysis: 'analyze', insight: 'insight', critic: 'critic', report: 'report' };
+
+  // ---------------------------------------------------------------- theme (same localStorage key as the Gradio app)
+  const toggle = $('dr-theme-toggle');
+  function applyTheme(dark) {
+    document.documentElement.classList.toggle('dark', dark);
+    toggle.textContent = dark ? '☀ Light mode' : '☾ Dark mode';
+  }
+  let pref = null;
+  try { pref = localStorage.getItem('dr-theme'); } catch (_) {}
+  applyTheme(pref !== 'light');
+  toggle.addEventListener('click', () => {
+    const dark = !document.documentElement.classList.contains('dark');
+    applyTheme(dark);
+    try { localStorage.setItem('dr-theme', dark ? 'dark' : 'light'); } catch (_) {}
   });
 
-  // Render untrusted text (user input, retrieved snippets) as text nodes only — never innerHTML.
-  function line(ev, text, cls) {
-    const el = document.createElement('div');
-    const tag = document.createElement('span');
-    tag.className = cls || 'ev';
-    tag.textContent = `[${ev}] `;
-    el.appendChild(tag);
-    el.appendChild(document.createTextNode(text));
-    log.appendChild(el);
+  // ---------------------------------------------------------------- tabs
+  for (const b of document.querySelectorAll('.tabs button')) {
+    b.addEventListener('click', () => {
+      document.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('selected', x === b));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('selected', p.id === 'tab-' + b.dataset.tab));
+    });
   }
 
-  // Parse one SSE message block per the spec: join every `data:` line with "\n".
+  // ---------------------------------------------------------------- pipeline boxes (port of pipeline_view.PipelineProgress)
+  const pipe = { stages: {}, expected: 0, doneInHop: 0, hop: 0 };
+  function resetPipeline() {
+    for (const [k, label] of STAGES) pipe.stages[k] = { key: k, label, status: 'pending', note: '', hop: null };
+    pipe.expected = 0; pipe.doneInHop = 0; pipe.hop = 0;
+    renderPipeline();
+  }
+  function set(key, status, note, hop) {
+    const st = pipe.stages[key];
+    if (status != null) st.status = status;
+    if (note != null) st.note = note;
+    if (hop !== undefined) st.hop = hop;
+  }
+  function activate(key, note) {
+    for (const k of ORDER.slice(0, ORDER.indexOf(key))) {
+      if (pipe.stages[k].status === 'active' || pipe.stages[k].status === 'waiting') pipe.stages[k].status = 'done';
+    }
+    set(key, 'active', note);
+  }
+  function pipelineEvent(event, data) {
+    if (event === 'activity') { pipelineActivity(data); renderPipeline(); return; }
+    if (event === 'started') activate('plan', 'starting...');
+    else if (event === 'plan') {
+      if (data.status === 'awaiting_approval') {
+        const n = ((data.plan || {}).sub_questions || []).length;
+        pipe.expected = n; set('plan', 'done', `${n} sub-questions`); set('retrieve', 'waiting', 'awaiting approval');
+      } else set('plan', 'done', (data.notes || []).join('; ').slice(0, 40) || 'planned');
+    } else if (event === 'approve') { pipe.doneInHop = 0; activate('retrieve', `0/${pipe.expected} sub-questions`); }
+    else if (event === 'retrieve') {
+      pipe.doneInHop += 1;
+      const hop = Number(data.hop || 0);
+      let note = `${pipe.doneInHop}/${pipe.expected || '?'} sub-questions`;
+      if (data.skipped) note = `${pipe.doneInHop}/${pipe.expected || '?'} (skipped: budget)`;
+      activate('retrieve', note); set('retrieve', null, null, hop || null);
+    } else if (event === 'validate') {
+      set('retrieve', 'done'); set('validate', 'done', `kept ${data.kept || 0}/${data.assessed || 0}`); activate('analyze', 'analysing...');
+    } else if (event === 'analyze') {
+      let note = `${data.claims || 0} claims, ${data.contradictions || 0} contradictions`;
+      if (data.gaps && data.gaps.length) note += `, ${data.gaps.length} gaps`;
+      set('analyze', 'done', note);
+    } else if (event === 'route_gaps') {
+      if (data.next === 'retrieve') {
+        pipe.hop = Number(data.hop || pipe.hop + 1); pipe.expected = (data.new_sub_questions || []).length; pipe.doneInHop = 0;
+        for (const k of ['retrieve', 'validate', 'analyze']) set(k, 'pending', null, pipe.hop);
+        activate('retrieve', `hop ${pipe.hop}: 0/${pipe.expected}`);
+      } else if (data.next === 'report') activate('report', 'writing...');
+      else activate('insight', 'generating...');
+    } else if (event === 'insight') { set('insight', 'done', `${(data.insights || []).length} insights`); activate('critic', 'reviewing...'); }
+    else if (event === 'critic') {
+      const verdict = data.verdict || '?';
+      set('critic', 'done', `round ${data.round}: ${verdict}`);
+      if (verdict === 'revise') { set('insight', 'pending'); activate('insight', 'revising...'); set('critic', 'pending', `round ${data.round}: revise`); }
+      else if (verdict === 'need_more_evidence') set('critic', 'done', `round ${data.round}: more evidence`);
+      else activate('report', 'writing...');
+    } else if (event === 'report') {
+      const s = data.stats || {};
+      set('report', 'done', `${s.kept ?? '?'} sources, ${s.claims ?? '?'} claims`);
+      for (const k of ORDER) if (['active', 'waiting'].includes(pipe.stages[k].status)) pipe.stages[k].status = 'done';
+    } else if (event === 'error') {
+      for (const k of ORDER) if (pipe.stages[k].status === 'active') { set(k, 'error', String(data.message || 'failed').slice(0, 60)); break; }
+    }
+    renderPipeline();
+  }
+  function pipelineActivity(d) {
+    const stage = ROLE_STAGE[String(d.role)];
+    if (d.kind === 'llm_start' && stage) {
+      const model = String(d.model || 'model').split('/').pop();
+      activate(stage, d.label && stage === 'analyze' ? `${d.label}: ${model}` : `calling ${model}`);
+    } else if (d.kind === 'llm_end' && stage) {
+      const note = `${d.elapsed_s}s` + (d.tokens ? `, ${(d.tokens / 1000).toFixed(1)}k tok` : '');
+      if (pipe.stages[stage].status === 'active') set(stage, null, note);
+    } else if (d.kind === 'llm_error' && stage) set(stage, 'error', String(d.error || 'failed').slice(0, 60));
+    else if (['tool_start', 'tool_end', 'tool_timeout'].includes(d.kind)) {
+      if (pipe.stages.retrieve.status === 'active') {
+        const verb = { tool_start: 'searching', tool_end: 'got', tool_timeout: 'timeout' }[d.kind];
+        set('retrieve', null, `${d.sub_question_id}: ${verb} ${d.tool}${d.kind === 'tool_end' ? ' ' + d.results : ''}`);
+      }
+    } else if (d.kind === 'embed_start' && pipe.stages.retrieve.status === 'active') set('retrieve', null, `${d.sub_question_id}: embedding ${d.sources}`);
+  }
+  function renderPipeline() {
+    const root = $('pipeline'); root.textContent = '';
+    for (const st of Object.values(pipe.stages)) {
+      const box = document.createElement('div'); box.className = `dr-box ${st.status}`;
+      if (st.hop) { const h = document.createElement('span'); h.className = 'dr-hop'; h.textContent = `hop ${st.hop}`; box.appendChild(h); }
+      const t = document.createElement('div'); t.className = 't'; t.textContent = st.label;
+      const n = document.createElement('div'); n.className = 'n'; n.textContent = st.note; n.title = st.note;
+      box.append(t, n); root.appendChild(box);
+    }
+  }
+
+  // ---------------------------------------------------------------- activity log (port of ui.format_event / format_activity)
+  const activity = $('dr-activity');
+  const stamp = () => new Date().toTimeString().slice(0, 8);
+  const tok = (n) => (typeof n === 'number' && n ? `, ${(n / 1000).toFixed(1)}k tokens` : '');
+  function formatActivity(d, s) {
+    const who = d.label ? `${d.role}[${d.label}]` : String(d.role);
+    switch (d.kind) {
+      case 'llm_start': return `[${s}]     ${who}: calling ${d.model} ...`;
+      case 'llm_end': return `[${s}]     ${who}: done in ${d.elapsed_s}s${tok(d.tokens)}`;
+      case 'llm_error': return `[${s}]     ${who}: FAILED after ${d.elapsed_s}s (${d.error})`;
+      case 'tool_start': return `[${s}]     ${d.sub_question_id}: searching ${d.tool} (${d.queries} queries) ...`;
+      case 'tool_end': return `[${s}]     ${d.sub_question_id}: ${d.tool} returned ${d.results} in ${d.elapsed_s}s`;
+      case 'tool_timeout': return `[${s}]     ${d.sub_question_id}: ${d.tool} timed out after ${d.elapsed_s}s (${d.results} kept)`;
+      case 'embed_start': return `[${s}]     ${d.sub_question_id}: embedding ${d.sources} sources ...`;
+      case 'embed_end': return `[${s}]     ${d.sub_question_id}: stored ${d.chunks ?? ''} chunks in ${d.elapsed_s}s`;
+      default: return `[${s}]     ${d.kind}: ${JSON.stringify(d).slice(0, 160)}`;
+    }
+  }
+  function formatEvent(event, d) {
+    const s = stamp();
+    switch (event) {
+      case 'plan':
+        if (d.status === 'awaiting_approval') return `[${s}] plan ready: ${((d.plan || {}).sub_questions || []).length} sub-questions - review, edit and approve below`;
+        return `[${s}] planner: ${(d.notes || []).join('; ')}`;
+      case 'retrieve': {
+        if (d.skipped) return `[${s}] retrieve ${d.sub_question_id}: skipped (${d.skipped})`;
+        const tools = Object.entries(d.tools || {}).map(([k, v]) => `${k} ${v}`).join(', ') || 'no tools';
+        return `[${s}] retrieve ${d.sub_question_id} (hop ${d.hop || 0}): ${d.sources || 0} sources, ${d.chunks_stored || 0} chunks [${tools}] in ${d.elapsed_s ?? '?'}s`;
+      }
+      case 'validate': return `[${s}] validator: kept ${d.kept || 0} of ${d.assessed || 0} sources`;
+      case 'analyze': return `[${s}] analysis: ${d.claims || 0} claims, ${d.contradictions || 0} contradictions, ${(d.gaps || []).length} gaps across ${(d.sub_questions || []).length} sub-questions`;
+      case 'route_gaps':
+        if (d.next === 'retrieve') return `[${s}] hop ${d.hop}: pursuing ${(d.new_sub_questions || []).join(', ')}`;
+        return `[${s}] gap router: ${(d.notes || []).join('; ')}`;
+      case 'insight': return [`[${s}] insights: ${(d.insights || []).length}`, ...(d.insights || []).map(h => `    - ${String(h).slice(0, 140)}`)].join('\n');
+      case 'critic': {
+        let line = `[${s}] critic round ${d.round}: ${d.verdict} (${(d.issues || []).length} issues)`;
+        if (d.follow_up && d.follow_up.length) line += ' - requesting: ' + d.follow_up.join('; ').slice(0, 200);
+        return line;
+      }
+      case 'report': return `[${s}] report ready: ${JSON.stringify(d.stats || {})}`;
+      case 'activity': return formatActivity(d, s);
+      case 'error': return `[${s}] ERROR: ${d.message}`;
+      case 'started': case 'done': case 'approve': return `[${s}] ${event}` + (d.elapsed_s ? ` (${d.elapsed_s}s)` : '');
+      default: { const { notes, ...rest } = d; return `[${s}] ${event}: ${JSON.stringify(rest).slice(0, 200)}`; }
+    }
+  }
+  function logLine(text, isError) {
+    const el = document.createElement('div'); el.textContent = text; if (isError) el.className = 'err';
+    activity.appendChild(el); activity.scrollTop = activity.scrollHeight;
+  }
+
+  // ---------------------------------------------------------------- plan table (port of plan_to_rows / rows_to_plan)
+  const tbody = document.querySelector('#plan tbody');
+  function addRow(cells) {
+    const tr = document.createElement('tr');
+    cells.forEach((v, i) => {
+      const td = document.createElement('td'); td.textContent = v;
+      if (i === 0) td.className = 'id'; else td.contentEditable = 'true';
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  }
+  function planToRows(plan) {
+    tbody.textContent = '';
+    for (const sq of plan.sub_questions || []) {
+      addRow([sq.id, sq.question, (sq.source_types || []).join(', '), (sq.search_queries || []).join(' | '), (sq.depends_on || []).join(', ')]);
+    }
+  }
+  const split = (v, sep) => String(v || '').split(sep).map(x => x.trim()).filter(Boolean);
+  function rowsToPlan(question) {
+    const subs = [];
+    for (const tr of tbody.querySelectorAll('tr')) {
+      const c = [...tr.children].map(td => td.textContent);
+      const q = (c[1] || '').trim();
+      if (!q) continue;
+      const types = split(c[2], ',').filter(t => SOURCE_TYPES.includes(t));
+      subs.push({ id: `sq${subs.length + 1}`, question: q, source_types: types.length ? types : ['web'],
+                  search_queries: split(c[3], '|').slice(0, 5), depends_on: split(c[4], ',') });
+    }
+    const valid = new Set(subs.map(s => s.id));
+    for (const s of subs) s.depends_on = s.depends_on.filter(d => valid.has(d) && d !== s.id);
+    return { question, sub_questions: subs };
+  }
+  $('add-row').addEventListener('click', () => addRow([`sq${tbody.children.length + 1}`, '', 'web', '', '']));
+
+  // ---------------------------------------------------------------- API plumbing
+  const tokenInput = $('token');
+  try { tokenInput.value = sessionStorage.getItem('dr_token') || ''; } catch (_) {}
+  tokenInput.addEventListener('change', () => { try { sessionStorage.setItem('dr_token', tokenInput.value.trim()); } catch (_) {} });
+  const authHeaders = () => { const t = tokenInput.value.trim(); return t ? { authorization: `Bearer ${t}` } : {}; };
+
   function parseBlock(block) {
-    let event = 'message';
-    const data = [];
+    let event = 'message'; const data = [];
     for (const raw of block.split('\n')) {
       if (raw.startsWith('event:')) event = raw.slice(6).trim();
       else if (raw.startsWith('data:')) data.push(raw.slice(5).replace(/^ /, ''));
     }
-    return { event, data: data.join('\n') };
+    let parsed = {};
+    try { parsed = data.length ? JSON.parse(data.join('\n')) : {}; } catch (_) { parsed = { raw: data.join('\n') }; }
+    return { event, data: parsed };
   }
 
-  function authHeaders() {
-    const t = tokenInput.value.trim();
-    return t ? { authorization: `Bearer ${t}` } : {};
-  }
-
-  try { tokenInput.value = sessionStorage.getItem('dr_token') || ''; } catch (_) {}
-
-  fetch('/api/health').then(r => r.json()).then(h => {
-    document.getElementById('health').textContent =
-      `ok · graph_wired=${h.graph_wired} · max_hops=${h.max_hops} · auth=${h.auth_required ? 'required' : 'off'}`;
-    if (h.auth_required) tokenInput.style.display = 'block';
-  }).catch(() => { document.getElementById('health').textContent = 'unreachable'; });
-
-  document.getElementById('f').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const btn = document.getElementById('go');
-    btn.disabled = true;
-    log.textContent = '';
-    try { sessionStorage.setItem('dr_token', tokenInput.value.trim()); } catch (_) {}
-    try {
-      const res = await fetch('/api/research', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({ question: document.getElementById('q').value })
-      });
-      if (!res.ok) {
-        let detail = `${res.status} ${res.statusText}`;
-        try { detail += ` — ${(await res.json()).detail ?? ''}`; } catch (_) {}
-        line('error', detail, 'err');
-        return;
-      }
-      const reader = res.body.getReader();
-      const dec = new TextDecoder();
-      let buf = '';
-      for (;;) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        // Normalise CRLF (some proxies rewrite line endings) before looking for block boundaries.
-        buf = (buf + dec.decode(value, { stream: true })).replace(/\r\n/g, '\n');
-        let i;
-        while ((i = buf.indexOf('\n\n')) >= 0) {
-          const { event, data } = parseBlock(buf.slice(0, i));
-          buf = buf.slice(i + 2);
-          if (event === 'report') {
-            try {
-              const parsed = JSON.parse(data);
-              if (parsed.report) { lastReport = { markdown: parsed.report, title: parsed.report_json?.title }; pdfBtn.style.display = 'inline-block'; }
-            } catch (_) {}
-          }
-          line(event, data, event === 'error' ? 'err' : 'ev');
-        }
-      }
-      if (buf.trim()) { const { event, data } = parseBlock(buf); line(event, data); }
-    } catch (err) {
-      line('error', err && err.message ? err.message : String(err), 'err');
-    } finally {
-      btn.disabled = false;
+  async function* sse(url, body) {
+    const res = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', ...authHeaders() }, body: JSON.stringify(body) });
+    if (!res.ok) {
+      let detail = `${res.status} ${res.statusText}`;
+      try { detail += ` - ${(await res.json()).detail ?? ''}`; } catch (_) {}
+      throw new Error(detail);
     }
+    const reader = res.body.getReader(); const dec = new TextDecoder(); let buf = '';
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf = (buf + dec.decode(value, { stream: true })).replace(/\r\n/g, '\n');
+      let i;
+      while ((i = buf.indexOf('\n\n')) >= 0) { yield parseBlock(buf.slice(0, i)); buf = buf.slice(i + 2); }
+    }
+    if (buf.trim()) yield parseBlock(buf);
+  }
+
+  // ---------------------------------------------------------------- health / settings
+  const kv = $('config');
+  function row(k, v) { const dt = document.createElement('dt'); dt.textContent = k; const dd = document.createElement('dd'); dd.textContent = v; kv.append(dt, dd); }
+  fetch('/api/health').then(r => r.json()).then(h => {
+    kv.textContent = '';
+    row('status', `${h.status} · graph ${h.graph_wired ? 'wired' : 'not wired'} · auth ${h.auth_required ? 'required' : 'off'}`);
+    row('max hops / budget', `${h.max_hops} / ${h.run_budget_seconds || 'none'} s`);
+    $('hops').value = Math.min(3, h.max_hops ?? 1); $('hops-out').value = $('hops').value;
+    $('budget').value = h.run_budget_seconds || 0;
+    const models = h.llm && h.llm.models ? h.llm.models : (h.llm || {});
+    row('models', typeof models === 'object' ? Object.entries(models).map(([k, v]) => `${k}: ${v}`).join('\n') : String(models));
+    row('embeddings', h.embeddings ? (h.embeddings.embedding_id || h.embeddings.error || 'n/a') : 'n/a');
+    row('vector db', h.vector_db ? `${h.vector_db.mode || ''} ${h.vector_db.collection || ''}`.trim() : 'n/a');
+    row('checkpointer', h.checkpointer ? h.checkpointer.kind : 'n/a');
+    row('sources', h.sources ? Object.entries(h.sources).map(([k, v]) => `${k}: ${(v.active || []).join('/') || 'off'}`).join('\n') : 'n/a');
+    row('languages', h.languages ? JSON.stringify(h.languages.allowed || h.languages) : 'n/a');
+    row('tracing', h.tracing && h.tracing.enabled ? `on (${h.tracing.project})` : 'off');
+    if (h.auth_required) {
+      $('auth-hint').textContent = 'This server requires a token: paste it here before planning. Kept in this browser tab only.';
+      if (!tokenInput.value) document.querySelector('[data-tab="settings"]').click();
+    }
+  }).catch(() => { $('health').textContent = 'unreachable'; });
+  $('hops').addEventListener('input', () => { $('hops-out').value = $('hops').value; });
+
+  // ---------------------------------------------------------------- run control
+  const planBtn = $('plan-btn'), runBtn = $('run-btn'), busy = $('dr-busy'), report = $('dr-report');
+  let threadId = null, question = '', lastReport = null;
+  function setBusy(text) { busy.textContent = text; busy.classList.toggle('busy', text !== 'Ready'); planBtn.disabled = text !== 'Ready'; runBtn.disabled = text !== 'Ready' || !threadId; }
+
+  planBtn.addEventListener('click', async () => {
+    question = $('q').value.trim();
+    if (question.length < 5) { busy.textContent = 'Enter a question first.'; return; }
+    threadId = null; lastReport = null; report.textContent = ''; $('dr-downloads').classList.remove('show');
+    tbody.textContent = ''; activity.textContent = ''; resetPipeline();
+    setBusy('Planning...');
+    try {
+      for await (const { event, data } of sse('/api/research', { question, max_hops: Number($('hops').value) })) {
+        if (event === 'started') threadId = data.thread_id;
+        pipelineEvent(event, data); logLine(formatEvent(event, data), event === 'error');
+        if (event === 'plan' && data.status === 'awaiting_approval') { planToRows(data.plan || { sub_questions: [] }); setBusy('Review the plan below, then approve.'); }
+        if (event === 'error') threadId = null;
+      }
+    } catch (err) { logLine(`[${stamp()}] ERROR: ${err.message || err}`, true); pipelineEvent('error', { message: err.message }); }
+    finally { setBusy('Ready'); if (threadId) busy.textContent = 'Plan ready - edit the table and approve.'; }
   });
+
+  runBtn.addEventListener('click', async () => {
+    if (!threadId) return;
+    const plan = rowsToPlan(question);
+    if (!plan.sub_questions.length) { busy.textContent = 'The plan needs at least one sub-question.'; return; }
+    setBusy('Researching...');
+    pipe.expected = plan.sub_questions.length;            // the approved (possibly edited) plan
+    set('plan', 'done', `${pipe.expected} sub-questions`); renderPipeline();
+    try {
+      for await (const { event, data } of sse(`/api/research/${threadId}/resume`, { plan })) {
+        if (event !== 'started') pipelineEvent(event, data);   // the plan box already shows the plan
+        logLine(formatEvent(event, data), event === 'error');
+        if (event === 'report' && data.report) {
+          lastReport = { markdown: data.report, json: data.report_json, title: (data.report_json || {}).title };
+          report.innerHTML = DOMPurify.sanitize(marked.parse(data.report));
+          $('dr-downloads').classList.add('show');
+        }
+        if (event === 'done') threadId = null;
+      }
+    } catch (err) { logLine(`[${stamp()}] ERROR: ${err.message || err}`, true); pipelineEvent('error', { message: err.message }); }
+    finally { setBusy('Ready'); if (lastReport) busy.textContent = 'Report ready.'; }
+  });
+
+  // ---------------------------------------------------------------- downloads
+  const slug = () => String((lastReport && lastReport.title) || 'research-report').slice(0, 60).replace(/[^\w.-]+/g, '-');
+  function download(blob, name) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); URL.revokeObjectURL(a.href); }
+  $('dl-md').addEventListener('click', () => lastReport && download(new Blob([lastReport.markdown], { type: 'text/markdown' }), `${slug()}.md`));
+  $('dl-json').addEventListener('click', () => lastReport && download(new Blob([JSON.stringify(lastReport.json, null, 2)], { type: 'application/json' }), `${slug()}.json`));
+  $('dl-pdf').addEventListener('click', async () => {
+    if (!lastReport) return;
+    const b = $('dl-pdf'); b.disabled = true;
+    try {
+      const res = await fetch('/api/report/pdf', { method: 'POST', headers: { 'content-type': 'application/json', ...authHeaders() },
+                                                   body: JSON.stringify({ markdown: lastReport.markdown, title: lastReport.title }) });
+      if (!res.ok) { logLine(`[${stamp()}] ERROR: PDF failed (${res.status})`, true); return; }
+      download(await res.blob(), `${slug()}.pdf`);
+    } finally { b.disabled = false; }
+  });
+
+  resetPipeline();
+})();
 </script>
 </body>
 </html>

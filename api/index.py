@@ -39,8 +39,14 @@ from typing import Any
 # Vercel installs requirements.txt but not the local package; make `src/` importable.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
+# Local runs (uvicorn, the container) read the git-ignored .env; hosted runs get real env vars and
+# have no file, so this is a no-op there. Existing variables are never overridden.
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")
+
 from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import Response, StreamingResponse
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 from starlette.concurrency import iterate_in_threadpool
 from starlette.types import Receive, Scope, Send
@@ -248,6 +254,16 @@ def _graph_available() -> bool:
         log.exception("deep_researcher.graph failed to import")
         return False
     return True
+
+
+@app.get("/", include_in_schema=False)
+async def index() -> FileResponse:
+    """The hosted UI. Vercel serves ``public/`` statically before reaching the function; this route
+    makes the same page available under uvicorn / the container."""
+    page = Path(__file__).resolve().parents[1] / "public" / "index.html"
+    if not page.exists():
+        raise HTTPException(status_code=404, detail="public/index.html not found")
+    return FileResponse(page, media_type="text/html")
 
 
 @app.get("/api/health")
