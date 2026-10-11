@@ -92,8 +92,11 @@ def doc_id_for(set_id: str, filename: str, data: bytes) -> str:
 
 
 def document_url(set_id: str, doc_id: str, page_start: int | None = None) -> str:
+    """``upload://<set>/<doc>/p<page>``: the page is a path segment, not a fragment, because the retriever
+    de-duplicates sources by normalised URL (fragments dropped) and every section must stay a distinct
+    piece of evidence with its own id."""
     base = f"{UPLOAD_SCHEME}{set_id}/{doc_id}"
-    return f"{base}#p{page_start}" if page_start else base
+    return f"{base}/p{page_start}" if page_start else base
 
 
 def is_upload_url(url: str) -> bool:
@@ -104,10 +107,12 @@ def parse_upload_url(url: str) -> tuple[str, str, int | None] | None:
     """``(set_id, doc_id, page)`` for an ``upload://`` URL, else None."""
     if not is_upload_url(url):
         return None
-    rest = url[len(UPLOAD_SCHEME) :]
-    path, _, frag = rest.partition("#")
-    set_id, _, doc_id = path.partition("/")
-    page = int(frag[1:]) if frag.startswith("p") and frag[1:].isdigit() else None
+    parts = url[len(UPLOAD_SCHEME) :].split("#", 1)[0].split("/")
+    set_id = parts[0] if parts else ""
+    doc_id = parts[1] if len(parts) > 1 else ""
+    page = None
+    if len(parts) > 2 and parts[2].startswith("p") and parts[2][1:].isdigit():
+        page = int(parts[2][1:])
     return set_id, doc_id, page
 
 

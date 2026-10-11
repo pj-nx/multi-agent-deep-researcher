@@ -103,7 +103,11 @@ def test_sections_are_page_aligned_and_split_oversized_pages():
 
 def test_urls_and_display():
     url = D.document_url("set1", "doc1", 12)
-    assert url == "upload://set1/doc1#p12" and D.parse_upload_url(url) == ("set1", "doc1", 12)
+    assert url == "upload://set1/doc1/p12" and D.parse_upload_url(url) == ("set1", "doc1", 12)
+    assert D.parse_upload_url("upload://set1/doc1") == ("set1", "doc1", None)
+    from deep_researcher.agents.retriever import evidence_id, normalise_url
+    assert normalise_url(url) != normalise_url(D.document_url("set1", "doc1", 13))   # sections stay distinct
+    assert evidence_id(url) != evidence_id(D.document_url("set1", "doc1", 13))
     assert D.parse_upload_url("https://x") is None
     assert D.display_source("report.pdf p.12-13", url) == "Uploaded: report.pdf, p. 12-13"
     assert D.display_source("t", "https://x") == "https://x"
@@ -146,7 +150,7 @@ async def test_documents_tool_returns_search_results(store):
     tool = DocumentsTool(set_id, store=store)
     results = await tool.search("four-day week productivity", limit=3)
     assert results and results[0].source_type == "documents" and results[0].title == "study.pdf p.1"
-    assert results[0].url == f"upload://{set_id}/{results[0].extra['doc_id']}#p1"
+    assert results[0].url == f"upload://{set_id}/{results[0].extra['doc_id']}/p1"
     assert await DocumentsTool("missing", store=store).search("x") == []
 
 
@@ -167,6 +171,7 @@ async def test_bound_deps_feed_documents_through_retrieval_and_validation(store,
                                "hop": 0, "deadline": 0}, deps)
     ev = out["evidence"]
     assert ev and all(e["source_type"] == "documents" and e["url"].startswith("upload://") for e in ev)
+    assert len(ev) == 2 and len({e["id"] for e in ev}) == 2      # both pages survive de-duplication
     assert out["retrieval_log"][0]["tools"] == {"documents": len(ev)}
     assert set(out["assessments"]) == {e["id"] for e in ev}                        # graded in the branch
 
