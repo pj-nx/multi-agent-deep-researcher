@@ -53,6 +53,7 @@ from starlette.types import Receive, Scope, Send
 
 from deep_researcher import embeddings, llm, tracing
 from deep_researcher.reports import markdown_to_pdf
+from deep_researcher.run_settings import RunSettings, effective_budget, make_deps
 from deep_researcher.schemas import ResearchPlan
 from deep_researcher.store import chunking, store_info
 from deep_researcher.tools import language as tool_language
@@ -99,10 +100,12 @@ API_TAGS = ["api", "vercel" if os.getenv("VERCEL") else "local"]
 class ResearchRequest(BaseModel):
     question: str = Field(min_length=5, max_length=2000)
     max_hops: int | None = Field(default=None, ge=0, le=5)
+    settings: RunSettings | None = Field(default=None, description="per-run models / effort / budget")
 
 
 class ResumeRequest(BaseModel):
     plan: ResearchPlan
+    settings: RunSettings | None = Field(default=None, description="send the same settings as the plan call")
 
 
 class PdfRequest(BaseModel):
@@ -275,6 +278,8 @@ async def health() -> dict:
         "run_budget_seconds": RUN_BUDGET_SECONDS,
         "auth_required": API_AUTH_TOKEN is not None,
         "rate_limit_per_minute": RATE_LIMIT_PER_MINUTE,
+        "run_settings": {"overridable": ["models", "reasoning_effort", "fallback_models", "budget_seconds"],
+                         "budget_cap_seconds": RUN_BUDGET_SECONDS or None, "max_hops_limit": 5},
         "tracing": tracing.info(),
         "llm": llm.info(),
         "embeddings": embeddings.info(),
@@ -350,21 +355,49 @@ async def research(req: ResearchRequest) -> StreamingResponse:
     slot = run_slots.acquire()
     thread_id = str(uuid.uuid4())
     max_hops = req.max_hops if req.max_hops is not None else MAX_HOPS
+    budget = effective_budget(req.settings, RUN_BUDGET_SECONDS)
 
-    def events():
+    async def events():
         if not _graph_available():
-            return _stub_events(req.question, thread_id)
-        from deep_researcher.graph import stream_until_interrupt  # type: ignore[import-not-found]
+            async for ev in _stub_events(req.question, thread_id):
+                yield ev
+            return
+        from deep_researcher.graph import graph_for, stream_until_interrupt  # type: ignore[import-not-found]
 
-        return stream_until_interrupt(
-            question=req.question, thread_id=thread_id, max_hops=max_hops,
-            budget_seconds=RUN_BUDGET_SECONDS,
-            config=tracing.run_config(thread_id, req.question, tags=["plan"]),
-        )
+        deps = make_deps(req.settings)
+        graph = await graph_for(deps) if deps else None      # None = the shared graph
+        if req.settings and not req.settings.is_empty():
+            yield "settings", req.settings.summary()
+        async for ev in stream_until_interrupt(
+            question=req.question, thread_id=thread_id, max_hops=max_hops, budget_seconds=budget,
+            config=tracing.run_config(thread_id, req.question, tags=["plan"]), graph=graph,
+        ):
+            yield ev
 
-    inputs = {"question": req.question, "max_hops": max_hops, "echo": {"question": req.question}}
+    echo = {"question": req.question, "max_hops": max_hops, "budget_seconds": budget}
+    inputs = {"question": req.question, "max_hops": max_hops, "echo": echo}
     return SlotStreamingResponse(_run_stream("api.research", thread_id, inputs, "plan", slot, events),
                                  media_type="text/event-stream", slot=slot)
+
+
+_models_cache: dict[str, Any] = {"at": 0.0, "rows": []}
+
+
+@app.get("/api/models", dependencies=[Depends(guard)])
+async def models(prefix: str = "") -> dict:
+    """OpenRouter's live model catalogue (id, context length, prices), cached for ten minutes, so the
+    hosted UI can offer the same model pickers as the Gradio Settings tab."""
+    if time.monotonic() - _models_cache["at"] > 600 or not _models_cache["rows"]:
+        try:
+            _models_cache["rows"] = await llm.alist_models()
+            _models_cache["at"] = time.monotonic()
+        except Exception as exc:  # upstream catalogue down: answer with what we have
+            log.warning("model catalogue fetch failed: %s", exc)
+            if not _models_cache["rows"]:
+                raise HTTPException(status_code=502,
+                                    detail="Could not fetch the OpenRouter model list.") from exc
+    rows = [r for r in _models_cache["rows"] if r["id"].startswith(prefix)]
+    return {"models": rows, "count": len(rows), "defaults": llm.info()["models"]}
 
 
 @app.post("/api/report/pdf", dependencies=[Depends(guard)])
@@ -390,12 +423,18 @@ async def resume(thread_id: str, req: ResumeRequest) -> StreamingResponse:
     if not _graph_available():
         raise HTTPException(status_code=501, detail="Research graph not wired yet (see PLAN.md Phase 6).")
     slot = run_slots.acquire()
-    from deep_researcher.graph import resume_with_plan  # type: ignore[import-not-found]
+    from deep_researcher.graph import graph_for, resume_with_plan  # type: ignore[import-not-found]
 
-    def events():
-        return resume_with_plan(thread_id=thread_id, plan=req.plan.model_dump(),
-                                budget_seconds=RUN_BUDGET_SECONDS,
-                                config=tracing.run_config(thread_id, tags=["research"]))
+    async def events():
+        deps = make_deps(req.settings)
+        graph = await graph_for(deps) if deps else None      # None = the shared graph
+        if req.settings and not req.settings.is_empty():
+            yield "settings", req.settings.summary()
+        budget = effective_budget(req.settings, RUN_BUDGET_SECONDS)
+        cfg = tracing.run_config(thread_id, tags=["research"])
+        async for ev in resume_with_plan(thread_id=thread_id, plan=req.plan.model_dump(),
+                                         budget_seconds=budget, config=cfg, graph=graph):
+            yield ev
 
     inputs = {"thread_id": thread_id, "plan": req.plan.model_dump()}
     return SlotStreamingResponse(_run_stream("api.resume", thread_id, inputs, "research", slot, events),

@@ -67,7 +67,11 @@ def test_run_config_shape(tracing):
 @pytest.mark.anyio
 async def test_api_health_reports_tracing(tracing, monkeypatch):
     import httpx
-    from api.index import app
+
+    from test_api import _load_api
+
+    monkeypatch.setenv("LANGSMITH_TRACING", "false")   # the API loads .env, which may enable tracing
+    app = _load_api(monkeypatch).app        # a fresh module: other tests may have loaded it with a token
 
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://t") as c:
         body = (await c.get("/api/health")).json()

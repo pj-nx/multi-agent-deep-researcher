@@ -12,6 +12,13 @@ def anyio_backend():
 
 
 @pytest.fixture(autouse=True)
+def no_tracing(monkeypatch):
+    """Tests never trace: the API loads the developer's .env, which may switch LangSmith on, and a live
+    tracer's background threads would upload test runs and hold the interpreter open at exit."""
+    monkeypatch.setenv("LANGSMITH_TRACING", "false")
+
+
+@pytest.fixture(autouse=True)
 def fake_graph_streams(request, monkeypatch):
     """API tests must not run the real graph (it needs an LLM key); give them canned streams.
 
@@ -31,8 +38,12 @@ def fake_graph_streams(request, monkeypatch):
         yield "retrieve", {"node": "retrieve", "sub_question_id": "sq1", "sources": 2}
         yield "report", {"node": "report", "report": "# digest"}
 
+    async def fake_graph_for(deps=None):       # never build a real checkpointer behind the fakes
+        return None
+
     monkeypatch.setattr(G, "stream_until_interrupt", fake_stream_until_interrupt)
     monkeypatch.setattr(G, "resume_with_plan", fake_resume_with_plan)
+    monkeypatch.setattr(G, "graph_for", fake_graph_for)
 
 
 def pytest_configure(config):

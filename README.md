@@ -154,10 +154,16 @@ by default with the same light/dark toggle.
   adds a row), "Approve and run", the rendered report and PDF / Markdown / JSON downloads (PDF via
   `/api/report/pdf`, the others built in the browser).
 - **Settings tab**: the API bearer token (kept in `sessionStorage` for the tab only; the tab opens
-  itself when the server requires a token and none is set) and the server's effective configuration
-  from `/api/health`: models per role, embeddings, vector DB, checkpointer, active sources,
-  languages, tracing. Keys and models are set through environment variables on the host; only the
-  local Gradio app edits them in place.
+  itself when the server requires a token and none is set); **per-run model and parameter
+  overrides**: the model for each tier (heavy / worker / cheap, with "Load model list from
+  OpenRouter" filling a picker with ids and prices via `GET /api/models`), reasoning effort,
+  fallback models and the run budget (on the Research tab); and the server's effective
+  configuration from `/api/health`. Overrides are remembered in `localStorage` and sent as a
+  `settings` object with both the plan and the resume request, so they apply to that run only. A
+  hosted function has no writable `.env`, so this is how the hosted page offers what the Gradio
+  Settings tab does; API keys are never part of it and stay on the server. The server caps the
+  budget at its own `RUN_BUDGET_SECONDS` and validates model ids; the chosen models appear in the
+  activity log (`settings` event) and in the report's methodology section.
 - Vercel serves `public/` statically; everywhere else the API's `GET /` returns the same file. User
   input and streamed text are rendered as text nodes; the report Markdown is sanitised with DOMPurify.
 
@@ -285,11 +291,14 @@ public and never exposes secrets.
 |---|---|---|
 | GET | `/` | the hosted UI (`public/index.html`) |
 | GET | `/api/health` | liveness, graph/tracing/llm/embeddings/chunking config, enabled sources |
-| POST | `/api/research` | `{question, max_hops?}` → SSE stream until plan approval |
-| POST | `/api/research/{thread_id}/resume` | `{plan: ResearchPlan}` → SSE stream to final report |
+| GET | `/api/models` | OpenRouter's live model catalogue (id, context length, prices), cached 10 min; `?prefix=anthropic/` filters |
+| POST | `/api/research` | `{question, max_hops?, settings?}` → SSE stream until plan approval |
+| POST | `/api/research/{thread_id}/resume` | `{plan: ResearchPlan, settings?}` → SSE stream to final report |
 | POST | `/api/report/pdf` | `{markdown, title?}` → `application/pdf`; stateless, so the hosted page can turn the streamed report into a download |
 
-SSE events: `started` (with `trace_url`), `plan` (awaiting approval), one `retrieve` per sub-question (parallel),
+`settings` is optional per-run overrides: `{models: {heavy|worker|cheap|<role>: "vendor/model"}, reasoning_effort, fallback_models, budget_seconds}`; the server validates ids, caps the budget at `RUN_BUDGET_SECONDS`, builds that run's models from it and echoes the resolved values in a `settings` event.
+
+SSE events: `started` (with `trace_url`), `settings` (when overrides were sent), `plan` (awaiting approval), one `retrieve` per sub-question (parallel),
 `validate` (assessed/kept), `analyze` (claims, contradictions, gaps), `route_gaps` (next hop or stop), repeated per
 hop, then `insight` (hypotheses), `critic` (verdict, issues, follow-up; may loop back), `report` (Markdown in
 `report`, structured record in `report_json`, `stats`), `error`, `done`.

@@ -74,10 +74,11 @@
   .block { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px 14px; }
   .block label, .field > label { display:block; font-size:13px; font-weight:600; color:var(--ink-2); margin-bottom:6px; }
   .grow4 { flex:4 1 420px; } .grow1 { flex:1 1 240px; }
-  textarea, input[type=text], input[type=password], input[type=number] {
+  textarea, select, input[type=text], input[type=password], input[type=number] {
     width:100%; font:inherit; padding:9px 11px; border:1px solid var(--line-2); border-radius:8px;
     background:var(--bg); color:var(--ink); outline:none; }
-  textarea:focus, input:focus { border-color:var(--green); box-shadow:0 0 0 3px rgba(0,204,0,.3); }
+  textarea:focus, select:focus, input:focus { border-color:var(--green); box-shadow:0 0 0 3px rgba(0,204,0,.3); }
+  select { appearance:auto; }
   textarea { resize:vertical; min-height:64px; }
   input[type=range] { width:100%; accent-color:var(--green); }
   .range-row { display:flex; align-items:center; gap:10px; font-size:13px; color:var(--ink-3); }
@@ -163,9 +164,9 @@
       <div class="block grow1">
         <label for="hops">Max follow-up hops</label>
         <div class="range-row"><span>0</span><input id="hops" type="range" min="0" max="3" step="1" value="1"><span>3</span><output id="hops-out">1</output></div>
-        <label for="budget" style="margin-top:12px">Budget (seconds, server-set)</label>
-        <input id="budget" type="number" value="0" disabled>
-        <div class="hint">Set by <code>RUN_BUDGET_SECONDS</code> on the server.</div>
+        <label for="budget" style="margin-top:12px">Budget (seconds, 0 = server default)</label>
+        <input id="budget" type="number" min="0" max="3600" step="10" value="0">
+        <div class="hint" id="budget-hint">Retrieval loops stop after this many seconds per leg.</div>
       </div>
     </div>
     <div class="actions">
@@ -204,6 +205,25 @@
       <label for="token">API token</label>
       <input id="token" type="password" placeholder="Bearer token (only needed when the server requires one)" autocomplete="off">
       <div class="hint" id="auth-hint">Kept in this browser tab only (sessionStorage).</div>
+    </div>
+    <div class="dr-step">Models and run parameters (per run)</div>
+    <div class="block">
+      <div class="row">
+        <div class="grow1"><label for="m-heavy">Heavy tier model</label><input id="m-heavy" type="text" list="model-list" placeholder="server default" autocomplete="off"><div class="hint">planner, analysis, insight, critic</div></div>
+        <div class="grow1"><label for="m-worker">Worker tier model</label><input id="m-worker" type="text" list="model-list" placeholder="server default" autocomplete="off"><div class="hint">retriever, report</div></div>
+        <div class="grow1"><label for="m-cheap">Cheap tier model</label><input id="m-cheap" type="text" list="model-list" placeholder="server default" autocomplete="off"><div class="hint">validator, grader</div></div>
+      </div>
+      <datalist id="model-list"></datalist>
+      <div class="row" style="margin-top:12px">
+        <div class="grow1"><label for="effort">Reasoning effort</label>
+          <select id="effort"><option value="">server default</option><option value="none">none</option><option value="minimal">minimal</option><option value="low">low</option><option value="medium">medium</option><option value="high">high</option></select></div>
+        <div class="grow4"><label for="fallbacks">Fallback models (comma separated)</label><input id="fallbacks" type="text" placeholder="e.g. anthropic/claude-sonnet-5, openai/gpt-5.1" autocomplete="off"></div>
+      </div>
+      <div class="actions" style="margin-bottom:0">
+        <button id="load-models" class="btn" type="button">Load model list from OpenRouter</button>
+        <button id="reset-settings" class="btn" type="button">Reset to server defaults</button>
+        <span class="hint" id="settings-status">Sent with each run; remembered in this browser. Keys stay on the server.</span>
+      </div>
     </div>
     <div class="dr-step">Effective server configuration</div>
     <div class="block"><dl class="kv" id="config"><dt>status</dt><dd id="health">checking…</dd></dl></div>
@@ -350,8 +370,9 @@
       case 'tool_end': return `[${s}]     ${d.sub_question_id}: ${d.tool} returned ${d.results} in ${d.elapsed_s}s`;
       case 'tool_timeout': return `[${s}]     ${d.sub_question_id}: ${d.tool} timed out after ${d.elapsed_s}s (${d.results} kept)`;
       case 'embed_start': return `[${s}]     ${d.sub_question_id}: embedding ${d.sources} sources ...`;
-      case 'embed_end': return `[${s}]     ${d.sub_question_id}: stored ${d.chunks ?? ''} chunks in ${d.elapsed_s}s`;
-      default: return `[${s}]     ${d.kind}: ${JSON.stringify(d).slice(0, 160)}`;
+      case 'embed_end': return `[${s}]     ${d.sub_question_id}: stored ${d.chunks ?? ''} chunks`;
+      case 'retrieval': return `[${s}]     ${d.label}`;
+      default: { const { kind, t, ...rest } = d; return `[${s}]     ${kind}: ${JSON.stringify(rest).slice(0, 160)}`; }
     }
   }
   function formatEvent(event, d) {
@@ -377,6 +398,14 @@
         return line;
       }
       case 'report': return `[${s}] report ready: ${JSON.stringify(d.stats || {})}`;
+      case 'settings': {
+        const m = d.models || {};
+        const parts = [`heavy ${m.planner}`, `worker ${m.report}`, `cheap ${m.validator}`];
+        if (d.reasoning_effort) parts.push(`effort ${d.reasoning_effort}`);
+        if (d.fallback_models) parts.push(`fallbacks ${d.fallback_models.join(', ')}`);
+        if (d.budget_seconds != null) parts.push(`budget ${d.budget_seconds}s`);
+        return `[${s}] run settings: ${parts.join(' · ')}`;
+      }
       case 'activity': return formatActivity(d, s);
       case 'error': return `[${s}] ERROR: ${d.message}`;
       case 'started': case 'done': case 'approve': return `[${s}] ${event}` + (d.elapsed_s ? ` (${d.elapsed_s}s)` : '');
@@ -457,6 +486,50 @@
     if (buf.trim()) yield parseBlock(buf);
   }
 
+  // ---------------------------------------------------------------- per-run settings (models, effort, fallbacks, budget)
+  const SETTING_IDS = ['m-heavy', 'm-worker', 'm-cheap', 'effort', 'fallbacks', 'budget'];
+  const TIER_OF = { 'm-heavy': 'heavy', 'm-worker': 'worker', 'm-cheap': 'cheap' };
+  let budgetCap = 0;
+  function runSettings() {
+    const models = {};
+    for (const id of ['m-heavy', 'm-worker', 'm-cheap']) { const v = $(id).value.trim(); if (v) models[TIER_OF[id]] = v; }
+    const s = {};
+    if (Object.keys(models).length) s.models = models;
+    if ($('effort').value) s.reasoning_effort = $('effort').value;
+    const fb = $('fallbacks').value.split(',').map(x => x.trim()).filter(Boolean);
+    if (fb.length) s.fallback_models = fb.slice(0, 5);
+    const budget = Number($('budget').value);
+    if (budget > 0) s.budget_seconds = Math.min(budget, 3600);
+    return Object.keys(s).length ? s : null;
+  }
+  function saveSettings() {
+    const saved = {}; for (const id of SETTING_IDS) saved[id] = $(id).value;
+    try { localStorage.setItem('dr-run-settings', JSON.stringify(saved)); } catch (_) {}
+  }
+  try {
+    const saved = JSON.parse(localStorage.getItem('dr-run-settings') || '{}');
+    for (const id of SETTING_IDS) if (saved[id] != null) $(id).value = saved[id];
+  } catch (_) {}
+  for (const id of SETTING_IDS) $(id).addEventListener('change', saveSettings);
+  $('reset-settings').addEventListener('click', () => { for (const id of SETTING_IDS) $(id).value = ''; $('budget').value = 0; saveSettings(); });
+  $('load-models').addEventListener('click', async () => {
+    const b = $('load-models'); b.disabled = true; $('settings-status').textContent = 'Loading model list...';
+    try {
+      const res = await fetch('/api/models', { headers: authHeaders() });
+      if (!res.ok) { $('settings-status').textContent = `Model list failed: ${res.status}`; return; }
+      const { models } = await res.json();
+      const dl = $('model-list'); dl.textContent = '';
+      for (const m of models) {
+        const o = document.createElement('option'); o.value = m.id;
+        const pin = Number(m.prompt_price) * 1e6, pout = Number(m.completion_price) * 1e6;
+        o.label = `${m.id}  ·  $${pin.toFixed(2)} / $${pout.toFixed(2)} per 1M tok`;
+        dl.appendChild(o);
+      }
+      $('settings-status').textContent = `${models.length} models loaded; start typing a vendor (e.g. "anthropic/") to pick one.`;
+    } catch (err) { $('settings-status').textContent = `Model list failed: ${err.message || err}`; }
+    finally { b.disabled = false; }
+  });
+
   // ---------------------------------------------------------------- health / settings
   const kv = $('config');
   function row(k, v) { const dt = document.createElement('dt'); dt.textContent = k; const dd = document.createElement('dd'); dd.textContent = v; kv.append(dt, dd); }
@@ -465,9 +538,16 @@
     row('status', `${h.status} · graph ${h.graph_wired ? 'wired' : 'not wired'} · auth ${h.auth_required ? 'required' : 'off'}`);
     row('max hops / budget', `${h.max_hops} / ${h.run_budget_seconds || 'none'} s`);
     $('hops').value = Math.min(3, h.max_hops ?? 1); $('hops-out').value = $('hops').value;
-    $('budget').value = h.run_budget_seconds || 0;
+    budgetCap = (h.run_settings && h.run_settings.budget_cap_seconds) || h.run_budget_seconds || 0;
+    $('budget-hint').textContent = budgetCap ? `Server default and cap: ${budgetCap} s per leg; a smaller value shortens the run.`
+                                             : 'No server cap; 0 means no budget.';
     const models = h.llm && h.llm.models ? h.llm.models : (h.llm || {});
     row('models', typeof models === 'object' ? Object.entries(models).map(([k, v]) => `${k}: ${v}`).join('\n') : String(models));
+    row('reasoning effort', (h.llm && h.llm.reasoning_effort) || 'model default');
+    row('fallback models', (h.llm && h.llm.fallback_models && h.llm.fallback_models.length) ? h.llm.fallback_models.join(', ') : 'none');
+    $('m-heavy').placeholder = `server default: ${models.planner || ''}`;
+    $('m-worker').placeholder = `server default: ${models.report || ''}`;
+    $('m-cheap').placeholder = `server default: ${models.validator || ''}`;
     row('embeddings', h.embeddings ? (h.embeddings.embedding_id || h.embeddings.error || 'n/a') : 'n/a');
     row('vector db', h.vector_db ? `${h.vector_db.mode || ''} ${h.vector_db.collection || ''}`.trim() : 'n/a');
     row('checkpointer', h.checkpointer ? h.checkpointer.kind : 'n/a');
@@ -493,9 +573,12 @@
     tbody.textContent = ''; activity.textContent = ''; resetPipeline();
     setBusy('Planning...');
     try {
-      for await (const { event, data } of sse('/api/research', { question, max_hops: Number($('hops').value) })) {
+      const body = { question, max_hops: Number($('hops').value) };
+      const settings = runSettings(); if (settings) body.settings = settings;
+      for await (const { event, data } of sse('/api/research', body)) {
         if (event === 'started') threadId = data.thread_id;
-        pipelineEvent(event, data); logLine(formatEvent(event, data), event === 'error');
+        if (event !== 'settings') pipelineEvent(event, data);
+        logLine(formatEvent(event, data), event === 'error');
         if (event === 'plan' && data.status === 'awaiting_approval') { planToRows(data.plan || { sub_questions: [] }); setBusy('Review the plan below, then approve.'); }
         if (event === 'error') threadId = null;
       }
@@ -511,8 +594,10 @@
     pipe.expected = plan.sub_questions.length;            // the approved (possibly edited) plan
     set('plan', 'done', `${pipe.expected} sub-questions`); renderPipeline();
     try {
-      for await (const { event, data } of sse(`/api/research/${threadId}/resume`, { plan })) {
-        if (event !== 'started') pipelineEvent(event, data);   // the plan box already shows the plan
+      const body = { plan };
+      const settings = runSettings(); if (settings) body.settings = settings;
+      for await (const { event, data } of sse(`/api/research/${threadId}/resume`, body)) {
+        if (event !== 'started' && event !== 'settings') pipelineEvent(event, data);   // plan box already set
         logLine(formatEvent(event, data), event === 'error');
         if (event === 'report' && data.report) {
           lastReport = { markdown: data.report, json: data.report_json, title: (data.report_json || {}).title };
