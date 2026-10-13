@@ -64,17 +64,19 @@ def kept_evidence(state: dict[str, Any]) -> list[dict[str, Any]]:
     return [e for e in state.get("evidence", []) if (assessments.get(e["id"]) or {}).get("keep", True)]
 
 
-def bibliography(state: dict[str, Any], max_items: int = 80) -> tuple[str, set[str]]:
+def bibliography(state: dict[str, Any], max_items: int = 80,
+                 evidence: list[dict[str, Any]] | None = None) -> tuple[str, set[str]]:
     """Compact source list for prompts: ``[E-id] (type, date, cred) title`` and the set of allowed ids."""
     assessments = state.get("assessments") or {}
+    evidence = kept_evidence(state) if evidence is None else evidence
     rows = []
-    for e in kept_evidence(state)[:max_items]:
+    for e in evidence[:max_items]:
         cred = (assessments.get(e["id"]) or {}).get("credibility", e.get("credibility")) or 0.5
         rows.append(
             f"[{e['id']}] ({e['source_type']}, {e.get('published_at') or 'n.d.'}, cred={cred:.2f}) "
             f"{(e.get('title') or e['url'])[:120]}"
         )
-    return "\n".join(rows), {e["id"] for e in kept_evidence(state)}
+    return "\n".join(rows), {e["id"] for e in evidence}
 
 
 def summaries_text(state: dict[str, Any], max_chars: int = 2500) -> str:

@@ -70,13 +70,24 @@ def write_report(question: str, markdown: str, report_json: dict[str, Any] | Non
     """
     out = out_dir or reports_dir()
     out.mkdir(parents=True, exist_ok=True)
-    stem = f"{time.strftime('%Y%m%d-%H%M%S')}-{slugify(question)}"
-    md_path = out / f"{stem}.md"
-    md_path.write_text(markdown)
+    base = f"{time.strftime('%Y%m%d-%H%M%S')}-{slugify(question)}"
+    suffix = 1
+    while True:
+        stem = base if suffix == 1 else f"{base}-{suffix}"
+        md_path = out / f"{stem}.md"
+        if any((out / f"{stem}{ext}").exists() for ext in (".json", ".pdf")):
+            suffix += 1
+            continue
+        try:
+            with md_path.open("x", encoding="utf-8") as f:
+                f.write(markdown)
+            break
+        except FileExistsError:
+            suffix += 1
     json_path = None
     if report_json:
         json_path = out / f"{stem}.json"
-        json_path.write_text(json.dumps(report_json, indent=2, default=str))
+        json_path.write_text(json.dumps(report_json, indent=2, default=str), encoding="utf-8")
     pdf_path = None
     if pdf:
         try:
