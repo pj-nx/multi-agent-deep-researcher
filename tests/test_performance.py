@@ -6,9 +6,9 @@ from typing import Any
 
 import pytest
 
+import deep_researcher.llm as llm
 from deep_researcher import reports
 from deep_researcher.graph import select_gaps
-from deep_researcher.llm import LLMConfigError, max_tokens
 from deep_researcher.schemas import EvidenceChunk
 from deep_researcher.store import EvidenceStore
 
@@ -141,5 +141,5 @@ def test_zero_gap_limit_does_not_schedule_a_branch() -> None:
 def test_llm_token_budget_must_be_positive(monkeypatch: pytest.MonkeyPatch, value: str) -> None:
     monkeypatch.setenv("OPENROUTER_MAX_TOKENS", value)
 
-    with pytest.raises(LLMConfigError, match="positive integer"):
-        max_tokens("planner")
+    with pytest.raises(llm.LLMConfigError, match="positive integer"):
+        llm.max_tokens("planner")
