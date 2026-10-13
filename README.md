@@ -61,6 +61,7 @@ shows the planner's sub-questions and asks before retrieving. The same graph ser
 ```bash
 uv run python -m deep_researcher.ui        # Gradio UI at http://127.0.0.1:7860 (uv sync --extra ui)
 uv run uvicorn api.index:app --reload      # HTTP API at http://localhost:8000; the hosted UI (public/index.html) at /
+uv run --extra dashboard python -m deep_researcher --dashboard  # optional Streamlit saved-report dashboard
 ```
 
 The Gradio UI (flat, minimalist; Matrix-green accent on white, dark by default, with a toggle that remembers your
@@ -74,6 +75,20 @@ catalogue), fallback models and reasoning effort, the embeddings provider/model/
 collection, and run limits. "Test OpenRouter key" makes one tiny call and reports the latency.
 
 ## Sources
+
+### Streamlit report dashboard
+
+The optional dashboard browses saved JSON/Markdown reports without replacing the Gradio research UI:
+
+```bash
+uv sync --extra dashboard
+uv run python -m deep_researcher --dashboard
+```
+
+It reads reports from `REPORTS_DIR` (default `reports/`). Local access is open by default. To require
+a shared password, set `DASHBOARD_PASSWORD` in `.env` before starting Streamlit; unset it to disable
+the login prompt. Keep this dashboard on a trusted network unless you provide an authenticated,
+TLS-terminating reverse proxy.
 
 Which tools run is decided per sub-question from the planner's `source_types`, and per tool by
 whether its key is present (`/api/health` → `sources`). Keyless tools are always on.

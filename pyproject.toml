@@ -42,6 +42,7 @@ agents = [
     "python-dotenv>=1.0",
 ]
 ui = ["gradio>=5.22"]
+dashboard = ["streamlit>=1.57"]
 # Persistent vector DB (embedded Chroma; same client talks to Chroma server/cloud).
 vectordb = ["chromadb>=1.0"]
 # Pick ONE embeddings backend. `local` needs no API key and no server.

@@ -68,15 +68,23 @@ def _print(event: str, data: dict) -> None:
 def main() -> None:
     load_dotenv()
     p = argparse.ArgumentParser(prog="deep_researcher")
-    p.add_argument("question")
+    p.add_argument("question", nargs="?")
     p.add_argument("--max-hops", type=int, default=1)
     p.add_argument("--budget", type=int, default=None, help="seconds before retrieval loops stop")
     p.add_argument("--auto-approve", action="store_true")
     p.add_argument("--out", default="reports")
+    p.add_argument("--dashboard", action="store_true", help="launch the optional Streamlit report dashboard")
     from deep_researcher.guardrails import GuardrailViolation
 
     try:
-        sys.exit(asyncio.run(_main(p.parse_args())))
+        args = p.parse_args()
+        if args.dashboard:
+            from deep_researcher.ui import launch_dashboard
+
+            sys.exit(launch_dashboard())
+        if not args.question:
+            p.error("question is required unless --dashboard is selected")
+        sys.exit(asyncio.run(_main(args)))
     except GuardrailViolation as exc:
         sys.exit(f"{exc}")
 

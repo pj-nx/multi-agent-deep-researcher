@@ -19,6 +19,7 @@ def isolated_env(monkeypatch):
     monkeypatch.setenv("DR_LOAD_DOTENV", "0")
     monkeypatch.setenv("LANGSMITH_TRACING", "false")
     monkeypatch.delenv("ALLOWED_MODELS", raising=False)
+    monkeypatch.delenv("DASHBOARD_PASSWORD", raising=False)
 
 
 @pytest.fixture(autouse=True)

@@ -544,5 +544,14 @@ def main() -> None:
                         theme=build_theme(), css=CSS)
 
 
+def launch_dashboard() -> int:
+    """Launch the optional Streamlit report browser without changing the Gradio UI entry point."""
+    import subprocess
+    import sys
+
+    dashboard = Path(__file__).with_name("dashboard.py")
+    return subprocess.call([sys.executable, "-m", "streamlit", "run", str(dashboard)])
+
+
 if __name__ == "__main__":
     main()
