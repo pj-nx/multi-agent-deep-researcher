@@ -136,6 +136,8 @@ class EvidenceStore:
     def add_chunks(self, chunks: Sequence[EvidenceChunk]) -> int:
         if not chunks:
             return 0
+        # Embed every batch before writing any: a provider failure part-way leaves the collection untouched.
+        batches: list[tuple[Sequence[EvidenceChunk], list[list[float]]]] = []
         for start in range(0, len(chunks), EMBEDDING_BATCH_SIZE):
             batch = chunks[start:start + EMBEDDING_BATCH_SIZE]
             vectors = self.embeddings.embed_documents([c.text for c in batch])
@@ -143,10 +145,12 @@ class EvidenceStore:
                 raise ValueError(
                     f"embedding provider returned {len(vectors)} vectors for {len(batch)} chunks"
                 )
-            dimensions = {len(vector) for vector in vectors}
-            if len(dimensions) != 1:
-                raise ValueError(f"embedding provider returned inconsistent vector dimensions: {dimensions}")
-            self._record_dim(len(vectors[0]))
+            batches.append((batch, vectors))
+        dimensions = {len(vector) for _, vectors in batches for vector in vectors}
+        if len(dimensions) != 1:
+            raise ValueError(f"embedding provider returned inconsistent vector dimensions: {dimensions}")
+        self._record_dim(dimensions.pop())
+        for batch, vectors in batches:
             self.collection.upsert(
                 ids=[c.id for c in batch],
                 embeddings=vectors,

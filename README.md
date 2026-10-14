@@ -85,10 +85,10 @@ uv sync --extra dashboard
 uv run python -m deep_researcher --dashboard
 ```
 
-It reads reports from `REPORTS_DIR` (default `reports/`). Local access is open by default. To require
-a shared password, set `DASHBOARD_PASSWORD` in `.env` before starting Streamlit; unset it to disable
-the login prompt. Keep this dashboard on a trusted network unless you provide an authenticated,
-TLS-terminating reverse proxy.
+It reads reports from `--out` if given, else `REPORTS_DIR` (default `reports/`). Without a password it
+listens on `127.0.0.1` only, with no login. Set `DASHBOARD_PASSWORD` in `.env` to require a shared
+password; the dashboard then listens on all interfaces. Keep it on a trusted network unless you
+provide an authenticated, TLS-terminating reverse proxy.
 
 Which tools run is decided per sub-question from the planner's `source_types`, and per tool by
 whether its key is present (`/api/health` → `sources`). Keyless tools are always on.

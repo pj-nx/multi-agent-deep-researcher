@@ -1,7 +1,8 @@
 # Copyright (c) 2026 C10 Hackathon G1
 """Optional Streamlit dashboard for browsing generated research reports.
 
-Run with ``uv run streamlit run src/deep_researcher/dashboard.py -- --reports-dir reports``.
+Run with ``uv run python -m deep_researcher --dashboard [--out reports]``, or directly with
+``REPORTS_DIR=reports uv run streamlit run src/deep_researcher/dashboard.py``.
 """
 from __future__ import annotations
 
@@ -16,6 +17,27 @@ from deep_researcher.dashboard_data import (
     load_report,
     verify_password,
 )
+from deep_researcher.reports import reports_dir
+
+
+def launch_command(password: str | None) -> list[str]:
+    """``streamlit run`` for this file; bound to localhost unless a dashboard password is configured."""
+    import sys
+
+    cmd = [sys.executable, "-m", "streamlit", "run", str(Path(__file__))]
+    if not auth_required(password):
+        cmd += ["--server.address", "127.0.0.1"]
+    return cmd
+
+
+def launch_dashboard(out_dir: Path | None = None) -> int:
+    """Launch the dashboard in a Streamlit subprocess; ``out_dir`` overrides ``REPORTS_DIR``."""
+    import subprocess
+
+    env = dict(os.environ)
+    if out_dir is not None:
+        env["REPORTS_DIR"] = str(out_dir)
+    return subprocess.call(launch_command(env.get("DASHBOARD_PASSWORD")), env=env)
 
 
 def _authenticated(st: Any, password: str | None) -> bool:
@@ -36,25 +58,35 @@ def _authenticated(st: Any, password: str | None) -> bool:
 def main() -> None:
     import streamlit as st
 
-    from deep_researcher.reports import reports_dir
-
     st.set_page_config(page_title="Deep Researcher", page_icon="🔎", layout="wide")
     st.title("Multi-Agent Deep Researcher")
     if not _authenticated(st, os.getenv("DASHBOARD_PASSWORD")):
         st.info("Sign in to view saved reports.")
         return
 
-    report_dir = Path(os.getenv("REPORTS_DIR") or reports_dir())
-    reports = list_reports(report_dir)
-    if not reports:
+    # Streamlit reruns this script on every interaction; re-parse a report only when its file changes.
+    @st.cache_data(show_spinner=False)
+    def read(path: str, mtime_ns: int) -> dict[str, Any]:
+        return load_report(Path(path))
+
+    report_dir = reports_dir()
+    report_data: dict[Path, dict[str, Any]] = {}
+    unreadable: list[str] = []
+    for path in list_reports(report_dir):
+        try:
+            report_data[path] = read(str(path), path.stat().st_mtime_ns)
+        except (OSError, ValueError):  # JSONDecodeError is a ValueError; one bad file must not hide the rest
+            unreadable.append(path.name)
+    if unreadable:
+        st.warning(f"Skipped {len(unreadable)} unreadable report(s): {', '.join(unreadable)}")
+    if not report_data:
         st.info(f"No saved reports in `{report_dir}` yet. Run a research question with the CLI or Gradio UI.")
         return
 
-    report_data = {path: load_report(path) for path in reports}
     selected = st.selectbox(
         "Saved reports",
-        reports,
-        format_func=lambda path: f"{path.stem} — {report_data[path].get('question', '')[:90]}",
+        list(report_data),
+        format_func=lambda path: f"{path.stem} — {str(report_data[path].get('question') or '')[:90]}",
     )
     report = report_data[selected]
     st.header(str(report.get("title") or selected.stem))

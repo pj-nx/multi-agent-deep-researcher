@@ -51,7 +51,8 @@ async def _main(args: argparse.Namespace) -> int:
     tracing.flush()
     await G.aclose()
     if report:
-        path, json_path, pdf_path = write_report(args.question, report, report_json, Path(args.out))
+        out = Path(args.out or "reports")
+        path, json_path, pdf_path = write_report(args.question, report, report_json, out)
         extras = [x for x, ok in ((".json", json_path), (".pdf", pdf_path)) if ok]
         print(f"\nreport written to {path}" + (f" (+ {', '.join(extras)})" if extras else ""))
     return 0
@@ -72,16 +73,19 @@ def main() -> None:
     p.add_argument("--max-hops", type=int, default=1)
     p.add_argument("--budget", type=int, default=None, help="seconds before retrieval loops stop")
     p.add_argument("--auto-approve", action="store_true")
-    p.add_argument("--out", default="reports")
+    p.add_argument("--out", default=None,
+                   help="report directory (default: reports/; with --dashboard, REPORTS_DIR)")
     p.add_argument("--dashboard", action="store_true", help="launch the optional Streamlit report dashboard")
     from deep_researcher.guardrails import GuardrailViolation
 
     try:
         args = p.parse_args()
         if args.dashboard:
-            from deep_researcher.ui import launch_dashboard
+            if args.question:
+                p.error("--dashboard does not take a question")
+            from deep_researcher.dashboard import launch_dashboard
 
-            sys.exit(launch_dashboard())
+            sys.exit(launch_dashboard(Path(args.out) if args.out else None))
         if not args.question:
             p.error("question is required unless --dashboard is selected")
         sys.exit(asyncio.run(_main(args)))

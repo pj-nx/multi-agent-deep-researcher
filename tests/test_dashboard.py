@@ -44,3 +44,35 @@ def test_report_loader_rejects_non_object_json(tmp_path) -> None:
 
     with pytest.raises(ValueError, match="JSON object"):
         load_report(report)
+
+
+def test_password_check_handles_non_ascii() -> None:
+    assert verify_password("pässwort", "pässwort")
+    assert not verify_password("é", "secret")
+    assert not verify_password("secret", "pässwort")
+
+
+def test_dashboard_binds_localhost_unless_password_set() -> None:
+    from deep_researcher.dashboard import launch_command
+
+    assert launch_command(None)[-2:] == ["--server.address", "127.0.0.1"]
+    assert "--server.address" not in launch_command("secret")
+
+
+def test_cli_passes_out_dir_to_dashboard_and_rejects_question(monkeypatch, tmp_path) -> None:
+    import sys
+
+    import deep_researcher.__main__ as cli
+    import deep_researcher.dashboard as dashboard
+
+    launched = []
+    monkeypatch.setattr(dashboard, "launch_dashboard", lambda out=None: launched.append(out) or 0)
+    monkeypatch.setattr(sys, "argv", ["deep_researcher", "--dashboard", "--out", str(tmp_path)])
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+    assert exc.value.code == 0 and launched == [tmp_path]
+
+    monkeypatch.setattr(sys, "argv", ["deep_researcher", "a question", "--dashboard"])
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+    assert exc.value.code == 2 and len(launched) == 1

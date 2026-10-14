@@ -93,6 +93,25 @@ def test_add_chunks_batches_embedding_requests_and_upserts(monkeypatch: pytest.M
     assert collection.metadata["embedding_dim"] == 2
 
 
+def test_add_chunks_writes_nothing_when_a_later_batch_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("deep_researcher.store.evidence_store.EMBEDDING_BATCH_SIZE", 2)
+
+    class _FailingEmbeddings(_Embeddings):
+        def embed_documents(self, texts: list[str]) -> list[list[float]]:
+            if len(self.document_batches) == 2:
+                raise RuntimeError("rate limited")
+            return super().embed_documents(texts)
+
+    collection = _Collection()
+    store = _bare_store(_FailingEmbeddings(), collection)
+
+    with pytest.raises(RuntimeError, match="rate limited"):
+        store.add_chunks([_chunk(i) for i in range(5)])
+
+    assert collection.upserts == []
+    assert collection.metadata == {}
+
+
 def test_query_reads_collection_count_only_once() -> None:
     embeddings = _Embeddings()
     collection = _Collection()

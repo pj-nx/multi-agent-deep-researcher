@@ -39,4 +39,4 @@ def verify_password(candidate: str, configured: str | None) -> bool:
     """Constant-time password check; an unconfigured dashboard remains open."""
     import hmac
 
-    return not configured or hmac.compare_digest(candidate, configured)
+    return not configured or hmac.compare_digest(candidate.encode(), configured.encode())
