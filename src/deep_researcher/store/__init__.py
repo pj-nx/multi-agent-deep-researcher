@@ -3,6 +3,7 @@
 
 from deep_researcher.store.chunking import chunk_text, count_tokens
 from deep_researcher.store.evidence_store import (
+    EMBEDDING_BATCH_SIZE,
     EmbeddingMismatchError,
     EvidenceStore,
     Hit,
@@ -12,5 +13,6 @@ from deep_researcher.store.evidence_store import (
     store_info,
 )
 
-__all__ = ["EmbeddingMismatchError", "EvidenceStore", "Hit", "chunk_text", "count_tokens", "get_store",
+__all__ = ["EMBEDDING_BATCH_SIZE", "EmbeddingMismatchError", "EvidenceStore", "Hit", "chunk_text",
+           "count_tokens", "get_store",
            "make_chroma_client", "reset_store_cache", "store_info"]

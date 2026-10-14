@@ -96,6 +96,9 @@ def select_gaps(gaps: list[dict[str, Any]], summaries: dict[str, dict[str, Any]]
                 limit: int) -> list[dict[str, Any]]:
     """De-duplicate near-identical gaps (Jaccard >= 0.5 on content words) and keep the ``limit`` most
     valuable: gaps from the least-answered sub-questions first (fewest claims), then by order raised."""
+    if limit <= 0:
+        return []
+
     def need(g: dict[str, Any]) -> int:
         return len((summaries.get(g.get("parent_sub_question_id", "")) or {}).get("claims", []))
 

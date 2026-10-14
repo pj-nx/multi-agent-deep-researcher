@@ -91,10 +91,11 @@ def _methodology_md(state: dict[str, Any], deps: Deps, stats: dict[str, Any]) ->
     return lines
 
 
-def _bibliography_md(state: dict[str, Any]) -> list[str]:
+def _bibliography_md(state: dict[str, Any], evidence: list[dict[str, Any]] | None = None) -> list[str]:
     assessments = state.get("assessments") or {}
     lines = ["## Sources", ""]
-    for e in sorted(kept_evidence(state), key=lambda e: (e["sub_question_id"], e["id"])):
+    evidence = kept_evidence(state) if evidence is None else evidence
+    for e in sorted(evidence, key=lambda e: (e["sub_question_id"], e["id"])):
         a = assessments.get(e["id"]) or {}
         cred = a.get("credibility", e.get("credibility")) or 0.5
         date = f" ({e['published_at']})" if e.get("published_at") else ""
@@ -117,7 +118,8 @@ def _plan_md(state: dict[str, Any]) -> list[str]:
 
 
 async def report_node(state: dict[str, Any], deps: Deps) -> dict[str, Any]:
-    bib, allowed = bibliography(state, max_items=200)
+    kept = kept_evidence(state)
+    bib, allowed = bibliography(state, max_items=200, evidence=kept)
     insights = state.get("insights") or []
     critiques = state.get("critiques") or []
     crit_text = "\n".join(
@@ -157,7 +159,6 @@ async def report_node(state: dict[str, Any], deps: Deps) -> dict[str, Any]:
     verified = len({i for t in [exec_summary, *findings] for i in cited_ids(t)})
 
     evidence = state.get("evidence", [])
-    kept = kept_evidence(state)
     summaries = state.get("summaries") or {}
     gaps = state.get("gaps", [])
     health = summarise(degradations)
@@ -232,7 +233,7 @@ async def report_node(state: dict[str, Any], deps: Deps) -> dict[str, Any]:
             for g in gaps
             if g["question"].lower() not in pursued
         ] + [""]
-    lines += _methodology_md(state, deps, stats) + _plan_md(state) + _bibliography_md(state)
+    lines += _methodology_md(state, deps, stats) + _plan_md(state) + _bibliography_md(state, kept)
     md = "\n".join(lines)
     report_json = {
         "title": out.title,

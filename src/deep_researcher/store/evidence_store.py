@@ -32,6 +32,7 @@ DEFAULT_PATH = ".chroma"
 DEFAULT_COLLECTION = "evidence"
 _META_EMBEDDING_ID = "embedding_id"
 _META_EMBEDDING_DIM = "embedding_dim"
+EMBEDDING_BATCH_SIZE = 128
 
 
 class EmbeddingMismatchError(RuntimeError):
@@ -135,21 +136,35 @@ class EvidenceStore:
     def add_chunks(self, chunks: Sequence[EvidenceChunk]) -> int:
         if not chunks:
             return 0
-        vectors = self.embeddings.embed_documents([c.text for c in chunks])
-        self._record_dim(len(vectors[0]))
-        self.collection.upsert(
-            ids=[c.id for c in chunks],
-            embeddings=vectors,
-            documents=[c.text for c in chunks],
-            metadatas=[_clean_meta(c.model_dump(exclude={"id", "text"})) for c in chunks],
-        )
+        # Embed every batch before writing any: a provider failure part-way leaves the collection untouched.
+        batches: list[tuple[Sequence[EvidenceChunk], list[list[float]]]] = []
+        for start in range(0, len(chunks), EMBEDDING_BATCH_SIZE):
+            batch = chunks[start:start + EMBEDDING_BATCH_SIZE]
+            vectors = self.embeddings.embed_documents([c.text for c in batch])
+            if len(vectors) != len(batch) or not vectors:
+                raise ValueError(
+                    f"embedding provider returned {len(vectors)} vectors for {len(batch)} chunks"
+                )
+            batches.append((batch, vectors))
+        dimensions = {len(vector) for _, vectors in batches for vector in vectors}
+        if len(dimensions) != 1:
+            raise ValueError(f"embedding provider returned inconsistent vector dimensions: {dimensions}")
+        self._record_dim(dimensions.pop())
+        for batch, vectors in batches:
+            self.collection.upsert(
+                ids=[c.id for c in batch],
+                embeddings=vectors,
+                documents=[c.text for c in batch],
+                metadatas=[_clean_meta(c.model_dump(exclude={"id", "text"})) for c in batch],
+            )
         return len(chunks)
 
     # ------------------------------------------------------------------ read
     def query(self, text: str, *, k: int = 10, sub_question_id: str | None = None,
               sub_question_ids: Sequence[str] | None = None, evidence_ids: Sequence[str] | None = None,
               where: dict[str, Any] | None = None) -> list[Hit]:
-        if self.count() == 0:
+        count = self.count()
+        if count == 0 or k <= 0:
             return []
         clauses: list[dict[str, Any]] = []
         if sub_question_id:
@@ -164,7 +179,7 @@ class EvidenceStore:
             clauses.append(where)
         filt = None if not clauses else (clauses[0] if len(clauses) == 1 else {"$and": clauses})
         vec = self.embeddings.embed_query(text)
-        res = self.collection.query(query_embeddings=[vec], n_results=min(k, self.count()), where=filt,
+        res = self.collection.query(query_embeddings=[vec], n_results=min(k, count), where=filt,
                                     include=["documents", "metadatas", "distances"])
         hits: list[Hit] = []
         for cid, doc, meta, dist in zip(res["ids"][0], res["documents"][0], res["metadatas"][0],

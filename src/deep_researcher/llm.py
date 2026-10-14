@@ -166,9 +166,12 @@ def max_tokens(role: str) -> int:
     if not raw:
         return default
     try:
-        return int(raw)
+        value = int(raw)
     except ValueError:
         raise LLMConfigError(f"OPENROUTER_MAX_TOKENS={raw!r}; expected an integer") from None
+    if value <= 0:
+        raise LLMConfigError(f"OPENROUTER_MAX_TOKENS={raw!r}; expected a positive integer")
+    return value
 
 
 def attribution_headers() -> dict[str, str]:
